@@ -110,12 +110,10 @@ Recommended modes:
 
 ## API
 
-Base prefix: `/api/v1`
+Business API base prefix: `/api/v1`
 
-Endpoints:
+Business endpoints:
 
-- `GET /v1/models`
-- `POST /v1/chat/completions`
 - `POST /sessions`
 - `POST /sessions/{session_id}/messages`
 - `GET /sessions/{session_id}`
@@ -252,7 +250,7 @@ Sources:
 
 Example config shipped in this repo:
 
-- [examples/litellm/config.yaml](/Users/g1lom/Documents/brainstorm-agent/examples/litellm/config.yaml)
+- [examples/litellm/config.yaml](examples/litellm/config.yaml)
 
 Example:
 

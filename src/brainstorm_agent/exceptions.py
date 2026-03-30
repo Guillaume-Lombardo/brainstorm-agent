@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+MISSING_USER_MESSAGE_ERROR = "The request must include at least one user message with text content."
+
 
 class PackageError(Exception):
     """Root exception for the package."""
@@ -112,7 +114,7 @@ class InvalidOpenAIRequestError(PackageError):
         Returns:
             InvalidOpenAIRequestError: Request validation error.
         """
-        return cls(message="The request must include at least one user message with text content.")
+        return cls(message=MISSING_USER_MESSAGE_ERROR)
 
     def __str__(self) -> str:
         """Return error message payload."""

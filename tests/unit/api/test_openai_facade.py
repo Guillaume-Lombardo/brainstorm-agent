@@ -71,3 +71,22 @@ def test_openai_chat_completion_rejects_unknown_model(tmp_path: Path) -> None:
     assert response.status_code == 404
     payload = response.json()
     assert payload["error"]["code"] == "model_not_found"
+
+
+def test_openai_chat_completion_accepts_null_content_on_non_user_messages(tmp_path: Path) -> None:
+    client = TestClient(create_app(settings=_build_settings(tmp_path)))
+
+    response = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "brainstorm-agent",
+            "messages": [
+                {"role": "assistant", "content": None},
+                {"role": "user", "content": "Continue the framing session."},
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["choices"][0]["message"]["role"] == "assistant"

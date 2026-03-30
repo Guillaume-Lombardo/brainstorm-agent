@@ -5,15 +5,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
-from brainstorm_agent.exceptions import InvalidOpenAIRequestError, UnsupportedOpenAIModelError
+from brainstorm_agent.exceptions import (
+    MISSING_USER_MESSAGE_ERROR,
+    InvalidOpenAIRequestError,
+    UnsupportedOpenAIModelError,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from brainstorm_agent.core.models import AssistantTurnOutput
-
-
-MISSING_USER_MESSAGE_ERROR = "The request must include at least one user message with text content."
 
 
 def _approximate_token_count(content: str) -> int:
@@ -143,7 +144,7 @@ class OpenAIChatFacade:
             str: Latest user message content.
 
         Raises:
-            InvalidOpenAIRequestError: If the request contains no user message with text content.
+            InvalidOpenAIRequestError: Raised when the request has no user message with text content.
         """
         for role, content in reversed(messages):
             if role == "user" and content.strip():

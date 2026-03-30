@@ -83,7 +83,7 @@ class OpenAIChatMessage(BaseModel):
     """OpenAI-compatible chat message."""
 
     role: Literal["system", "developer", "user", "assistant", "tool"]
-    content: str | list[OpenAIContentPart]
+    content: str | list[OpenAIContentPart] | None
 
     def as_text(self) -> str:
         """Return the message content as plain text.
@@ -91,6 +91,8 @@ class OpenAIChatMessage(BaseModel):
         Returns:
             str: Flattened text content.
         """
+        if self.content is None:
+            return ""
         if isinstance(self.content, str):
             return self.content
         return "\n".join(
