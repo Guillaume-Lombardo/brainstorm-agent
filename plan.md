@@ -70,3 +70,55 @@ Copy/update this block for each initiative:
 - Rationale:
 - Follow-up:
 - ADR record: `docs/adr/NNNN-short-title.md` (or `none` with rationale)
+
+### Initiative: AI tooling alignment for structured brainstorming backend
+
+- Status: `done`
+- Owner: `both`
+- Objective: Align repository governance and prompt assets with the target backend before runtime implementation.
+- In scope:
+  - audit current repository structure and AI tooling
+  - define target AI tooling layout for agents, skills, and prompts
+  - create versioned prompt assets for the fixed business workflow
+  - update governance files to make the brainstorming backend the canonical product target
+- Out of scope:
+  - FastAPI implementation
+  - LangGraph runtime implementation
+  - database schema and infrastructure delivery
+- Constraints:
+  - no backend implementation before user validation
+  - keep prompts externalized and versionable
+  - preserve existing repo delivery rules
+- Risks:
+  - governance drift between `AGENTS.md`, `agent.md`, and `SKILLS.md`
+  - prompt structure becoming the only source of business truth
+- Acceptance criteria:
+  - repository state and gaps are documented
+  - target prompt and agent structure is explicit
+  - required prompt files exist and are readable
+  - governance files are coherent with the product brief
+- ADR impact: `required`
+- ADR reference(s): `docs/adr/0001-ai-tooling-layout.md`
+
+#### Steps
+
+- [x] Audit repository structure, tooling, and current AI artifacts
+- [x] Define target architecture for agents, prompts, and responsibilities
+- [x] Update governance files and create versioned prompt assets
+
+#### Validation
+
+- [x] `uv run ruff format .`
+- [x] `uv run ruff check .`
+- [x] `uv run ty check src tests`
+- [x] `uv run pytest -m unit`
+- [x] `uv run pytest -m integration`
+- [x] `uv run pytest -m end2end`
+- [x] `uv run pre-commit run --all-files`
+
+#### Notes / Decisions
+
+- Decision: Keep one source of truth in `AGENTS.md` and make `agent.md` a short pointer document.
+- Rationale: This removes duplicated governance and reduces instruction drift.
+- Follow-up: Implement runtime modules around the new prompt and workflow structure in a dedicated feature phase.
+- ADR record: `docs/adr/0001-ai-tooling-layout.md`

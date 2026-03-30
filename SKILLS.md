@@ -2,34 +2,38 @@
 
 ## Purpose
 
-This file maps project delivery skills to the active collaborative plan in `plan.md` and clarifies when each skill should be applied.
+This file maps project-local skills to the active initiative in `plan.md`.
+Use the smallest set of skills that covers the validated scope.
 
-## Core Skills (Project Local)
+## Core Skills
 
 - `skills/architecture/SKILL.md`
-  - Use for module boundaries, interfaces/protocols, and architecture decisions.
-- `skills/testing/SKILL.md`
-  - Use for test strategy across unit/integration/end2end and when adding regression tests.
+  - Use for module boundaries, domain contracts, LangGraph shape, and ADR-worthy decisions.
 - `skills/code-style/SKILL.md`
-  - Use for style/lint/type consistency, docstring format, and enum/model conventions.
+  - Use for Python typing, enum conventions, docstrings, and schema discipline.
+- `skills/testing/SKILL.md`
+  - Use for unit, integration, and end-to-end coverage strategy.
 - `skills/tooling/SKILL.md`
-  - Use for local tooling workflow (`uv`, `ruff`, `ty`, `pytest`, `pre-commit`) and dev setup reliability.
+  - Use for `uv`, lint/type/test workflow, local setup, and PR validation.
+- `skills/brainstorm-workflow/SKILL.md`
+  - Use for stage definitions, prompt responsibilities, transition criteria, and document shape.
 - `skills/review-followup/SKILL.md`
-  - Use to close review comments and ensure PR feedback is fully addressed.
+  - Use after PR review comments arrive.
 
-## Skill Usage by Plan
+## Skill Selection Rules
 
-- Use `plan.md` as the source of truth for the current initiative.
-- Select the smallest set of skills that covers the validated scope.
-- Revisit skill selection when scope changes during user feedback.
+- Start from `plan.md`.
+- Use `architecture` and `brainstorm-workflow` for scope affecting the stage engine.
+- Add `testing` whenever behavior or persistence changes.
+- Add `tooling` for environment, CI, Docker, or local validation work.
+- Add `code-style` for schema or contract changes.
 
 ## Operating Rules
 
-- Prefer the smallest skill set that fully covers the task.
-- Keep artifacts in English by default (French as complementary only if needed).
-- Update this file if new project-local skills are added or if plan ownership changes significantly.
-- Before implementation/review completion, read and apply:
+- Keep artifacts in English by default.
+- Keep prompt assets versioned under `prompts/v*/`.
+- Keep delivery guidance in sync with:
+  - `AGENTS.md`
   - `docs/engineering/DEFINITION_OF_DONE.md`
   - `docs/engineering/REVIEW_RUNBOOK.md`
   - `docs/adr/README.md`
-- For every PR, poll CI and review status every 60 seconds and act on relevant findings.

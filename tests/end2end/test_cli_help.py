@@ -1,15 +1,18 @@
 from __future__ import annotations
 
+import runpy
 import sys
-from subprocess import run as subprocess_run  # noqa: S404
+
+import pytest
 
 
-def test_cli_help() -> None:
-    result = subprocess_run(  # noqa: S603
-        [sys.executable, "-m", "brainstorm_agent.cli", "--help"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    assert result.returncode == 0
-    assert "usage" in result.stdout.lower()
+def test_cli_help(capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(sys, "argv", ["brainstorm_agent.cli", "--help"])
+    monkeypatch.delitem(sys.modules, "brainstorm_agent.cli", raising=False)
+
+    with pytest.raises(SystemExit) as exc_info:
+        runpy.run_module("brainstorm_agent.cli", run_name="__main__")
+
+    assert exc_info.value.code == 0
+    captured = capsys.readouterr()
+    assert "usage" in captured.out.lower()
