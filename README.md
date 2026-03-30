@@ -78,6 +78,7 @@ Migration helpers:
 ```bash
 uv run brainstorm-agent migrate --revision head
 uv run brainstorm-agent hash-api-key "replace-me"
+uv run brainstorm-agent hash-api-key "replace-me" --pepper "server-side-secret"
 ```
 
 ## Docker Compose
@@ -120,6 +121,7 @@ Core configuration:
 - `AUTH_API_KEYS`
 - `AUTH_MODE`
 - `AUTH_API_KEY_HASHES`
+- `AUTH_API_KEY_PEPPER`
 - `JWT_SECRET_KEY`
 - `JWT_ALGORITHM`
 - `JWT_AUDIENCE`
@@ -370,10 +372,10 @@ This works because the brainstorming backend now exposes `/v1/models` and `/v1/c
   - `AUTH_MODE=api_key` with `AUTH_API_KEY_HASHES` or `AUTH_API_KEYS`
   - `AUTH_MODE=jwt` with `JWT_SECRET_KEY`
   - `AUTH_MODE=hybrid` to accept either
-- Prefer `AUTH_API_KEY_HASHES` in production. Generate values with:
+- Prefer `AUTH_API_KEY_HASHES` in production. For stronger at-rest protection, pair them with `AUTH_API_KEY_PEPPER` and generate values with:
 
 ```bash
-uv run brainstorm-agent hash-api-key "replace-me"
+uv run brainstorm-agent hash-api-key "replace-me" --pepper "server-side-secret"
 ```
 
 - Send hashed-key credentials through `X-API-Key`.

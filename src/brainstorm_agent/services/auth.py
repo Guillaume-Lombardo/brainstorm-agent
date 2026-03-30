@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from hashlib import sha256
+from hmac import new as hmac_new
 from secrets import compare_digest
 from typing import TYPE_CHECKING
 
@@ -16,16 +17,28 @@ if TYPE_CHECKING:
     from brainstorm_agent.settings import Settings
 
 
-def hash_api_key(raw_value: str) -> str:
-    """Hash an API key with SHA-256 for storage and comparison.
+LEGACY_HASH_PREFIX = "sha256"
+VERSIONED_HASH_PREFIX = "v1"
+
+
+def hash_api_key(raw_value: str, pepper: str | None = None) -> str:
+    """Hash an API key for storage and comparison.
 
     Args:
         raw_value: Raw API key.
+        pepper: Optional server-side secret used to harden stored hashes.
 
     Returns:
-        str: Hex-encoded SHA-256 digest.
+        str: Versioned digest string.
     """
-    return sha256(raw_value.encode("utf-8")).hexdigest()
+    if pepper:
+        digest = hmac_new(
+            pepper.encode("utf-8"),
+            raw_value.encode("utf-8"),
+            digestmod="sha256",
+        ).hexdigest()
+        return f"{VERSIONED_HASH_PREFIX}${digest}"
+    return f"{LEGACY_HASH_PREFIX}${sha256(raw_value.encode('utf-8')).hexdigest()}"
 
 
 class AuthenticationService:
@@ -38,6 +51,17 @@ class AuthenticationService:
             settings: Application settings.
         """
         self.settings = settings
+
+    def hash_api_key(self, raw_value: str) -> str:
+        """Hash an API key using the configured storage strategy.
+
+        Args:
+            raw_value: Raw API key.
+
+        Returns:
+            str: Versioned digest string.
+        """
+        return hash_api_key(raw_value, pepper=self.settings.auth_api_key_pepper)
 
     def authenticate(
         self,
@@ -70,18 +94,36 @@ class AuthenticationService:
     def _authenticate_api_key(self, candidate: str | None) -> AuthenticatedPrincipal | None:
         if not candidate:
             return None
-        candidate_hash = hash_api_key(candidate)
-        hashes = set(self.settings.auth_api_key_hashes)
-        hashes.update(hash_api_key(item) for item in self.settings.auth_api_keys)
+        legacy_candidate_hash = hash_api_key(candidate)
+        peppered_candidate_hash = self.hash_api_key(candidate)
+        hashes = {self._normalize_hash(expected_hash) for expected_hash in self.settings.auth_api_key_hashes}
+        hashes.update(self._normalize_hash(hash_api_key(item)) for item in self.settings.auth_api_keys)
         for expected_hash in hashes:
-            if compare_digest(candidate_hash, expected_hash):
-                key_suffix = candidate_hash[-12:]
+            matches_peppered = compare_digest(peppered_candidate_hash, expected_hash)
+            matches_legacy = compare_digest(legacy_candidate_hash, expected_hash)
+            if matches_peppered or matches_legacy:
+                matched_hash = peppered_candidate_hash if matches_peppered else legacy_candidate_hash
+                key_suffix = matched_hash[-12:]
                 return AuthenticatedPrincipal(
                     subject=f"api-key:{key_suffix}",
                     auth_mode=AuthMode.API_KEY,
                     token_id=key_suffix,
                 )
         return None
+
+    @staticmethod
+    def _normalize_hash(candidate_hash: str) -> str:
+        """Normalize stored API key hashes to a versioned format.
+
+        Args:
+            candidate_hash: Stored hash string.
+
+        Returns:
+            str: Versioned hash string.
+        """
+        if "$" in candidate_hash:
+            return candidate_hash
+        return f"{LEGACY_HASH_PREFIX}${candidate_hash}"
 
     def _authenticate_jwt(self, authorization: str | None) -> AuthenticatedPrincipal | None:
         if not authorization or not authorization.startswith("Bearer "):

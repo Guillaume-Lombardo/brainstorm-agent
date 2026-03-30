@@ -46,13 +46,16 @@ class InMemoryRateLimiter:
             tuple[bool, int]: `(allowed, retry_after_seconds)`.
         """
         now = time()
+        bucket = int(now // window_seconds)
+        key = f"{identifier}:{bucket}"
+        window_end = float((bucket + 1) * window_seconds)
         with self._lock:
-            count, reset_at = self._buckets[identifier]
-            if now >= reset_at:
+            count, reset_at = self._buckets[key]
+            if reset_at != window_end:
                 count = 0
-                reset_at = now + window_seconds
+                reset_at = window_end
             count += 1
-            self._buckets[identifier] = (count, reset_at)
+            self._buckets[key] = (count, reset_at)
             if count <= limit:
                 return True, 0
             return False, max(1, int(reset_at - now))
@@ -77,15 +80,20 @@ class RedisRateLimiter:
         Returns:
             tuple[bool, int]: `(allowed, retry_after_seconds)`.
         """
-        bucket = int(time() // window_seconds)
+        now = time()
+        bucket = int(now // window_seconds)
         key = f"{self.namespace}:rate-limit:{bucket}:{identifier}"
         current = cast("int", self.redis_client.incr(key))
         if current == 1:
-            self.redis_client.expire(key, window_seconds)
+            remaining = window_seconds - int(now % window_seconds)
+            if remaining <= 0:
+                remaining = 1
+            self.redis_client.expire(key, remaining)
         if current <= limit:
             return True, 0
-        ttl = cast("int", self.redis_client.ttl(key))
-        retry_after = max(1, ttl if isinstance(ttl, int) and ttl > 0 else window_seconds)
+        retry_after = window_seconds - int(now % window_seconds)
+        if retry_after <= 0:
+            retry_after = 1
         return False, retry_after
 
 

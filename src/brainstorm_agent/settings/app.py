@@ -37,6 +37,7 @@ class Settings(BaseSettings):
         default_factory=list,
         validation_alias="AUTH_API_KEY_HASHES",
     )
+    auth_api_key_pepper: str | None = Field(default=None, validation_alias="AUTH_API_KEY_PEPPER")
     jwt_secret_key: str | None = Field(default=None, validation_alias="JWT_SECRET_KEY")
     jwt_algorithm: str = Field(default="HS256", validation_alias="JWT_ALGORITHM")
     jwt_audience: str | None = Field(default=None, validation_alias="JWT_AUDIENCE")
@@ -145,13 +146,15 @@ class Settings(BaseSettings):
         Raises:
             ValueError: If the configuration is inconsistent.
         """
+        effective_mode = self.effective_auth_mode
+
         if self.enable_auth and self.auth_mode is AuthMode.NONE:
             raise ValueError(self._auth_mode_disabled_error())
-        if self.auth_mode is AuthMode.API_KEY and not (self.auth_api_keys or self.auth_api_key_hashes):
+        if effective_mode is AuthMode.API_KEY and not (self.auth_api_keys or self.auth_api_key_hashes):
             raise ValueError(self._api_key_auth_error())
-        if self.auth_mode is AuthMode.JWT and not self.jwt_secret_key:
+        if effective_mode is AuthMode.JWT and not self.jwt_secret_key:
             raise ValueError(self._jwt_auth_error())
-        if self.auth_mode is AuthMode.HYBRID and not (
+        if effective_mode is AuthMode.HYBRID and not (
             self.jwt_secret_key and (self.auth_api_keys or self.auth_api_key_hashes)
         ):
             raise ValueError(self._hybrid_auth_error())

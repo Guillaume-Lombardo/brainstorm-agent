@@ -47,3 +47,9 @@ def test_settings_parse_hashed_api_keys_from_env(monkeypatch) -> None:
 def test_settings_require_jwt_secret_for_jwt_mode() -> None:
     with pytest.raises(ValueError, match="JWT auth requires JWT_SECRET_KEY"):
         Settings(enable_auth=True, auth_mode=AuthMode.JWT)
+
+
+def test_settings_skip_mode_specific_validation_when_auth_disabled() -> None:
+    settings = Settings(enable_auth=False, auth_mode=AuthMode.JWT)
+
+    assert settings.effective_auth_mode is AuthMode.NONE

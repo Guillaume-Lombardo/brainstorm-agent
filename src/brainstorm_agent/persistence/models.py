@@ -27,9 +27,14 @@ class SessionRecord(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     current_stage: Mapped[str] = mapped_column(String(64), nullable=False)
-    state_payload: Mapped[dict] = mapped_column(JSON, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+    state_payload: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        onupdate=utc_now,
+        nullable=False,
+    )
 
     messages: Mapped[list[MessageRecord]] = relationship(
         back_populates="session",
@@ -65,7 +70,7 @@ class MessageRecord(Base):
     modality: Mapped[str] = mapped_column(String(16), nullable=False)
     stage: Mapped[str] = mapped_column(String(64), nullable=False)
     turn_index: Mapped[int] = mapped_column(Integer, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
 
     session: Mapped[SessionRecord] = relationship(back_populates="messages")
 
@@ -81,14 +86,14 @@ class DocumentRecord(Base):
     version: Mapped[int] = mapped_column(Integer, nullable=False)
     markdown: Mapped[str] = mapped_column(Text, nullable=False)
     summary: Mapped[str] = mapped_column(Text, nullable=False)
-    facts_payload: Mapped[list] = mapped_column(JSON, default=list)
-    assumptions_payload: Mapped[list] = mapped_column(JSON, default=list)
-    decisions_payload: Mapped[list] = mapped_column(JSON, default=list)
-    uncertainties_payload: Mapped[list] = mapped_column(JSON, default=list)
-    open_questions_payload: Mapped[list] = mapped_column(JSON, default=list)
-    risks_payload: Mapped[list] = mapped_column(JSON, default=list)
+    facts_payload: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    assumptions_payload: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    decisions_payload: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    uncertainties_payload: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    open_questions_payload: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    risks_payload: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
     is_current: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
 
     session: Mapped[SessionRecord] = relationship(back_populates="documents")
 
@@ -104,9 +109,9 @@ class TransitionDecisionRecord(Base):
     to_stage: Mapped[str | None] = mapped_column(String(64), nullable=True)
     stage_is_clear_enough: Mapped[bool] = mapped_column(Boolean, nullable=False)
     reason: Mapped[str] = mapped_column(Text, nullable=False)
-    missing_fields_payload: Mapped[list] = mapped_column(JSON, default=list)
-    blocking_reasons_payload: Mapped[list] = mapped_column(JSON, default=list)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    missing_fields_payload: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    blocking_reasons_payload: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
 
     session: Mapped[SessionRecord] = relationship(back_populates="transitions")
 
@@ -123,8 +128,13 @@ class OpenQuestionRecord(Base):
     why_it_matters: Mapped[str | None] = mapped_column(Text, nullable=True)
     blocking: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     status: Mapped[str] = mapped_column(String(16), nullable=False, default=OpenQuestionStatus.OPEN.value)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        onupdate=utc_now,
+        nullable=False,
+    )
 
     session: Mapped[SessionRecord] = relationship(back_populates="open_questions")
 
@@ -140,6 +150,6 @@ class HumanReviewDecisionRecord(Base):
     proposed_next_stage: Mapped[str | None] = mapped_column(String(64), nullable=True)
     decision: Mapped[str] = mapped_column(String(16), nullable=False)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
 
     session: Mapped[SessionRecord] = relationship(back_populates="human_reviews")

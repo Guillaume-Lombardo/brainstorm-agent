@@ -8,6 +8,7 @@ from fastapi import Depends, Header, HTTPException, Request, status
 from redis import Redis
 from sqlalchemy.orm import Session  # noqa: TC002
 
+from brainstorm_agent.core.enums import AuthMode
 from brainstorm_agent.persistence.session import (
     create_all,
     create_engine_from_settings,
@@ -157,7 +158,7 @@ def enforce_api_security(
     )
     request.state.principal = principal
     mode = settings.effective_auth_mode
-    if mode.value != "none" and principal is None:
+    if mode is not AuthMode.NONE and principal is None:
         request.app.state.metrics.record_auth_failure(reason="invalid_credentials")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

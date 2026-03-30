@@ -29,6 +29,7 @@ def build_parser() -> argparse.ArgumentParser:
     migrate_parser.add_argument("--revision", default="head")
     hash_parser = subparsers.add_parser("hash-api-key", help="Hash an API key for storage.")
     hash_parser.add_argument("value")
+    hash_parser.add_argument("--pepper", default=None)
     return parser
 
 
@@ -40,10 +41,14 @@ def main() -> int:
     """
     parser = build_parser()
     args = parser.parse_args()
+    command = getattr(args, "command", None)
+    if command == "hash-api-key":
+        print(hash_api_key(args.value, pepper=args.pepper))
+        return 0
+
     settings = get_settings()
     configure_logging(settings=settings)
     logger = get_logger("brainstorm_agent.cli")
-    command = getattr(args, "command", None)
     if command == "serve":
         logger.info("Starting API server", host=args.host or settings.host, port=args.port or settings.port)
         uvicorn.run(
@@ -56,9 +61,6 @@ def main() -> int:
     if command == "migrate":
         logger.info("Running migrations", revision=args.revision)
         upgrade_database(database_url=settings.database_url, revision=args.revision)
-        return 0
-    if command == "hash-api-key":
-        print(hash_api_key(args.value))
         return 0
 
     logger.info("CLI initialized", version=__version__)

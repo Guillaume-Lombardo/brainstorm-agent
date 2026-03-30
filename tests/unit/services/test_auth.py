@@ -15,6 +15,16 @@ def test_hash_api_key_is_stable() -> None:
 
     assert first == second
     assert first != hash_api_key("other")
+    assert first.startswith("sha256$")
+
+
+def test_hash_api_key_with_pepper_is_stable() -> None:
+    first = hash_api_key("secret", pepper="pepper-value")
+    second = hash_api_key("secret", pepper="pepper-value")
+
+    assert first == second
+    assert first != hash_api_key("secret", pepper="other-pepper")
+    assert first.startswith("v1$")
 
 
 def test_auth_service_accepts_hashed_api_key() -> None:
@@ -22,6 +32,21 @@ def test_auth_service_accepts_hashed_api_key() -> None:
         enable_auth=True,
         auth_mode=AuthMode.API_KEY,
         auth_api_key_hashes=[hash_api_key("secret-token")],
+    )
+    service = AuthenticationService(settings)
+
+    principal = service.authenticate(x_api_key="secret-token", authorization=None)
+
+    assert principal is not None
+    assert principal.auth_mode is AuthMode.API_KEY
+
+
+def test_auth_service_accepts_peppered_hashed_api_key() -> None:
+    settings = Settings(
+        enable_auth=True,
+        auth_mode=AuthMode.API_KEY,
+        auth_api_key_hashes=[hash_api_key("secret-token", pepper="pepper-value")],
+        auth_api_key_pepper="pepper-value",  # pragma: allowlist secret
     )
     service = AuthenticationService(settings)
 
