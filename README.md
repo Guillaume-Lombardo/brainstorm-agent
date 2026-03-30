@@ -44,6 +44,7 @@ Supporting assets:
 
 - `src/brainstorm_agent/resources/prompts/v1/`: packaged versioned prompt files
 - `docs/adr/`: architecture decisions
+- `examples/litellm/config.yaml`: example LiteLLM registration
 - `tests/unit`, `tests/integration`, `tests/end2end`
 
 ## Local setup
@@ -94,6 +95,7 @@ Core configuration:
 - `OPENAI_TIMEOUT_SECONDS`
 - `PROMPT_VERSION`
 - `PROMPT_BASE_PATH`
+- `OPENAI_FACADE_MODEL_NAME`
 - `REDIS_LOCK_TIMEOUT_SECONDS`
 - `REDIS_LOCK_BLOCKING_TIMEOUT_SECONDS`
 - `HOST`
@@ -108,9 +110,9 @@ Recommended modes:
 
 ## API
 
-Base prefix: `/api/v1`
+Business API base prefix: `/api/v1`
 
-Endpoints:
+Business endpoints:
 
 - `POST /sessions`
 - `POST /sessions/{session_id}/messages`
@@ -157,6 +159,121 @@ curl -X POST http://localhost:8000/api/v1/sessions/<session_id>/messages \
   "next_stage": "stage_1_problem_framing"
 }
 ```
+
+## OpenAI-compatible facade
+
+The backend also exposes a minimal OpenAI-compatible surface for LiteLLM and generic clients:
+
+- `GET /v1/models`
+- `POST /v1/chat/completions`
+
+The public alias is controlled through `OPENAI_FACADE_MODEL_NAME` and defaults to `brainstorm-agent`.
+
+### Session continuity contract
+
+The OpenAI-compatible facade remains stateful.
+
+- If `metadata.session_id` is missing, the backend creates a new brainstorming session.
+- If `metadata.session_id` is present, the backend continues that persisted session.
+- The response includes the session id in:
+  - the `brainstorm.session_id` field
+  - the `X-Brainstorm-Session-Id` response header
+
+The facade processes the latest user message from `messages[]`.
+It does not attempt to reconstruct the full persistent state from client-side chat history alone.
+
+### Example `chat/completions` request
+
+```bash
+curl -X POST http://localhost:8000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "brainstorm-agent",
+    "messages": [
+      {
+        "role": "user",
+        "content": "I need an agent that helps teams turn vague project ideas into a structured backlog."
+      }
+    ],
+    "metadata": {}
+  }'
+```
+
+### Example OpenAI-compatible response shape
+
+```json
+{
+  "id": "chatcmpl-...",
+  "object": "chat.completion",
+  "created": 1743360000,
+  "model": "brainstorm-agent",
+  "choices": [
+    {
+      "index": 0,
+      "finish_reason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": "Please answer the blocking questions...\\n\\n# Structured Summary\\n..."
+      }
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 12,
+    "completion_tokens": 84,
+    "total_tokens": 96
+  },
+  "brainstorm": {
+    "session_id": "uuid",
+    "current_stage": "stage_0_pitch",
+    "processed_stage": "stage_0_pitch",
+    "next_stage": null,
+    "stage_clear_enough": false,
+    "summary": "Stage 0 currently covers ...",
+    "open_questions": [],
+    "transition_decision_reason": "Blocking questions remain open."
+  }
+}
+```
+
+## LiteLLM registration
+
+LiteLLM can register this backend as an OpenAI-compatible upstream by exposing the facade endpoint through its proxy configuration.
+
+Official LiteLLM docs show:
+
+- `model_list` entries in `config.yaml` for model registration
+- OpenAI-style proxy usage through a single `base_url`
+
+Sources:
+
+- [LiteLLM getting started](https://docs.litellm.ai/)
+
+Example config shipped in this repo:
+
+- [examples/litellm/config.yaml](examples/litellm/config.yaml)
+
+Example:
+
+```yaml
+model_list:
+  - model_name: brainstorm-agent
+    litellm_params:
+      model: openai/brainstorm-agent
+      api_base: http://app:8000/v1
+      api_key: not-used
+```
+
+This works because the brainstorming backend now exposes `/v1/models` and `/v1/chat/completions`.
+
+### Local LiteLLM wiring
+
+To run LiteLLM next to the backend locally:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.litellm.yml up --build
+```
+
+Then call LiteLLM on `http://localhost:4000` with the registered model name `brainstorm-agent`.
 
 ## Workflow principles
 

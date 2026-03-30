@@ -8,6 +8,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from brainstorm_agent.api.dependencies import configure_application_state
+from brainstorm_agent.api.routes.openai import router as openai_router
 from brainstorm_agent.api.routes.sessions import router as session_router
 from brainstorm_agent.exceptions import LLMResponseError, LockAcquisitionError, NotFoundError
 from brainstorm_agent.settings import get_settings
@@ -32,6 +33,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         description="Strict staged brainstorming backend with LangGraph orchestration.",
     )
     configure_application_state(app, app_settings)
+    app.include_router(openai_router)
     app.include_router(session_router, prefix=app_settings.api_v1_prefix)
 
     @app.get("/healthz")
