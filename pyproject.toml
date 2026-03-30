@@ -1,0 +1,79 @@
+[project]
+name = "brainstorm-agent"
+version = "0.1.0"
+description = "An agent to help brainstorm."
+readme = "README.md"
+requires-python = ">=3.14"
+authors = [{ name = "Guillaume Lombardo", email = "g1lom@later.day" }]
+license = { text = "MIT" }
+keywords = ["python", "package", "cli", "automation"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.14"
+]
+dependencies = [
+  "pydantic>=2.12.0",
+  "pydantic-settings>=2.12.0",
+  "python-dotenv>=1.1.0",
+  "structlog>=25.5.0"
+]
+
+[dependency-groups]
+dev = [
+  "build>=1.3.0",
+  "twine>=6.2.0",
+  "detect-secrets>=1.5.0",
+  "pre-commit>=4.5.1",
+  "pytest>=9.0.2",
+  "pytest-cov>=7.0.0",
+  "pytest-mock>=3.15.1",
+  "ruff>=0.15.0",
+  "ty>=0.0.15"
+]
+
+[project.urls]
+Homepage = "https://github.com/Guillaume-Lombardo/brainstorm-agent"
+Repository = "https://github.com/Guillaume-Lombardo/brainstorm-agent"
+Issues = "https://github.com/Guillaume-Lombardo/brainstorm-agent/issues"
+
+[project.scripts]
+brainstorm-agent = "brainstorm_agent.cli:main"
+
+[build-system]
+requires = ["hatchling>=1.27.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/brainstorm_agent"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/brainstorm_agent", "README.md", "pyproject.toml", "LICENSE"]
+
+[tool.pytest.ini_options]
+minversion = "9.0"
+testpaths = ["tests"]
+addopts = "-ra -q -m unit --strict-markers --cov=src --cov-report=term-missing:skip-covered --cov-report=html"
+pythonpath = ["src"]
+markers = [
+  "unit: mark a test as a unit test.",
+  "integration: mark a test as an integration test.",
+  "end2end: mark a test as an end-to-end test."
+]
+
+[tool.coverage.run]
+branch = true
+source = ["src/brainstorm_agent"]
+omit = ["*/tests/*"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+precision = 2
+fail_under = 80
+
+[tool.coverage.html]
+directory = "htmlcov"
+title = "brainstorm-agent coverage"
