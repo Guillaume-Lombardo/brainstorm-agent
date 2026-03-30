@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from typing import Annotated
 
-from pydantic import Field, computed_field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field, computed_field, field_validator, model_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
-from brainstorm_agent.core.enums import LLMMode
+from brainstorm_agent.core.enums import AuthMode, LLMMode
 from brainstorm_agent.exceptions import SettingsError
 
 
@@ -27,7 +28,20 @@ class Settings(BaseSettings):
     host: str = Field(default="127.0.0.1", validation_alias="HOST")
     port: int = Field(default=8000, validation_alias="PORT")
     enable_auth: bool = Field(default=False, validation_alias="ENABLE_AUTH")
-    auth_api_keys: list[str] = Field(default_factory=list, validation_alias="AUTH_API_KEYS")
+    auth_mode: AuthMode = Field(default=AuthMode.NONE, validation_alias="AUTH_MODE")
+    auth_api_keys: Annotated[list[str], NoDecode] = Field(
+        default_factory=list,
+        validation_alias="AUTH_API_KEYS",
+    )
+    auth_api_key_hashes: Annotated[list[str], NoDecode] = Field(
+        default_factory=list,
+        validation_alias="AUTH_API_KEY_HASHES",
+    )
+    auth_api_key_pepper: str | None = Field(default=None, validation_alias="AUTH_API_KEY_PEPPER")
+    jwt_secret_key: str | None = Field(default=None, validation_alias="JWT_SECRET_KEY")
+    jwt_algorithm: str = Field(default="HS256", validation_alias="JWT_ALGORITHM")
+    jwt_audience: str | None = Field(default=None, validation_alias="JWT_AUDIENCE")
+    jwt_issuer: str | None = Field(default=None, validation_alias="JWT_ISSUER")
 
     log_level: str = Field(default="INFO", validation_alias="LOG_LEVEL")
     log_json: bool = Field(default=True, validation_alias="LOG_JSON")
@@ -60,6 +74,15 @@ class Settings(BaseSettings):
         default=False,
         validation_alias="REQUIRE_HUMAN_VALIDATION_FOR_TRANSITIONS",
     )
+    auto_create_schema: bool = Field(default=True, validation_alias="AUTO_CREATE_SCHEMA")
+    run_db_migrations_on_startup: bool = Field(
+        default=False,
+        validation_alias="RUN_DB_MIGRATIONS_ON_STARTUP",
+    )
+    rate_limit_enabled: bool = Field(default=False, validation_alias="RATE_LIMIT_ENABLED")
+    rate_limit_requests: int = Field(default=60, validation_alias="RATE_LIMIT_REQUESTS")
+    rate_limit_window_seconds: int = Field(default=60, validation_alias="RATE_LIMIT_WINDOW_SECONDS")
+    rate_limit_namespace: str = Field(default="brainstorm-agent", validation_alias="RATE_LIMIT_NAMESPACE")
     prompt_version: str = Field(default="v1", validation_alias="PROMPT_VERSION")
     prompt_base_path: str | None = Field(default=None, validation_alias="PROMPT_BASE_PATH")
 
@@ -78,6 +101,67 @@ class Settings(BaseSettings):
             return [item.strip() for item in value.split(",") if item.strip()]
         return value
 
+    @field_validator("auth_api_key_hashes", mode="before")
+    @classmethod
+    def _split_auth_api_key_hashes(cls, value: object) -> object:
+        """Parse hashed API keys from a comma-separated environment variable.
+
+        Args:
+            value: Raw environment value.
+
+        Returns:
+            object: Parsed list or original value.
+        """
+        if isinstance(value, str):
+            return [item.strip() for item in value.split(",") if item.strip()]
+        return value
+
+    @staticmethod
+    def _auth_mode_disabled_error() -> str:
+        return "AUTH_MODE must not be 'none' when ENABLE_AUTH=true."
+
+    @staticmethod
+    def _api_key_auth_error() -> str:
+        return "API key auth requires AUTH_API_KEYS or AUTH_API_KEY_HASHES."
+
+    @staticmethod
+    def _jwt_auth_error() -> str:
+        return "JWT auth requires JWT_SECRET_KEY."
+
+    @staticmethod
+    def _hybrid_auth_error() -> str:
+        return "HYBRID auth requires JWT_SECRET_KEY and AUTH_API_KEYS or AUTH_API_KEY_HASHES."
+
+    @staticmethod
+    def _rate_limit_error() -> str:
+        return "RATE_LIMIT_REQUESTS must be greater than zero."
+
+    @model_validator(mode="after")
+    def _validate_security_settings(self) -> Settings:
+        """Validate auth and rate-limit configuration coherence.
+
+        Returns:
+            Settings: Validated settings instance.
+
+        Raises:
+            ValueError: If the configuration is inconsistent.
+        """
+        effective_mode = self.effective_auth_mode
+
+        if self.enable_auth and self.auth_mode is AuthMode.NONE:
+            raise ValueError(self._auth_mode_disabled_error())
+        if effective_mode is AuthMode.API_KEY and not (self.auth_api_keys or self.auth_api_key_hashes):
+            raise ValueError(self._api_key_auth_error())
+        if effective_mode is AuthMode.JWT and not self.jwt_secret_key:
+            raise ValueError(self._jwt_auth_error())
+        if effective_mode is AuthMode.HYBRID and not (
+            self.jwt_secret_key and (self.auth_api_keys or self.auth_api_key_hashes)
+        ):
+            raise ValueError(self._hybrid_auth_error())
+        if self.rate_limit_enabled and self.rate_limit_requests <= 0:
+            raise ValueError(self._rate_limit_error())
+        return self
+
     @computed_field
     @property
     def is_sqlite(self) -> bool:
@@ -87,6 +171,18 @@ class Settings(BaseSettings):
             bool: `True` when using SQLite.
         """
         return self.database_url.startswith("sqlite")
+
+    @computed_field
+    @property
+    def effective_auth_mode(self) -> AuthMode:
+        """Return the effective auth mode derived from feature flags.
+
+        Returns:
+            AuthMode: Effective authentication mode.
+        """
+        if not self.enable_auth:
+            return AuthMode.NONE
+        return self.auth_mode
 
 
 @lru_cache(maxsize=1)

@@ -1,0 +1,9 @@
+model_list:
+  - model_name: brainstorm-agent
+    litellm_params:
+      model: openai/brainstorm-agent
+      api_base: http://app:8000/v1
+      api_key: not-used # pragma: allowlist secret
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY

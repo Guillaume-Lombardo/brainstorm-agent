@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+from pathlib import Path
 from typing import TYPE_CHECKING
 
+from alembic import command
+from alembic.config import Config
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -53,6 +56,31 @@ def create_all(engine: Engine) -> None:
         engine: Database engine.
     """
     Base.metadata.create_all(engine)
+
+
+def alembic_config(*, database_url: str) -> Config:
+    """Build an Alembic config bound to the provided database URL.
+
+    Args:
+        database_url: Database URL for migration execution.
+
+    Returns:
+        Config: Configured Alembic config.
+    """
+    repository_root = Path(__file__).resolve().parents[3]
+    config = Config(str(repository_root / "alembic.ini"))
+    config.set_main_option("sqlalchemy.url", database_url)
+    return config
+
+
+def upgrade_database(*, database_url: str, revision: str = "head") -> None:
+    """Upgrade the database schema through Alembic.
+
+    Args:
+        database_url: Database URL for migration execution.
+        revision: Target revision.
+    """
+    command.upgrade(alembic_config(database_url=database_url), revision)
 
 
 @contextmanager

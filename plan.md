@@ -315,3 +315,61 @@ Copy/update this block for each initiative:
 - Rationale: It preserves the backend's persistent session model without forcing clients onto the first-party session API.
 - Follow-up: Consider `/v1/responses` and SSE after validating real LiteLLM/OpenWebUI usage.
 - ADR record: `docs/adr/0003-openai-compatible-facade.md`
+
+### Initiative: Production hardening stack
+
+- Status: `done`
+- Owner: `agent`
+- Objective: Add formal schema migrations, stronger authentication, broader observability, rate limiting, and production-oriented deployment/configuration for LiteLLM and OpenWebUI.
+- In scope:
+  - Alembic migrations for the current schema
+  - stronger auth with hashed API keys and JWT bearer support
+  - Redis-backed rate limiting
+  - improved observability endpoints and Prometheus metrics
+  - production deployment assets and startup flow
+  - LiteLLM and OpenWebUI production-oriented configuration examples
+- Out of scope:
+  - cloud-specific IaC
+  - managed identity providers
+  - full distributed tracing backend deployment
+- Constraints:
+  - preserve current API behavior by default where practical
+  - keep test ergonomics simple for local development
+  - avoid coupling the core workflow logic to deployment details
+- Risks:
+  - migration baseline mismatch with existing `create_all()` behavior
+  - auth surface complexity if multiple modes are added carelessly
+  - rate limiting semantics differing between Redis-backed and fallback modes
+- Acceptance criteria:
+  - schema can be upgraded through Alembic
+  - auth supports JWT and hashed API keys
+  - rate limiting returns deterministic `429` responses
+  - metrics and health/readiness are production-usable
+  - prod deployment docs/assets cover app, postgres, redis, litellm, and openwebui
+- ADR impact: `required`
+- ADR reference(s): `docs/adr/0005-production-hardening-stack.md`
+
+#### Steps
+
+- [x] Add Alembic configuration and baseline migrations
+- [x] Implement robust auth modes and API-key hashing support
+- [x] Add Redis-backed rate limiting and metrics around auth/throttling
+- [x] Add production deployment assets and startup flow
+- [x] Add LiteLLM/OpenWebUI configuration examples and documentation
+
+#### Validation
+
+- [x] `uv run ruff format .`
+- [x] `uv run ruff check .`
+- [x] `uv run ty check src tests`
+- [x] `uv run pytest -m unit`
+- [x] `uv run pytest -m integration`
+- [x] `uv run pytest -m end2end`
+- [x] `uv run pre-commit run --all-files`
+
+#### Notes / Decisions
+
+- Decision: Implement auth as configurable modes so deployments can choose JWT, hashed API keys, or both without changing routes.
+- Rationale: This keeps the core HTTP contract stable while enabling stronger production security postures.
+- Follow-up: Revisit OpenID Connect or external auth gateways if multi-tenant deployment becomes necessary.
+- ADR record: `docs/adr/0005-production-hardening-stack.md`

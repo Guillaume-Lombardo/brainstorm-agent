@@ -9,6 +9,7 @@ from uuid import uuid4
 from pydantic import BaseModel, Field
 
 from brainstorm_agent.core.enums import (
+    AuthMode,
     HumanReviewDecision,
     MessageRole,
     Modality,
@@ -212,3 +213,12 @@ class SessionOverview(BaseModel):
     open_questions: list[OpenQuestionItem] = Field(default_factory=list)
     completed_stages: list[Stage] = Field(default_factory=list)
     pending_human_review: PendingHumanReview | None = None
+
+
+class AuthenticatedPrincipal(BaseModel):
+    """Authenticated API caller principal."""
+
+    subject: str
+    auth_mode: AuthMode
+    token_id: str | None = None
+    scopes: list[str] = Field(default_factory=list)

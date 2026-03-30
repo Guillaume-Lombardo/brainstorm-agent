@@ -1,0 +1,34 @@
+:80 {
+  handle /api/* {
+    reverse_proxy app:8000
+  }
+
+  handle /v1/* {
+    reverse_proxy app:8000
+  }
+
+  handle /metrics {
+    reverse_proxy app:8000
+  }
+
+  handle /healthz {
+    reverse_proxy app:8000
+  }
+
+  handle /readyz {
+    reverse_proxy app:8000
+  }
+
+  handle /livez {
+    reverse_proxy app:8000
+  }
+
+  handle /litellm/* {
+    uri strip_prefix /litellm
+    reverse_proxy litellm:4000
+  }
+
+  handle {
+    reverse_proxy openwebui:8080
+  }
+}
