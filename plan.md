@@ -183,3 +183,58 @@ Copy/update this block for each initiative:
 - Follow-up: Reassess streaming and human-review hooks after the core synchronous API is stable.
 - ADR record: `docs/adr/0002-backend-runtime-architecture.md`
 - Note: `langgraph` currently emits a Python 3.14 warning through `langchain-core` Pydantic V1 compatibility code during tests, but validation still passes.
+
+### Initiative: Add an OpenAI-compatible facade for LiteLLM registration
+
+- Status: `done`
+- Owner: `agent`
+- Objective: Expose the brainstorming backend behind a minimal OpenAI-compatible surface so it can be registered in LiteLLM and consumed by generic OpenAI clients.
+- In scope:
+  - `GET /v1/models`
+  - `POST /v1/chat/completions`
+  - stable public model alias configuration
+  - session continuity through request metadata
+  - LiteLLM example configuration and usage documentation
+- Out of scope:
+  - full `/v1/responses` implementation
+  - streaming support on the OpenAI-compatible facade
+  - authentication on the facade beyond future-ready design
+- Constraints:
+  - keep the existing session API backward compatible
+  - preserve persistent server-side session state
+  - avoid moving business logic into FastAPI routes
+- Risks:
+  - generic OpenAI clients may not preserve custom session metadata automatically
+  - the facade could be mistaken for a fully generic OpenAI backend
+- Acceptance criteria:
+  - `/v1/models` exposes a stable alias for the brainstorming backend
+  - `/v1/chat/completions` can create or continue a brainstorming session
+  - the response includes a recoverable session identifier
+  - README documents LiteLLM registration and the session continuity contract
+  - automated tests cover the facade flow
+- ADR impact: `required`
+- ADR reference(s): `docs/adr/0003-openai-compatible-facade.md`
+
+#### Steps
+
+- [x] Add OpenAI-compatible schemas and facade service
+- [x] Add `/v1/models` and `/v1/chat/completions`
+- [x] Document LiteLLM configuration and local wiring
+- [x] Add tests for facade behavior and session continuity
+
+#### Validation
+
+- [x] `uv run ruff format .`
+- [x] `uv run ruff check .`
+- [x] `uv run ty check src tests`
+- [x] `uv run pytest -m unit`
+- [x] `uv run pytest -m integration`
+- [x] `uv run pytest -m end2end`
+- [x] `uv run pre-commit run --all-files`
+
+#### Notes / Decisions
+
+- Decision: Use `metadata.session_id` as the continuity handle on the OpenAI-compatible facade.
+- Rationale: It preserves the backend's persistent session model without forcing clients onto the first-party session API.
+- Follow-up: Consider `/v1/responses` and SSE after validating real LiteLLM/OpenWebUI usage.
+- ADR record: `docs/adr/0003-openai-compatible-facade.md`

@@ -50,6 +50,10 @@ class Settings(BaseSettings):
     openai_api_key: str | None = Field(default=None, validation_alias="OPENAI_API_KEY")
     model_name: str = Field(default="gpt-4.1-mini", validation_alias="MODEL_NAME")
     openai_timeout_seconds: float = Field(default=30.0, validation_alias="OPENAI_TIMEOUT_SECONDS")
+    openai_facade_model_name: str = Field(
+        default="brainstorm-agent",
+        validation_alias="OPENAI_FACADE_MODEL_NAME",
+    )
     prompt_version: str = Field(default="v1", validation_alias="PROMPT_VERSION")
     prompt_base_path: str | None = Field(default=None, validation_alias="PROMPT_BASE_PATH")
 

@@ -84,6 +84,42 @@ class LockAcquisitionError(PackageError):
 
 
 @dataclass
+class UnsupportedOpenAIModelError(PackageError):
+    """Raised when the OpenAI-compatible facade receives an unknown model alias."""
+
+    requested_model: str
+    available_model: str
+    message: str = "The requested OpenAI-compatible model is not available."
+
+    def __str__(self) -> str:
+        """Return error message payload."""
+        return (
+            f"{self.message} requested_model={self.requested_model!r} "
+            f"available_model={self.available_model!r}"
+        )
+
+
+@dataclass
+class InvalidOpenAIRequestError(PackageError):
+    """Raised when the OpenAI-compatible facade request payload is invalid."""
+
+    message: str = "The OpenAI-compatible request payload is invalid."
+
+    @classmethod
+    def missing_user_message(cls) -> InvalidOpenAIRequestError:
+        """Build a missing-user-message error.
+
+        Returns:
+            InvalidOpenAIRequestError: Request validation error.
+        """
+        return cls(message="The request must include at least one user message with text content.")
+
+    def __str__(self) -> str:
+        """Return error message payload."""
+        return self.message
+
+
+@dataclass
 class AsyncExecutionError(PackageError):
     """Raised when an async operation fails in compatibility runner."""
 
