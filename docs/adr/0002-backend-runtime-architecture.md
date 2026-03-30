@@ -33,7 +33,7 @@ Key runtime decisions:
 - Keep stage-transition authority in code-level validators, not in LLM text alone.
 - Store critical state in SQLAlchemy/Postgres-compatible tables.
 - Use Redis only for optional session locking and coordination.
-- Keep prompts externalized and versioned under `prompts/v1/`.
+- Keep prompts externalized as packaged resources under `src/brainstorm_agent/resources/prompts/v1/`.
 - Provide a heuristic LLM mode for tests and local dry runs, while production mode remains OpenAI-compatible.
 
 ## Consequences

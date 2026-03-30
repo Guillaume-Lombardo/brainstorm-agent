@@ -86,11 +86,11 @@ Use the following repository layout for AI-facing assets:
 - `agent.md`: concise execution contract referencing `AGENTS.md`
 - `SKILLS.md`: local skill index and usage guidance
 - `skills/`: reusable project-local delivery skills
-- `prompts/README.md`: prompt organization and versioning policy
-- `prompts/v*/system.md`: global system prompt
-- `prompts/v*/stages/*.md`: stage-specific prompts
-- `prompts/v*/evaluation/*.md`: evaluation prompts
-- `prompts/v*/rendering/*.md`: rendering prompts
+- `src/brainstorm_agent/resources/prompts/README.md`: prompt organization and versioning policy
+- `src/brainstorm_agent/resources/prompts/v*/system.md`: global system prompt
+- `src/brainstorm_agent/resources/prompts/v*/stages/*.md`: stage-specific prompts
+- `src/brainstorm_agent/resources/prompts/v*/evaluation/*.md`: evaluation prompts
+- `src/brainstorm_agent/resources/prompts/v*/rendering/*.md`: rendering prompts
 
 Rules:
 

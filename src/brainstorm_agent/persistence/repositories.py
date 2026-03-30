@@ -101,9 +101,11 @@ class SessionRepository:
             SessionRecord: Updated record.
         """
         record = self.require(session_id)
+        timestamp = _utc_now()
+        state.updated_at = timestamp
         record.current_stage = state.current_stage.value
         record.state_payload = state.model_dump(mode="json")
-        record.updated_at = _utc_now()
+        record.updated_at = timestamp
         self.db_session.add(record)
         self.db_session.flush()
         return record

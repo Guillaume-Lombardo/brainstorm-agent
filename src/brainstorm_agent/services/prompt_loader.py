@@ -2,29 +2,64 @@
 
 from __future__ import annotations
 
+from importlib.resources import files
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from brainstorm_agent.core.enums import Stage
 
 if TYPE_CHECKING:
-    from pathlib import Path
+    from importlib.resources.abc import Traversable
+
+    from brainstorm_agent.settings import Settings
 
 
 class PromptLoader:
-    """Load versioned prompt assets from disk."""
+    """Load versioned prompt assets from package resources or a configured directory."""
 
-    def __init__(self, *, base_path: Path, version: str = "v1") -> None:
+    def __init__(self, *, version: str = "v1", base_path: Path | None = None) -> None:
         """Initialize the prompt loader.
 
         Args:
-            base_path: Root prompt directory.
             version: Prompt version folder to load.
+            base_path: Optional prompt root override. When omitted, packaged resources are used.
         """
-        self.base_path = base_path
         self.version = version
+        self.base_path = base_path
+
+    @classmethod
+    def from_settings(cls, settings: Settings) -> PromptLoader:
+        """Build a prompt loader from runtime settings.
+
+        Args:
+            settings: Application settings.
+
+        Returns:
+            PromptLoader: Configured prompt loader.
+        """
+        base_path = Path(settings.prompt_base_path) if settings.prompt_base_path else None
+        return cls(version=settings.prompt_version, base_path=base_path)
+
+    def _root(self) -> Traversable | Path:
+        """Return the base directory containing prompt versions.
+
+        Returns:
+            Traversable | Path: Prompt root.
+        """
+        if self.base_path is not None:
+            return self.base_path
+        return files("brainstorm_agent.resources.prompts")
 
     def _read(self, relative_path: str) -> str:
-        prompt_path = self.base_path / self.version / relative_path
+        """Read one prompt file.
+
+        Args:
+            relative_path: Path relative to the version directory.
+
+        Returns:
+            str: Prompt file content.
+        """
+        prompt_path = self._root().joinpath(self.version, relative_path)
         return prompt_path.read_text(encoding="utf-8")
 
     def system_prompt(self) -> str:

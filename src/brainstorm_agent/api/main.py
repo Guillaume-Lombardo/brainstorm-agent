@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 
 from brainstorm_agent.api.dependencies import configure_application_state
 from brainstorm_agent.api.routes.sessions import router as session_router
-from brainstorm_agent.exceptions import NotFoundError
+from brainstorm_agent.exceptions import LLMResponseError, LockAcquisitionError, NotFoundError
 from brainstorm_agent.settings import get_settings
 
 if TYPE_CHECKING:
@@ -41,5 +41,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.exception_handler(NotFoundError)
     def handle_not_found(_: Request, exc: NotFoundError) -> JSONResponse:
         return JSONResponse(status_code=404, content={"detail": str(exc)})
+
+    @app.exception_handler(LLMResponseError)
+    def handle_llm_response_error(_: Request, exc: LLMResponseError) -> JSONResponse:
+        return JSONResponse(status_code=502, content={"detail": str(exc)})
+
+    @app.exception_handler(LockAcquisitionError)
+    def handle_lock_timeout(_: Request, exc: LockAcquisitionError) -> JSONResponse:
+        return JSONResponse(status_code=503, content={"detail": str(exc)})
 
     return app

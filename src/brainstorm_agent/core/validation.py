@@ -22,7 +22,7 @@ def _is_present(value: object) -> bool:
         return False
     if isinstance(value, str):
         return bool(value.strip())
-    if isinstance(value, list | tuple | set):
+    if isinstance(value, (list, tuple, set)):
         return any(_is_present(item) for item in value)
     if isinstance(value, dict):
         return any(_is_present(item) for item in value.values())

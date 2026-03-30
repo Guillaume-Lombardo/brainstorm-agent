@@ -57,6 +57,33 @@ class SettingsError(PackageError):
 
 
 @dataclass
+class LLMResponseError(PackageError):
+    """Raised when an LLM response cannot be parsed into the expected schema."""
+
+    stage: str
+    message: str = "The LLM response could not be parsed."
+    raw_output_excerpt: str | None = None
+
+    def __str__(self) -> str:
+        """Return error message payload."""
+        if self.raw_output_excerpt:
+            return f"{self.message} stage={self.stage} raw_output_excerpt={self.raw_output_excerpt!r}"
+        return f"{self.message} stage={self.stage}"
+
+
+@dataclass
+class LockAcquisitionError(PackageError):
+    """Raised when a session-scoped lock cannot be acquired in time."""
+
+    session_id: str
+    message: str = "Timed out while waiting for the session lock."
+
+    def __str__(self) -> str:
+        """Return error message payload."""
+        return f"{self.message} session_id={self.session_id}"
+
+
+@dataclass
 class AsyncExecutionError(PackageError):
     """Raised when an async operation fails in compatibility runner."""
 

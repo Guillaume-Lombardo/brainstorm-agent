@@ -36,12 +36,22 @@ class Settings(BaseSettings):
         validation_alias="DATABASE_URL",
     )
     redis_url: str = Field(default="redis://redis:6379/0", validation_alias="REDIS_URL")
+    redis_lock_timeout_seconds: float = Field(
+        default=30.0,
+        validation_alias="REDIS_LOCK_TIMEOUT_SECONDS",
+    )
+    redis_lock_blocking_timeout_seconds: float = Field(
+        default=5.0,
+        validation_alias="REDIS_LOCK_BLOCKING_TIMEOUT_SECONDS",
+    )
 
     llm_mode: LLMMode = Field(default=LLMMode.HEURISTIC, validation_alias="LLM_MODE")
     openai_base_url: str | None = Field(default=None, validation_alias="OPENAI_BASE_URL")
     openai_api_key: str | None = Field(default=None, validation_alias="OPENAI_API_KEY")
     model_name: str = Field(default="gpt-4.1-mini", validation_alias="MODEL_NAME")
     openai_timeout_seconds: float = Field(default=30.0, validation_alias="OPENAI_TIMEOUT_SECONDS")
+    prompt_version: str = Field(default="v1", validation_alias="PROMPT_VERSION")
+    prompt_base_path: str | None = Field(default=None, validation_alias="PROMPT_BASE_PATH")
 
     @computed_field
     @property

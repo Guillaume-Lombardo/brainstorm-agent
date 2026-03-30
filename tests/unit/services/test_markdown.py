@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 from brainstorm_agent.core.enums import Stage
 from brainstorm_agent.core.models import AssistantAnalysis, FactItem, OpenQuestionItem, StageValidationResult
 from brainstorm_agent.services.markdown import MarkdownRenderer
@@ -9,7 +7,7 @@ from brainstorm_agent.services.prompt_loader import PromptLoader
 
 
 def test_markdown_renderer_emits_required_sections() -> None:
-    loader = PromptLoader(base_path=Path(__file__).resolve().parents[3] / "prompts")
+    loader = PromptLoader()
     renderer = MarkdownRenderer(loader)
 
     markdown = renderer.render(

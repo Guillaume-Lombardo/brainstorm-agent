@@ -141,7 +141,7 @@ Copy/update this block for each initiative:
   - voice input implementation
   - human review endpoint implementation beyond architecture-ready placeholders
 - Constraints:
-  - keep prompts externalized under `prompts/`
+  - keep prompts externalized under `src/brainstorm_agent/resources/prompts/`
   - use an OpenAI-compatible API through configurable `OPENAI_BASE_URL`, `OPENAI_API_KEY`, and `MODEL_NAME`
   - keep stage progression deterministic through coded validation rules
 - Risks:

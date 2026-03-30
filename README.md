@@ -42,7 +42,7 @@ src/brainstorm_agent/
 
 Supporting assets:
 
-- `prompts/v1/`: versioned prompt files
+- `src/brainstorm_agent/resources/prompts/v1/`: packaged versioned prompt files
 - `docs/adr/`: architecture decisions
 - `tests/unit`, `tests/integration`, `tests/end2end`
 
@@ -92,6 +92,10 @@ Core configuration:
 - `OPENAI_API_KEY`
 - `MODEL_NAME`
 - `OPENAI_TIMEOUT_SECONDS`
+- `PROMPT_VERSION`
+- `PROMPT_BASE_PATH`
+- `REDIS_LOCK_TIMEOUT_SECONDS`
+- `REDIS_LOCK_BLOCKING_TIMEOUT_SECONDS`
 - `HOST`
 - `PORT`
 - `LOG_LEVEL`

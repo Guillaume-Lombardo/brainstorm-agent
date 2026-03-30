@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
@@ -39,8 +38,16 @@ class SessionService:
     """Orchestrate session creation and message processing."""
 
     @staticmethod
-    def _default_prompt_loader() -> PromptLoader:
-        return PromptLoader(base_path=Path(__file__).resolve().parents[3] / "prompts")
+    def _default_prompt_loader(settings: Settings) -> PromptLoader:
+        """Build the default prompt loader from settings.
+
+        Args:
+            settings: Application settings.
+
+        Returns:
+            PromptLoader: Prompt loader configured for packaged resources.
+        """
+        return PromptLoader.from_settings(settings)
 
     def __init__(
         self,
@@ -62,7 +69,7 @@ class SessionService:
         """
         self.db_session = db_session
         self.settings = settings
-        self.prompt_loader = prompt_loader or self._default_prompt_loader()
+        self.prompt_loader = prompt_loader or self._default_prompt_loader(settings)
         self.llm = llm or build_llm(settings=settings, prompt_loader=self.prompt_loader)
         self.renderer = MarkdownRenderer(self.prompt_loader)
         self.lock_manager = lock_manager or NoopSessionLockManager()
@@ -155,7 +162,6 @@ class SessionService:
             )
             state.stage_states[output.processed_stage.value] = processed_stage_state
             state.current_stage = output.current_stage
-            state.updated_at = processed_stage_state.updated_at
             self.sessions.save_state(session_id, state)
             self.messages.add(
                 ConversationTurn(

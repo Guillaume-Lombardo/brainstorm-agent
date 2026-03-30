@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from openai import OpenAI
+from pydantic import ValidationError
 
 from brainstorm_agent.core.enums import LLMMode, Stage
 from brainstorm_agent.core.models import (
@@ -20,6 +21,7 @@ from brainstorm_agent.core.models import (
     StageState,
 )
 from brainstorm_agent.core.stage_contracts import STAGE_CONTRACTS, STAGE_FIELD_ALIASES
+from brainstorm_agent.exceptions import LLMResponseError
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -61,6 +63,30 @@ def _extract_json_object(content: str) -> dict[str, Any]:
     if start == -1 or end == -1 or start >= end:
         raise ValueError
     return json.loads(content[start : end + 1])
+
+
+def _parse_analysis_payload(*, stage: Stage, content: str) -> AssistantAnalysis:
+    """Parse a model response into the analysis schema.
+
+    Args:
+        stage: Stage that triggered the model call.
+        content: Raw model output.
+
+    Returns:
+        AssistantAnalysis: Parsed analysis payload.
+
+    Raises:
+        LLMResponseError: If the model output is not valid JSON or does not match the schema.
+    """
+    try:
+        payload = _extract_json_object(content)
+        return AssistantAnalysis.model_validate(payload)
+    except (ValueError, json.JSONDecodeError, ValidationError) as exc:
+        raise LLMResponseError(
+            stage=stage.value,
+            message="The configured OpenAI-compatible model returned an invalid analysis payload.",
+            raw_output_excerpt=content[:400],
+        ) from exc
 
 
 def _default_open_questions(stage: Stage, missing_fields: Iterable[str]) -> list[OpenQuestionItem]:
@@ -366,8 +392,7 @@ class OpenAICompatibleBrainstormLLM:
             ],
         )
         content = completion.choices[0].message.content or "{}"
-        payload = _extract_json_object(content)
-        return AssistantAnalysis.model_validate(payload)
+        return _parse_analysis_payload(stage=stage, content=content)
 
     def challenge(
         self,
@@ -405,8 +430,7 @@ class OpenAICompatibleBrainstormLLM:
             ],
         )
         content = completion.choices[0].message.content or "{}"
-        payload = _extract_json_object(content)
-        return AssistantAnalysis.model_validate(payload)
+        return _parse_analysis_payload(stage=stage, content=content)
 
 
 def build_llm(*, settings: Settings, prompt_loader: PromptLoader) -> BrainstormLLM:

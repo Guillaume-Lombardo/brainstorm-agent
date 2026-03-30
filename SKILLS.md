@@ -31,7 +31,7 @@ Use the smallest set of skills that covers the validated scope.
 ## Operating Rules
 
 - Keep artifacts in English by default.
-- Keep prompt assets versioned under `prompts/v*/`.
+- Keep prompt assets versioned under `src/brainstorm_agent/resources/prompts/v*/`.
 - Keep delivery guidance in sync with:
   - `AGENTS.md`
   - `docs/engineering/DEFINITION_OF_DONE.md`

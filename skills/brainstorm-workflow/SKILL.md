@@ -42,11 +42,11 @@ Every assistant turn must produce:
 
 ## Prompt Organization
 
-- `prompts/v*/system.md`: global behavior and invariants
-- `prompts/v*/stages/`: one file per workflow stage
-- `prompts/v*/evaluation/completeness.md`: completeness and blocking holes
-- `prompts/v*/evaluation/contradiction-challenge.md`: contradiction and ambiguity review
-- `prompts/v*/rendering/step-markdown.md`: Markdown rendering instructions
+- `src/brainstorm_agent/resources/prompts/v*/system.md`: global behavior and invariants
+- `src/brainstorm_agent/resources/prompts/v*/stages/`: one file per workflow stage
+- `src/brainstorm_agent/resources/prompts/v*/evaluation/completeness.md`: completeness and blocking holes
+- `src/brainstorm_agent/resources/prompts/v*/evaluation/contradiction-challenge.md`: contradiction and ambiguity review
+- `src/brainstorm_agent/resources/prompts/v*/rendering/step-markdown.md`: Markdown rendering instructions
 
 ## Deliverables
 

@@ -10,10 +10,9 @@ RUN pip install --no-cache-dir uv
 
 COPY pyproject.toml uv.lock* README.md LICENSE ./
 COPY src ./src
-COPY prompts ./prompts
 COPY .env.example ./.env.example
 
-RUN uv sync --group dev
+RUN uv sync
 
 EXPOSE 8000
 

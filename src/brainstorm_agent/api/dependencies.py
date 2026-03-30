@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
 from fastapi import Depends, Request
@@ -59,13 +58,18 @@ def get_db_session(request: Request) -> Iterator[Session]:
         db_session.close()
 
 
-def get_prompt_loader() -> PromptLoader:
+def get_prompt_loader(
+    settings: Annotated[Settings, Depends(get_app_settings)],
+) -> PromptLoader:
     """Build the prompt loader dependency.
 
+    Args:
+        settings: Application settings.
+
     Returns:
-        PromptLoader: Prompt loader rooted at the repository prompt directory.
+        PromptLoader: Prompt loader backed by packaged resources.
     """
-    return PromptLoader(base_path=Path(__file__).resolve().parents[3] / "prompts")
+    return PromptLoader.from_settings(settings)
 
 
 def get_llm(
@@ -140,7 +144,11 @@ def configure_application_state(app: FastAPI, settings: Settings) -> None:
         redis_client = Redis.from_url(settings.redis_url)
         redis_client.ping()
         app.state.redis = redis_client
-        app.state.lock_manager = RedisSessionLockManager(redis_client)
+        app.state.lock_manager = RedisSessionLockManager(
+            redis_client,
+            timeout_seconds=settings.redis_lock_timeout_seconds,
+            blocking_timeout_seconds=settings.redis_lock_blocking_timeout_seconds,
+        )
     except Exception:
         app.state.redis = None
         app.state.lock_manager = NoopSessionLockManager()

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
 from typing import TYPE_CHECKING, cast
+
+import pytest
 
 from brainstorm_agent.core.enums import LLMMode, Stage
 from brainstorm_agent.core.models import AssistantAnalysis, BrainstormSessionState
+from brainstorm_agent.exceptions import LLMResponseError
 from brainstorm_agent.services.llm_client import OpenAICompatibleBrainstormLLM, build_llm
 from brainstorm_agent.services.prompt_loader import PromptLoader
 from brainstorm_agent.settings import Settings
@@ -56,7 +58,7 @@ def test_openai_compatible_llm_parses_json_payload() -> None:
     llm = OpenAICompatibleBrainstormLLM(
         client=cast("OpenAI", _FakeOpenAIClient(payload)),
         settings=Settings(llm_mode=LLMMode.OPENAI, openai_api_key="key"),
-        prompt_loader=PromptLoader(base_path=Path(__file__).resolve().parents[3] / "prompts"),
+        prompt_loader=PromptLoader(),
     )
 
     analysis = llm.analyze(
@@ -76,7 +78,25 @@ def test_build_llm_returns_openai_adapter_when_configured(mocker) -> None:
 
     llm = build_llm(
         settings=Settings(llm_mode=LLMMode.OPENAI, openai_api_key="key"),
-        prompt_loader=PromptLoader(base_path=Path(__file__).resolve().parents[3] / "prompts"),
+        prompt_loader=PromptLoader(),
     )
 
     assert isinstance(llm, OpenAICompatibleBrainstormLLM)
+
+
+def test_openai_compatible_llm_raises_domain_error_on_invalid_payload() -> None:
+    llm = OpenAICompatibleBrainstormLLM(
+        client=cast("OpenAI", _FakeOpenAIClient("not-json")),
+        settings=Settings(llm_mode=LLMMode.OPENAI, openai_api_key="key"),
+        prompt_loader=PromptLoader(),
+    )
+
+    with pytest.raises(LLMResponseError) as excinfo:
+        llm.analyze(
+            stage=Stage.STAGE_1_PROBLEM_FRAMING,
+            user_message="problem: x",
+            session_state=BrainstormSessionState(session_id="session-1"),
+            current_stage_state=None,
+        )
+
+    assert excinfo.value.stage == Stage.STAGE_1_PROBLEM_FRAMING.value
