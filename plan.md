@@ -122,3 +122,64 @@ Copy/update this block for each initiative:
 - Rationale: This removes duplicated governance and reduces instruction drift.
 - Follow-up: Implement runtime modules around the new prompt and workflow structure in a dedicated feature phase.
 - ADR record: `docs/adr/0001-ai-tooling-layout.md`
+
+### Initiative: Implement the structured brainstorming backend
+
+- Status: `done`
+- Owner: `agent`
+- Objective: Deliver a working FastAPI + LangGraph backend with persistent staged brainstorming sessions, OpenAI-compatible model access, and Docker-based local execution.
+- In scope:
+  - application settings and environment contract
+  - domain schemas and stage validation rules
+  - SQLAlchemy persistence for sessions, turns, documents, and transition decisions
+  - optional Redis integration for non-critical cache/coordination hooks
+  - LangGraph orchestration for one conversation turn
+  - FastAPI endpoints for session lifecycle and document retrieval
+  - Dockerfile, docker-compose, README, and tests
+- Out of scope:
+  - OpenWebUI-specific integration
+  - voice input implementation
+  - human review endpoint implementation beyond architecture-ready placeholders
+- Constraints:
+  - keep prompts externalized under `prompts/`
+  - use an OpenAI-compatible API through configurable `OPENAI_BASE_URL`, `OPENAI_API_KEY`, and `MODEL_NAME`
+  - keep stage progression deterministic through coded validation rules
+- Risks:
+  - LangGraph integration drift if state boundaries are unclear
+  - persistence complexity across sessions, documents, and versions
+  - overfitting the LLM adapter to one provider behavior
+- Acceptance criteria:
+  - local Docker Compose starts app, Postgres, and Redis
+  - session creation and message exchange work through HTTP
+  - a structured Markdown deliverable is persisted on each turn
+  - stage transitions are blocked when required fields are incomplete
+  - unit, integration, and end-to-end coverage exists for core flows
+- ADR impact: `required`
+- ADR reference(s): `docs/adr/0002-backend-runtime-architecture.md`
+
+#### Steps
+
+- [x] Define runtime architecture, settings contract, and ADR
+- [x] Implement domain models, prompt loading, and validation rules
+- [x] Implement persistence models and repositories
+- [x] Implement LangGraph orchestration and LLM adapter
+- [x] Implement FastAPI routes and dependency wiring
+- [x] Add Docker assets, docs, and test coverage
+
+#### Validation
+
+- [x] `uv run ruff format .`
+- [x] `uv run ruff check .`
+- [x] `uv run ty check src tests`
+- [x] `uv run pytest -m unit`
+- [x] `uv run pytest -m integration`
+- [x] `uv run pytest -m end2end`
+- [x] `uv run pre-commit run --all-files`
+
+#### Notes / Decisions
+
+- Decision: Use a real LangGraph state graph for turn orchestration with rule-based transition checks outside the LLM.
+- Rationale: This satisfies the product constraint that stage progression must not depend only on free-form model output.
+- Follow-up: Reassess streaming and human-review hooks after the core synchronous API is stable.
+- ADR record: `docs/adr/0002-backend-runtime-architecture.md`
+- Note: `langgraph` currently emits a Python 3.14 warning through `langchain-core` Pydantic V1 compatibility code during tests, but validation still passes.

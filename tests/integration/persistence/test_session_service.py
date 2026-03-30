@@ -1,0 +1,70 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+from brainstorm_agent.core.enums import LLMMode, Stage
+from brainstorm_agent.persistence.session import (
+    create_all,
+    create_engine_from_settings,
+    create_session_factory,
+)
+from brainstorm_agent.services.session_service import SessionService
+from brainstorm_agent.settings import Settings
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+
+def _build_settings(tmp_path: Path) -> Settings:
+    return Settings(
+        database_url=f"sqlite+pysqlite:///{tmp_path / 'service.db'}",
+        llm_mode=LLMMode.HEURISTIC,
+        redis_url="redis://localhost:6399/0",
+    )
+
+
+def test_session_service_persists_versions_and_resolves_open_questions(tmp_path: Path) -> None:
+    settings = _build_settings(tmp_path)
+    engine = create_engine_from_settings(settings)
+    create_all(engine)
+    session_factory = create_session_factory(engine)
+
+    with session_factory() as db_session:
+        service = SessionService(db_session=db_session, settings=settings)
+        session = service.create_session()
+
+        first_output = service.process_user_message(
+            session_id=session.session_id,
+            content="A tool to structure project brainstorming for product teams.",
+        )
+        assert first_output.current_stage is Stage.STAGE_1_PROBLEM_FRAMING
+
+        blocked_output = service.process_user_message(
+            session_id=session.session_id,
+            content="problem: Discovery is inconsistent across teams.",
+        )
+        assert blocked_output.current_stage is Stage.STAGE_1_PROBLEM_FRAMING
+        assert blocked_output.stage_clear_enough is False
+        assert blocked_output.open_questions
+
+        clear_output = service.process_user_message(
+            session_id=session.session_id,
+            content=(
+                "problem: Discovery is inconsistent across teams.\n"
+                "users: Product managers; founders\n"
+                "objectives: reduce ambiguity; speed up scoping\n"
+                "constraints: must stay model-agnostic; keep Markdown artifacts\n"
+                "non_goals: building a general assistant\n"
+                "hypotheses: teams want structured guidance\n"
+                "initial_risks: low adoption; incomplete inputs\n"
+                "5w1h: who product teams; what project framing; why reduce ambiguity; how staged workflow"
+            ),
+        )
+        assert clear_output.current_stage is Stage.STAGE_2_USER_STORY_MAPPING
+        assert clear_output.next_stage is Stage.STAGE_2_USER_STORY_MAPPING
+
+        documents = service.list_documents(session.session_id)
+        stage_1_documents = [item for item in documents if item.stage is Stage.STAGE_1_PROBLEM_FRAMING]
+        assert len(stage_1_documents) == 2
+        assert stage_1_documents[-1].version == 2
+        assert service.get_session(session.session_id).open_questions == []
