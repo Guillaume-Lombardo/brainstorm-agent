@@ -31,11 +31,11 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """Return cached settings instance.
 
-    Raises:
-        SettingsError: If settings cannot be loaded or validated.
-
     Returns:
         Settings: The loaded settings instance.
+
+    Raises:
+        SettingsError: If settings cannot be loaded or validated.
     """
     try:
         return Settings()

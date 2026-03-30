@@ -19,11 +19,11 @@ def _run_in_background_thread[T](coro: Coroutine[Any, Any, T]) -> T:
     Args:
         coro: The coroutine to run.
 
-    Raises:
-        AsyncExecutionError: If the coroutine raises an exception.
-
     Returns:
         The result of the coroutine.
+
+    Raises:
+        AsyncExecutionError: If the coroutine raises an exception.
     """
     output: Queue[T | BaseException] = Queue(maxsize=1)
 
