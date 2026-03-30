@@ -10,7 +10,7 @@ from fastapi import Depends, FastAPI, Request, Response
 from fastapi.responses import JSONResponse, PlainTextResponse
 from sqlalchemy import text
 
-from brainstorm_agent.api.dependencies import configure_application_state, require_api_key
+from brainstorm_agent.api.dependencies import configure_application_state, enforce_api_security
 from brainstorm_agent.api.routes.openai import router as openai_router
 from brainstorm_agent.api.routes.sessions import router as session_router
 from brainstorm_agent.exceptions import ConflictError, LLMResponseError, LockAcquisitionError, NotFoundError
@@ -21,6 +21,81 @@ if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
     from brainstorm_agent.settings import Settings
+
+
+def _build_health_payload(app: FastAPI) -> dict[str, object]:
+    """Build the shared health payload.
+
+    Args:
+        app: FastAPI application.
+
+    Returns:
+        dict[str, object]: Health payload.
+    """
+    database_status = "ok"
+    try:
+        with app.state.engine.connect() as connection:
+            connection.execute(text("SELECT 1"))
+    except Exception:
+        database_status = "degraded"
+    return {
+        "status": "ok",
+        "database": database_status,
+        "redis": "ok" if app.state.redis is not None else "degraded",
+        "auth_enabled": app.state.settings.enable_auth,
+        "human_review_required": app.state.settings.require_human_validation_for_transitions,
+    }
+
+
+def _register_exception_handlers(app: FastAPI) -> None:
+    """Register exception handlers on the FastAPI app.
+
+    Args:
+        app: FastAPI application.
+    """
+
+    @app.exception_handler(NotFoundError)
+    def handle_not_found(_: Request, exc: NotFoundError) -> JSONResponse:
+        return JSONResponse(status_code=404, content={"detail": str(exc)})
+
+    @app.exception_handler(ConflictError)
+    def handle_conflict(_: Request, exc: ConflictError) -> JSONResponse:
+        return JSONResponse(status_code=409, content={"detail": str(exc)})
+
+    @app.exception_handler(LLMResponseError)
+    def handle_llm_response_error(_: Request, exc: LLMResponseError) -> JSONResponse:
+        return JSONResponse(status_code=502, content={"detail": str(exc)})
+
+    @app.exception_handler(LockAcquisitionError)
+    def handle_lock_timeout(_: Request, exc: LockAcquisitionError) -> JSONResponse:
+        return JSONResponse(status_code=503, content={"detail": str(exc)})
+
+
+def _register_health_routes(app: FastAPI) -> None:
+    """Register health and metrics routes.
+
+    Args:
+        app: FastAPI application.
+    """
+
+    @app.get("/healthz")
+    def healthcheck() -> dict[str, object]:
+        return _build_health_payload(app)
+
+    @app.get("/livez")
+    def livez() -> dict[str, str]:
+        return {"status": "ok"}
+
+    @app.get("/readyz")
+    def readyz(response: Response) -> dict[str, object]:
+        payload = _build_health_payload(app)
+        if payload["database"] != "ok":
+            response.status_code = 503
+        return payload
+
+    @app.get("/metrics", response_class=PlainTextResponse, dependencies=[Depends(enforce_api_security)])
+    def metrics() -> str:
+        return app.state.metrics.render_prometheus()
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -40,11 +115,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     logger = get_logger("brainstorm_agent.api")
     configure_application_state(app, app_settings)
-    app.include_router(openai_router, dependencies=[Depends(require_api_key)])
+    app.include_router(openai_router, dependencies=[Depends(enforce_api_security)])
     app.include_router(
         session_router,
         prefix=app_settings.api_v1_prefix,
-        dependencies=[Depends(require_api_key)],
+        dependencies=[Depends(enforce_api_security)],
     )
 
     @app.middleware("http")
@@ -76,40 +151,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
         return response
 
-    @app.get("/healthz")
-    def healthcheck() -> dict[str, object]:
-        database_status = "ok"
-        try:
-            with app.state.engine.connect() as connection:
-                connection.execute(text("SELECT 1"))
-        except Exception:
-            database_status = "degraded"
-        return {
-            "status": "ok",
-            "database": database_status,
-            "redis": "ok" if app.state.redis is not None else "degraded",
-            "auth_enabled": app.state.settings.enable_auth,
-            "human_review_required": app.state.settings.require_human_validation_for_transitions,
-        }
-
-    @app.get("/metrics", response_class=PlainTextResponse, dependencies=[Depends(require_api_key)])
-    def metrics() -> str:
-        return app.state.metrics.render_prometheus()
-
-    @app.exception_handler(NotFoundError)
-    def handle_not_found(_: Request, exc: NotFoundError) -> JSONResponse:
-        return JSONResponse(status_code=404, content={"detail": str(exc)})
-
-    @app.exception_handler(ConflictError)
-    def handle_conflict(_: Request, exc: ConflictError) -> JSONResponse:
-        return JSONResponse(status_code=409, content={"detail": str(exc)})
-
-    @app.exception_handler(LLMResponseError)
-    def handle_llm_response_error(_: Request, exc: LLMResponseError) -> JSONResponse:
-        return JSONResponse(status_code=502, content={"detail": str(exc)})
-
-    @app.exception_handler(LockAcquisitionError)
-    def handle_lock_timeout(_: Request, exc: LockAcquisitionError) -> JSONResponse:
-        return JSONResponse(status_code=503, content={"detail": str(exc)})
-
+    _register_health_routes(app)
+    _register_exception_handlers(app)
     return app

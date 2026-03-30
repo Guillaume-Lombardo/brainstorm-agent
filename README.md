@@ -45,6 +45,9 @@ Supporting assets:
 - `src/brainstorm_agent/resources/prompts/v1/`: packaged versioned prompt files
 - `docs/adr/`: architecture decisions
 - `examples/litellm/config.yaml`: example LiteLLM registration
+- `examples/litellm/config.openwebui.yaml`: LiteLLM config for OpenWebUI-oriented deployments
+- `examples/openwebui/.env.example`: OpenWebUI OpenAI-compatible connection example
+- `migrations/`: Alembic schema history
 - `tests/unit`, `tests/integration`, `tests/end2end`
 
 ## Local setup
@@ -70,6 +73,13 @@ Or via CLI:
 uv run brainstorm-agent serve
 ```
 
+Migration helpers:
+
+```bash
+uv run brainstorm-agent migrate --revision head
+uv run brainstorm-agent hash-api-key "replace-me"
+```
+
 ## Docker Compose
 
 ```bash
@@ -82,7 +92,11 @@ Services started:
 - `postgres`: durable session/document store
 - `redis`: optional session locking and coordination
 
-If you change persistence schemas on an existing local stack, recreate the database volume or start from a clean environment because this project currently relies on `create_all()` rather than formal migrations.
+Formal schema upgrades now use Alembic. For local development you can still rely on auto-creation, but for persistent environments prefer:
+
+```bash
+uv run brainstorm-agent migrate --revision head
+```
 
 ## Environment variables
 
@@ -104,9 +118,21 @@ Core configuration:
 - `PORT`
 - `ENABLE_AUTH`
 - `AUTH_API_KEYS`
+- `AUTH_MODE`
+- `AUTH_API_KEY_HASHES`
+- `JWT_SECRET_KEY`
+- `JWT_ALGORITHM`
+- `JWT_AUDIENCE`
+- `JWT_ISSUER`
 - `LOG_LEVEL`
 - `LOG_JSON`
 - `REQUIRE_HUMAN_VALIDATION_FOR_TRANSITIONS`
+- `AUTO_CREATE_SCHEMA`
+- `RUN_DB_MIGRATIONS_ON_STARTUP`
+- `RATE_LIMIT_ENABLED`
+- `RATE_LIMIT_REQUESTS`
+- `RATE_LIMIT_WINDOW_SECONDS`
+- `RATE_LIMIT_NAMESPACE`
 
 Recommended modes:
 
@@ -134,6 +160,8 @@ Business endpoints:
 Operational endpoints:
 
 - `GET /healthz`
+- `GET /readyz`
+- `GET /livez`
 - `GET /metrics`
 
 ### Create a session
@@ -338,10 +366,22 @@ This works because the brainstorming backend now exposes `/v1/models` and `/v1/c
 
 ## Security and operations
 
-- Set `ENABLE_AUTH=true` and provide one or more comma-separated values in `AUTH_API_KEYS` to protect all business and OpenAI-compatible endpoints.
-- Send the selected key through the `X-API-Key` header.
+- Auth supports:
+  - `AUTH_MODE=api_key` with `AUTH_API_KEY_HASHES` or `AUTH_API_KEYS`
+  - `AUTH_MODE=jwt` with `JWT_SECRET_KEY`
+  - `AUTH_MODE=hybrid` to accept either
+- Prefer `AUTH_API_KEY_HASHES` in production. Generate values with:
+
+```bash
+uv run brainstorm-agent hash-api-key "replace-me"
+```
+
+- Send hashed-key credentials through `X-API-Key`.
+- Send JWT credentials through `Authorization: Bearer <token>`.
+- Enable Redis-backed throttling with `RATE_LIMIT_ENABLED=true`.
 - Every HTTP response includes an `X-Request-Id` header.
-- `GET /metrics` exposes lightweight Prometheus-style counters for request count and cumulative duration.
+- `GET /metrics` exposes Prometheus-style counters for requests, auth failures, and rate-limit rejections.
+- `GET /readyz` fails with `503` when the database check does not pass.
 
 ### Local LiteLLM wiring
 
@@ -352,6 +392,39 @@ docker compose -f docker-compose.yml -f docker-compose.litellm.yml up --build
 ```
 
 Then call LiteLLM on `http://localhost:4000` with the registered model name `brainstorm-agent`.
+
+## Production deployment
+
+Production-oriented compose assets are available in:
+
+- [docker-compose.prod.yml](docker-compose.prod.yml)
+- [deploy/caddy/Caddyfile](deploy/caddy/Caddyfile)
+- [examples/litellm/config.openwebui.yaml](examples/litellm/config.openwebui.yaml)
+- [examples/openwebui/.env.example](examples/openwebui/.env.example)
+
+The production overlay includes:
+
+- the brainstorming backend
+- Postgres
+- Redis
+- LiteLLM
+- OpenWebUI
+- Caddy as a reverse proxy
+
+Example startup:
+
+```bash
+cp .env.example .env
+docker compose -f docker-compose.prod.yml up --build -d
+```
+
+By default the app entrypoint can run `alembic upgrade head` on startup when `RUN_DB_MIGRATIONS_ON_STARTUP=true`.
+
+## LiteLLM and OpenWebUI
+
+LiteLLM should point to the backend facade at `http://app:8000/v1`.
+
+OpenWebUI can use LiteLLM as an OpenAI-compatible backend. The Open WebUI docs for OpenAI-compatible providers document `OPENAI_API_BASE_URL` and `OPENAI_API_KEY`; the example in [examples/openwebui/.env.example](examples/openwebui/.env.example) uses that contract with LiteLLM in front of this backend.
 
 ## Workflow principles
 

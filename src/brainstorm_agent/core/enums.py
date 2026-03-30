@@ -84,6 +84,15 @@ class LLMMode(StrEnum):
     HEURISTIC = "heuristic"
 
 
+class AuthMode(StrEnum):
+    """Supported API authentication modes."""
+
+    NONE = "none"
+    API_KEY = "api_key"  # pragma: allowlist secret
+    JWT = "jwt"
+    HYBRID = "hybrid"
+
+
 class OpenQuestionStatus(StrEnum):
     """Lifecycle for open questions."""
 

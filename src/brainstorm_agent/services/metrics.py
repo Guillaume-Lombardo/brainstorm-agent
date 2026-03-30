@@ -14,6 +14,8 @@ class MetricsRegistry:
         self._lock = Lock()
         self._request_total: Counter[tuple[str, str, int]] = Counter()
         self._request_duration_seconds: defaultdict[tuple[str, str], float] = defaultdict(float)
+        self._auth_failures_total: Counter[str] = Counter()
+        self._rate_limit_rejections_total: Counter[str] = Counter()
 
     def record_request(self, *, method: str, path: str, status_code: int, duration_seconds: float) -> None:
         """Record one completed HTTP request.
@@ -55,4 +57,42 @@ class MetricsRegistry:
                     "brainstorm_agent_http_request_duration_seconds_total"
                     f'{{method="{method}",path="{path}"}} {duration:.6f}',
                 )
+            lines.extend(
+                [
+                    "# HELP brainstorm_agent_auth_failures_total Total authentication failures.",
+                    "# TYPE brainstorm_agent_auth_failures_total counter",
+                ],
+            )
+            for reason, count in sorted(self._auth_failures_total.items()):
+                lines.append(
+                    f'brainstorm_agent_auth_failures_total{{reason="{reason}"}} {count}',
+                )
+            lines.extend(
+                [
+                    "# HELP brainstorm_agent_rate_limit_rejections_total Total rate-limit rejections.",
+                    "# TYPE brainstorm_agent_rate_limit_rejections_total counter",
+                ],
+            )
+            for reason, count in sorted(self._rate_limit_rejections_total.items()):
+                lines.append(
+                    f'brainstorm_agent_rate_limit_rejections_total{{reason="{reason}"}} {count}',
+                )
         return "\n".join(lines) + "\n"
+
+    def record_auth_failure(self, *, reason: str) -> None:
+        """Record an authentication failure.
+
+        Args:
+            reason: Failure reason label.
+        """
+        with self._lock:
+            self._auth_failures_total[reason] += 1
+
+    def record_rate_limit_rejection(self, *, reason: str) -> None:
+        """Record a rate-limit rejection.
+
+        Args:
+            reason: Rejection reason label.
+        """
+        with self._lock:
+            self._rate_limit_rejections_total[reason] += 1

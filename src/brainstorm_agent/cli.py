@@ -8,6 +8,8 @@ import uvicorn
 
 from brainstorm_agent import __version__
 from brainstorm_agent.logging import configure_logging, get_logger
+from brainstorm_agent.persistence.session import upgrade_database
+from brainstorm_agent.services.auth import hash_api_key
 from brainstorm_agent.settings import get_settings
 
 
@@ -23,6 +25,10 @@ def build_parser() -> argparse.ArgumentParser:
     serve_parser = subparsers.add_parser("serve", help="Run the FastAPI backend.")
     serve_parser.add_argument("--host", default=None)
     serve_parser.add_argument("--port", default=None, type=int)
+    migrate_parser = subparsers.add_parser("migrate", help="Run Alembic migrations.")
+    migrate_parser.add_argument("--revision", default="head")
+    hash_parser = subparsers.add_parser("hash-api-key", help="Hash an API key for storage.")
+    hash_parser.add_argument("value")
     return parser
 
 
@@ -46,6 +52,13 @@ def main() -> int:
             host=args.host or settings.host,
             port=args.port or settings.port,
         )
+        return 0
+    if command == "migrate":
+        logger.info("Running migrations", revision=args.revision)
+        upgrade_database(database_url=settings.database_url, revision=args.revision)
+        return 0
+    if command == "hash-api-key":
+        print(hash_api_key(args.value))
         return 0
 
     logger.info("CLI initialized", version=__version__)

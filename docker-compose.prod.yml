@@ -1,0 +1,92 @@
+services:
+  app:
+    build:
+      context: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      AUTO_CREATE_SCHEMA: "false"
+      RUN_DB_MIGRATIONS_ON_STARTUP: "true"
+      DATABASE_URL: postgresql+psycopg://brainstorm:brainstorm@postgres:5432/brainstorm # pragma: allowlist secret
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    expose:
+      - "8000"
+
+  litellm:
+    image: docker.litellm.ai/berriai/litellm:main-latest
+    restart: unless-stopped
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    environment:
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-change-me} # pragma: allowlist secret
+    volumes:
+      - ./examples/litellm/config.openwebui.yaml:/app/config.yaml:ro
+    depends_on:
+      app:
+        condition: service_started
+    expose:
+      - "4000"
+
+  openwebui:
+    image: ghcr.io/open-webui/open-webui:main
+    restart: unless-stopped
+    environment:
+      ENABLE_OLLAMA_API: "false"
+      ENABLE_OPENAI_API: "true"
+      OPENAI_API_BASE_URL: http://litellm:4000/v1
+      OPENAI_API_KEY: ${LITELLM_MASTER_KEY:-change-me} # pragma: allowlist secret
+      WEBUI_AUTH: "true"
+    depends_on:
+      litellm:
+        condition: service_started
+    expose:
+      - "8080"
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      app:
+        condition: service_started
+      openwebui:
+        condition: service_started
+
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: brainstorm
+      POSTGRES_USER: brainstorm
+      POSTGRES_PASSWORD: brainstorm # pragma: allowlist secret
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U brainstorm -d brainstorm"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:8
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+
+volumes:
+  postgres-data:
+  redis-data:
+  caddy-data:
+  caddy-config:
