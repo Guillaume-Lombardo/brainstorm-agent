@@ -1,0 +1,40 @@
+services:
+  app:
+    build:
+      context: .
+    env_file:
+      - .env.example
+    environment:
+      DATABASE_URL: postgresql+psycopg://brainstorm:brainstorm@postgres:5432/brainstorm # pragma: allowlist secret
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: brainstorm
+      POSTGRES_USER: brainstorm
+      POSTGRES_PASSWORD: brainstorm # pragma: allowlist secret
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U brainstorm -d brainstorm"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:8
+    ports:
+      - "6379:6379"
+
+volumes:
+  postgres-data:

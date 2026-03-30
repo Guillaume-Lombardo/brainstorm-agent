@@ -24,7 +24,7 @@ Adopt the following AI tooling structure:
 - `agent.md` as a short execution contract that points back to `AGENTS.md`
 - `SKILLS.md` as the local skill index
 - `skills/brainstorm-workflow/SKILL.md` for workflow-specific delivery guidance
-- `prompts/v1/` for versioned prompt assets split by responsibility:
+- `src/brainstorm_agent/resources/prompts/v1/` for packaged versioned prompt assets split by responsibility:
   - `system.md`
   - `stages/*.md`
   - `evaluation/*.md`
