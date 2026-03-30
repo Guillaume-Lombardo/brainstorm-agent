@@ -102,6 +102,29 @@ def test_human_review_gate_blocks_transition_until_approved(tmp_path: Path) -> N
     assert reviews.json()["items"][0]["decision"] == "approved"
 
 
+def test_human_review_gate_rejects_new_messages_until_resolved(tmp_path: Path) -> None:
+    settings = _build_settings(tmp_path)
+    settings.require_human_validation_for_transitions = True
+    client = TestClient(create_app(settings=settings))
+
+    created = client.post("/api/v1/sessions")
+    session_id = created.json()["session_id"]
+
+    first_turn = client.post(
+        f"/api/v1/sessions/{session_id}/messages",
+        json={"content": "A service that helps teams structure product framing before delivery."},
+    )
+    assert first_turn.status_code == 200
+    assert first_turn.json()["requires_human_review"] is True
+
+    blocked = client.post(
+        f"/api/v1/sessions/{session_id}/messages",
+        json={"content": "Trying to continue without human approval."},
+    )
+    assert blocked.status_code == 409
+    assert "human review is pending" in blocked.json()["detail"]
+
+
 def test_session_message_stream_returns_sse_payload(tmp_path: Path) -> None:
     app = create_app(settings=_build_settings(tmp_path))
     client = TestClient(app)

@@ -8,6 +8,7 @@ from uuid import uuid4
 
 from fastapi import Depends, FastAPI, Request, Response
 from fastapi.responses import JSONResponse, PlainTextResponse
+from sqlalchemy import text
 
 from brainstorm_agent.api.dependencies import configure_application_state, require_api_key
 from brainstorm_agent.api.routes.openai import router as openai_router
@@ -57,7 +58,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         response = await call_next(request)
         duration = perf_counter() - start
         route = request.scope.get("route")
-        route_path = getattr(route, "path", request.url.path)
+        route_path = getattr(route, "path", "unmatched")
         app.state.metrics.record_request(
             method=request.method,
             path=str(route_path),
@@ -77,9 +78,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/healthz")
     def healthcheck() -> dict[str, object]:
+        database_status = "ok"
+        try:
+            with app.state.engine.connect() as connection:
+                connection.execute(text("SELECT 1"))
+        except Exception:
+            database_status = "degraded"
         return {
             "status": "ok",
-            "database": "ok",
+            "database": database_status,
             "redis": "ok" if app.state.redis is not None else "degraded",
             "auth_enabled": app.state.settings.enable_auth,
             "human_review_required": app.state.settings.require_human_validation_for_transitions,

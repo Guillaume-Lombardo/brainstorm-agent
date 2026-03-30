@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import pytest
+
 from brainstorm_agent.core.enums import LLMMode, Stage
+from brainstorm_agent.exceptions import ConflictError
 from brainstorm_agent.persistence.session import (
     create_all,
     create_engine_from_settings,
@@ -97,3 +100,54 @@ def test_session_service_requires_human_review_when_enabled(tmp_path: Path) -> N
         assert approved.current_stage is Stage.STAGE_1_PROBLEM_FRAMING
         assert approved.pending_human_review is None
         assert service.list_human_reviews(session.session_id)[0].decision.value == "approved"
+
+
+def test_session_service_reject_review_keeps_stage_and_clears_pending_review(tmp_path: Path) -> None:
+    settings = _build_settings(tmp_path)
+    settings.require_human_validation_for_transitions = True
+    engine = create_engine_from_settings(settings)
+    create_all(engine)
+    session_factory = create_session_factory(engine)
+
+    with session_factory() as db_session:
+        service = SessionService(db_session=db_session, settings=settings)
+        session = service.create_session()
+
+        first_output = service.process_user_message(
+            session_id=session.session_id,
+            content="A tool to structure project brainstorming for product teams.",
+        )
+        assert first_output.pending_review is not None
+
+        rejected = service.review_pending_transition(
+            session_id=session.session_id,
+            approved=False,
+            note="More review is needed before transition.",
+        )
+        assert rejected.current_stage is Stage.STAGE_0_PITCH
+        assert rejected.pending_human_review is None
+        assert service.list_human_reviews(session.session_id)[0].decision.value == "rejected"
+
+
+def test_session_service_blocks_new_message_while_review_is_pending(tmp_path: Path) -> None:
+    settings = _build_settings(tmp_path)
+    settings.require_human_validation_for_transitions = True
+    engine = create_engine_from_settings(settings)
+    create_all(engine)
+    session_factory = create_session_factory(engine)
+
+    with session_factory() as db_session:
+        service = SessionService(db_session=db_session, settings=settings)
+        session = service.create_session()
+
+        service.process_user_message(
+            session_id=session.session_id,
+            content="A tool to structure project brainstorming for product teams.",
+        )
+
+        with pytest.raises(ConflictError) as exc_info:
+            service.process_user_message(
+                session_id=session.session_id,
+                content="Trying to continue before human review.",
+            )
+        assert "human review is pending" in str(exc_info.value)

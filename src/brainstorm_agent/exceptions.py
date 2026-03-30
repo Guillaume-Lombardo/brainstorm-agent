@@ -61,6 +61,15 @@ class ConflictError(PackageError):
         """
         return cls(message="This session has no pending human review.")
 
+    @classmethod
+    def pending_human_review_in_progress(cls) -> ConflictError:
+        """Build a conflict error for a pending human review gate.
+
+        Returns:
+            ConflictError: Conflict for an unresolved pending review.
+        """
+        return cls(message="Cannot process a new user message while a human review is pending.")
+
     def __str__(self) -> str:
         """Return error message payload."""
         return self.message

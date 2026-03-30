@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from secrets import compare_digest
 from typing import TYPE_CHECKING, Annotated
 
 from fastapi import Depends, Header, HTTPException, Request, status
@@ -129,7 +130,7 @@ def require_api_key(
     settings = request.app.state.settings
     if not settings.enable_auth:
         return
-    if x_api_key and x_api_key in settings.auth_api_keys:
+    if x_api_key and any(compare_digest(x_api_key, candidate) for candidate in settings.auth_api_keys):
         return
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,

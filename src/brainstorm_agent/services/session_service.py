@@ -124,13 +124,15 @@ class SessionService:
 
         Raises:
             missing_session: If the session does not exist.
+            pending_human_review_in_progress: If a human validation decision is still pending.
         """
         with self.lock_manager.lock(session_id):
             record = self.sessions.get(session_id)
             if record is None:
                 raise NotFoundError.missing_session(session_id)
             state = self.sessions.to_state(record)
-            state.pending_human_review = None
+            if state.pending_human_review is not None:
+                raise ConflictError.pending_human_review_in_progress()
             current_stage = state.current_stage
             self.messages.add(
                 ConversationTurn(
