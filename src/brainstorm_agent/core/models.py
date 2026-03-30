@@ -8,7 +8,13 @@ from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
-from brainstorm_agent.core.enums import MessageRole, Modality, OpenQuestionStatus, Stage
+from brainstorm_agent.core.enums import (
+    HumanReviewDecision,
+    MessageRole,
+    Modality,
+    OpenQuestionStatus,
+    Stage,
+)
 
 
 def utc_now() -> datetime:
@@ -96,6 +102,28 @@ class StepDocument(BaseModel):
     created_at: datetime = Field(default_factory=utc_now)
 
 
+class PendingHumanReview(BaseModel):
+    """Pending transition awaiting explicit human review."""
+
+    from_stage: Stage
+    to_stage: Stage | None
+    summary: str
+    transition_decision_reason: str
+    requested_at: datetime = Field(default_factory=utc_now)
+
+
+class HumanReviewRecord(BaseModel):
+    """Persisted human review decision."""
+
+    id: str = Field(default_factory=lambda: str(uuid4()))
+    session_id: str
+    from_stage: Stage
+    proposed_next_stage: Stage | None
+    decision: HumanReviewDecision
+    note: str | None = None
+    created_at: datetime = Field(default_factory=utc_now)
+
+
 class StageState(BaseModel):
     """Current structured state for one stage."""
 
@@ -121,6 +149,7 @@ class BrainstormSessionState(BaseModel):
     session_id: str
     current_stage: Stage = Stage.STAGE_0_PITCH
     stage_states: dict[str, StageState] = Field(default_factory=dict)
+    pending_human_review: PendingHumanReview | None = None
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 
@@ -169,6 +198,8 @@ class AssistantTurnOutput(BaseModel):
     step_markdown: str
     transition_decision_reason: str
     next_stage: Stage | None = None
+    requires_human_review: bool = False
+    pending_review: PendingHumanReview | None = None
 
 
 class SessionOverview(BaseModel):
@@ -180,3 +211,4 @@ class SessionOverview(BaseModel):
     updated_at: datetime
     open_questions: list[OpenQuestionItem] = Field(default_factory=list)
     completed_stages: list[Stage] = Field(default_factory=list)
+    pending_human_review: PendingHumanReview | None = None

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
-from pydantic import Field, computed_field
+from pydantic import Field, computed_field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from brainstorm_agent.core.enums import LLMMode
@@ -26,6 +26,8 @@ class Settings(BaseSettings):
     api_v1_prefix: str = "/api/v1"
     host: str = Field(default="127.0.0.1", validation_alias="HOST")
     port: int = Field(default=8000, validation_alias="PORT")
+    enable_auth: bool = Field(default=False, validation_alias="ENABLE_AUTH")
+    auth_api_keys: list[str] = Field(default_factory=list, validation_alias="AUTH_API_KEYS")
 
     log_level: str = Field(default="INFO", validation_alias="LOG_LEVEL")
     log_json: bool = Field(default=True, validation_alias="LOG_JSON")
@@ -54,8 +56,27 @@ class Settings(BaseSettings):
         default="brainstorm-agent",
         validation_alias="OPENAI_FACADE_MODEL_NAME",
     )
+    require_human_validation_for_transitions: bool = Field(
+        default=False,
+        validation_alias="REQUIRE_HUMAN_VALIDATION_FOR_TRANSITIONS",
+    )
     prompt_version: str = Field(default="v1", validation_alias="PROMPT_VERSION")
     prompt_base_path: str | None = Field(default=None, validation_alias="PROMPT_BASE_PATH")
+
+    @field_validator("auth_api_keys", mode="before")
+    @classmethod
+    def _split_auth_api_keys(cls, value: object) -> object:
+        """Parse auth API keys from a comma-separated environment variable.
+
+        Args:
+            value: Raw environment value.
+
+        Returns:
+            object: Parsed list or original value.
+        """
+        if isinstance(value, str):
+            return [item.strip() for item in value.split(",") if item.strip()]
+        return value
 
     @computed_field
     @property

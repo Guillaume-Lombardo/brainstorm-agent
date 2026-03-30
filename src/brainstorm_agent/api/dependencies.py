@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Annotated
 
-from fastapi import Depends, Request
+from fastapi import Depends, Header, HTTPException, Request, status
 from redis import Redis
 from sqlalchemy.orm import Session  # noqa: TC002
 
@@ -19,6 +19,7 @@ from brainstorm_agent.services.locks import (
     RedisSessionLockManager,
     SessionLockManager,
 )
+from brainstorm_agent.services.metrics import MetricsRegistry
 from brainstorm_agent.services.prompt_loader import PromptLoader
 from brainstorm_agent.services.session_service import SessionService
 from brainstorm_agent.settings import Settings  # noqa: TC001
@@ -100,6 +101,42 @@ def get_lock_manager(request: Request) -> SessionLockManager:
     return request.app.state.lock_manager
 
 
+def get_metrics(request: Request) -> MetricsRegistry:
+    """Return the shared metrics registry.
+
+    Args:
+        request: FastAPI request.
+
+    Returns:
+        MetricsRegistry: Shared in-process metrics registry.
+    """
+    return request.app.state.metrics
+
+
+def require_api_key(
+    request: Request,
+    x_api_key: str | None = Header(default=None, alias="X-API-Key"),
+) -> None:
+    """Require a configured API key when auth is enabled.
+
+    Args:
+        request: FastAPI request.
+        x_api_key: API key provided by the caller.
+
+    Raises:
+        HTTPException: If auth is enabled and the API key is missing or invalid.
+    """
+    settings = request.app.state.settings
+    if not settings.enable_auth:
+        return
+    if x_api_key and x_api_key in settings.auth_api_keys:
+        return
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="A valid X-API-Key header is required.",
+    )
+
+
 def get_session_service(
     db_session: Annotated[Session, Depends(get_db_session)],
     settings: Annotated[Settings, Depends(get_app_settings)],
@@ -140,6 +177,7 @@ def configure_application_state(app: FastAPI, settings: Settings) -> None:
     create_all(engine)
     app.state.engine = engine
     app.state.session_factory = create_session_factory(engine)
+    app.state.metrics = MetricsRegistry()
     try:
         redis_client = Redis.from_url(settings.redis_url)
         redis_client.ping()

@@ -26,7 +26,9 @@ def test_healthcheck_and_session_flow(tmp_path: Path) -> None:
 
     health = client.get("/healthz")
     assert health.status_code == 200
-    assert health.json() == {"status": "ok"}
+    assert health.json()["status"] == "ok"
+    assert health.json()["database"] == "ok"
+    assert health.headers["X-Request-Id"]
 
     created = client.post("/api/v1/sessions")
     assert created.status_code == 201
@@ -50,6 +52,10 @@ def test_healthcheck_and_session_flow(tmp_path: Path) -> None:
     assert documents.status_code == 200
     assert len(documents.json()["items"]) == 1
 
+    metrics = client.get("/metrics")
+    assert metrics.status_code == 200
+    assert "brainstorm_agent_http_requests_total" in metrics.text
+
 
 def test_missing_session_returns_not_found(tmp_path: Path) -> None:
     client = TestClient(create_app(settings=_build_settings(tmp_path)))
@@ -72,3 +78,16 @@ def test_llm_response_errors_return_bad_gateway(tmp_path: Path) -> None:
 
     assert response.status_code == 502
     assert "could not be parsed" in response.json()["detail"]
+
+
+def test_auth_blocks_requests_when_enabled(tmp_path: Path) -> None:
+    settings = _build_settings(tmp_path)
+    settings.enable_auth = True
+    settings.auth_api_keys = ["secret-token"]
+    client = TestClient(create_app(settings=settings))
+
+    blocked = client.post("/api/v1/sessions")
+    assert blocked.status_code == 401
+
+    allowed = client.post("/api/v1/sessions", headers={"X-API-Key": "secret-token"})
+    assert allowed.status_code == 201

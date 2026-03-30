@@ -82,6 +82,8 @@ Services started:
 - `postgres`: durable session/document store
 - `redis`: optional session locking and coordination
 
+If you change persistence schemas on an existing local stack, recreate the database volume or start from a clean environment because this project currently relies on `create_all()` rather than formal migrations.
+
 ## Environment variables
 
 Core configuration:
@@ -100,8 +102,11 @@ Core configuration:
 - `REDIS_LOCK_BLOCKING_TIMEOUT_SECONDS`
 - `HOST`
 - `PORT`
+- `ENABLE_AUTH`
+- `AUTH_API_KEYS`
 - `LOG_LEVEL`
 - `LOG_JSON`
+- `REQUIRE_HUMAN_VALIDATION_FOR_TRANSITIONS`
 
 Recommended modes:
 
@@ -116,10 +121,20 @@ Business endpoints:
 
 - `POST /sessions`
 - `POST /sessions/{session_id}/messages`
+- `POST /sessions/{session_id}/messages/stream`
 - `GET /sessions/{session_id}`
 - `GET /sessions/{session_id}/messages`
 - `GET /sessions/{session_id}/document`
 - `GET /sessions/{session_id}/documents`
+- `GET /sessions/{session_id}/export/markdown`
+- `GET /sessions/{session_id}/export/json`
+- `GET /sessions/{session_id}/reviews`
+- `POST /sessions/{session_id}/reviews`
+
+Operational endpoints:
+
+- `GET /healthz`
+- `GET /metrics`
 
 ### Create a session
 
@@ -156,8 +171,41 @@ curl -X POST http://localhost:8000/api/v1/sessions/<session_id>/messages \
   "risks": [],
   "step_markdown": "# Structured Summary\n...",
   "transition_decision_reason": "All coded stage requirements are satisfied and no blocking questions remain.",
-  "next_stage": "stage_1_problem_framing"
+  "next_stage": "stage_1_problem_framing",
+  "requires_human_review": false,
+  "pending_review": null
 }
+```
+
+### Session SSE example
+
+```bash
+curl -N -X POST http://localhost:8000/api/v1/sessions/<session_id>/messages/stream \
+  -H "Content-Type: application/json" \
+  -d '{
+    "content": "A service that helps teams turn rough project ideas into structured plans.",
+    "modality": "text"
+  }'
+```
+
+### Human review gate
+
+When `REQUIRE_HUMAN_VALIDATION_FOR_TRANSITIONS=true`, a stage can be clear enough without advancing immediately.
+In that mode:
+
+- turn responses may include `"requires_human_review": true`
+- the session exposes `pending_human_review`
+- `POST /api/v1/sessions/{session_id}/reviews` approves or rejects the transition
+
+Example:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/sessions/<session_id>/reviews \
+  -H "Content-Type: application/json" \
+  -d '{
+    "decision": "approved",
+    "note": "Transition accepted by project lead."
+  }'
 ```
 
 ## OpenAI-compatible facade
@@ -166,6 +214,7 @@ The backend also exposes a minimal OpenAI-compatible surface for LiteLLM and gen
 
 - `GET /v1/models`
 - `POST /v1/chat/completions`
+- `POST /v1/responses`
 
 The public alias is controlled through `OPENAI_FACADE_MODEL_NAME` and defaults to `brainstorm-agent`.
 
@@ -235,6 +284,28 @@ curl -X POST http://localhost:8000/v1/chat/completions \
 }
 ```
 
+### Example `/v1/responses` request
+
+```bash
+curl -X POST http://localhost:8000/v1/responses \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "brainstorm-agent",
+    "input": "Help me frame a discovery workflow for product teams.",
+    "metadata": {}
+  }'
+```
+
+### Streaming support
+
+The backend supports SSE-style streaming for:
+
+- `POST /api/v1/sessions/{session_id}/messages/stream`
+- `POST /v1/chat/completions` with `"stream": true`
+- `POST /v1/responses` with `"stream": true`
+
+Streaming is currently incremental at the transport layer only: the backend emits the final computed turn as SSE events once the LangGraph turn is complete.
+
 ## LiteLLM registration
 
 LiteLLM can register this backend as an OpenAI-compatible upstream by exposing the facade endpoint through its proxy configuration.
@@ -264,6 +335,13 @@ model_list:
 ```
 
 This works because the brainstorming backend now exposes `/v1/models` and `/v1/chat/completions`.
+
+## Security and operations
+
+- Set `ENABLE_AUTH=true` and provide one or more comma-separated values in `AUTH_API_KEYS` to protect all business and OpenAI-compatible endpoints.
+- Send the selected key through the `X-API-Key` header.
+- Every HTTP response includes an `X-Request-Id` header.
+- `GET /metrics` exposes lightweight Prometheus-style counters for request count and cumulative duration.
 
 ### Local LiteLLM wiring
 

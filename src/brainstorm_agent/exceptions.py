@@ -47,6 +47,26 @@ class NotFoundError(PackageError):
 
 
 @dataclass
+class ConflictError(PackageError):
+    """Raised when the requested operation conflicts with current state."""
+
+    message: str
+
+    @classmethod
+    def no_pending_human_review(cls) -> ConflictError:
+        """Build a missing-pending-review conflict error.
+
+        Returns:
+            ConflictError: Conflict for absent pending review.
+        """
+        return cls(message="This session has no pending human review.")
+
+    def __str__(self) -> str:
+        """Return error message payload."""
+        return self.message
+
+
+@dataclass
 class SettingsError(PackageError):
     """Raised when settings cannot be loaded or validated."""
 

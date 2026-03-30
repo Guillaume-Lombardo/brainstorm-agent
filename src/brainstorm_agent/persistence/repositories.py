@@ -8,10 +8,17 @@ from uuid import uuid4
 
 from sqlalchemy import Select, desc, func, select, update
 
-from brainstorm_agent.core.enums import MessageRole, Modality, OpenQuestionStatus, Stage
+from brainstorm_agent.core.enums import (
+    HumanReviewDecision,
+    MessageRole,
+    Modality,
+    OpenQuestionStatus,
+    Stage,
+)
 from brainstorm_agent.core.models import (
     BrainstormSessionState,
     ConversationTurn,
+    HumanReviewRecord,
     OpenQuestionItem,
     SessionOverview,
     StepDocument,
@@ -19,6 +26,7 @@ from brainstorm_agent.core.models import (
 from brainstorm_agent.exceptions import NotFoundError
 from brainstorm_agent.persistence.models import (
     DocumentRecord,
+    HumanReviewDecisionRecord,
     MessageRecord,
     OpenQuestionRecord,
     SessionRecord,
@@ -145,6 +153,7 @@ class SessionRepository:
             updated_at=record.updated_at,
             open_questions=open_questions,
             completed_stages=completed_stages,
+            pending_human_review=state.pending_human_review,
         )
 
 
@@ -475,6 +484,68 @@ class OpenQuestionRepository:
                 why_it_matters=row.why_it_matters,
                 blocking=row.blocking,
                 status=OpenQuestionStatus(row.status),
+            )
+            for row in rows
+        ]
+
+
+class HumanReviewRepository:
+    """Persistence operations for human review decisions."""
+
+    def __init__(self, db_session: Session) -> None:
+        """Initialize the repository.
+
+        Args:
+            db_session: Database session.
+        """
+        self.db_session = db_session
+
+    def add(self, review: HumanReviewRecord) -> HumanReviewDecisionRecord:
+        """Persist one human review decision.
+
+        Args:
+            review: Human review decision to persist.
+
+        Returns:
+            HumanReviewDecisionRecord: Created ORM row.
+        """
+        record = HumanReviewDecisionRecord(
+            id=review.id,
+            session_id=review.session_id,
+            from_stage=review.from_stage.value,
+            proposed_next_stage=review.proposed_next_stage.value if review.proposed_next_stage else None,
+            decision=review.decision.value,
+            note=review.note,
+            created_at=review.created_at,
+        )
+        self.db_session.add(record)
+        self.db_session.flush()
+        return record
+
+    def list_for_session(self, session_id: str) -> list[HumanReviewRecord]:
+        """List all human review decisions for a session.
+
+        Args:
+            session_id: Session identifier.
+
+        Returns:
+            list[HumanReviewRecord]: Ordered review decisions.
+        """
+        query = (
+            select(HumanReviewDecisionRecord)
+            .where(HumanReviewDecisionRecord.session_id == session_id)
+            .order_by(HumanReviewDecisionRecord.created_at.asc())
+        )
+        rows = self.db_session.execute(query).scalars().all()
+        return [
+            HumanReviewRecord(
+                id=row.id,
+                session_id=row.session_id,
+                from_stage=Stage(row.from_stage),
+                proposed_next_stage=Stage(row.proposed_next_stage) if row.proposed_next_stage else None,
+                decision=HumanReviewDecision(row.decision),
+                note=row.note,
+                created_at=row.created_at,
             )
             for row in rows
         ]

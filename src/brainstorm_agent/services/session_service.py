@@ -5,19 +5,22 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
-from brainstorm_agent.core.enums import MessageRole, Modality, Stage
+from brainstorm_agent.core.enums import HumanReviewDecision, MessageRole, Modality, Stage
 from brainstorm_agent.core.models import (
     AssistantTurnOutput,
     BrainstormSessionState,
     ConversationTurn,
+    HumanReviewRecord,
+    PendingHumanReview,
     SessionOverview,
     StageState,
     StepDocument,
 )
-from brainstorm_agent.exceptions import NotFoundError
+from brainstorm_agent.exceptions import ConflictError, NotFoundError
 from brainstorm_agent.graph.builder import build_turn_graph
 from brainstorm_agent.persistence.repositories import (
     DocumentRepository,
+    HumanReviewRepository,
     MessageRepository,
     OpenQuestionRepository,
     SessionRepository,
@@ -78,6 +81,7 @@ class SessionService:
         self.documents = DocumentRepository(db_session)
         self.transitions = TransitionRepository(db_session)
         self.open_questions = OpenQuestionRepository(db_session)
+        self.human_reviews = HumanReviewRepository(db_session)
         self.graph = build_turn_graph(llm=self.llm, renderer=self.renderer)
 
     def create_session(self) -> SessionOverview:
@@ -126,6 +130,7 @@ class SessionService:
             if record is None:
                 raise NotFoundError.missing_session(session_id)
             state = self.sessions.to_state(record)
+            state.pending_human_review = None
             current_stage = state.current_stage
             self.messages.add(
                 ConversationTurn(
@@ -161,7 +166,30 @@ class SessionService:
                 transition_decision_reason=output.transition_decision_reason,
             )
             state.stage_states[output.processed_stage.value] = processed_stage_state
-            state.current_stage = output.current_stage
+            proposed_next_stage = output.next_stage
+            if (
+                self.settings.require_human_validation_for_transitions
+                and output.stage_clear_enough
+                and proposed_next_stage is not None
+            ):
+                pending_review = PendingHumanReview(
+                    from_stage=output.processed_stage,
+                    to_stage=proposed_next_stage,
+                    summary=output.summary,
+                    transition_decision_reason=output.transition_decision_reason,
+                )
+                state.pending_human_review = pending_review
+                state.current_stage = output.processed_stage
+                output.current_stage = output.processed_stage
+                output.requires_human_review = True
+                output.pending_review = pending_review
+                output.assistant_message = (
+                    f"{output.assistant_message.rstrip()}\n\n"
+                    "Human validation is required before advancing to the next stage."
+                )
+            else:
+                state.current_stage = output.current_stage
+                output.pending_review = None
             self.sessions.save_state(session_id, state)
             self.messages.add(
                 ConversationTurn(
@@ -270,3 +298,112 @@ class SessionService:
         """
         self.sessions.require(session_id)
         return self.documents.list_all(session_id)
+
+    def export_markdown(self, session_id: str) -> str:
+        """Export the latest session documents into one Markdown artifact.
+
+        Args:
+            session_id: Session identifier.
+
+        Returns:
+            str: Consolidated Markdown export.
+        """
+        overview = self.get_session(session_id)
+        messages = self.list_messages(session_id)
+        documents_by_stage = {item.stage: item for item in self.list_documents(session_id) if item.version}
+        sections = [
+            "# Brainstorm Session Export",
+            "",
+            f"- Session ID: `{overview.session_id}`",
+            f"- Current stage: `{overview.current_stage.value}`",
+            f"- Pending human review: `{bool(overview.pending_human_review)}`",
+            "",
+            "## Conversation Summary",
+            "",
+            f"- Message count: `{len(messages)}`",
+            f"- Open questions: `{len(overview.open_questions)}`",
+            "",
+        ]
+        for stage in Stage.ordered():
+            document = documents_by_stage.get(stage)
+            if document is None:
+                continue
+            sections.extend(
+                [
+                    f"## {stage.label}",
+                    "",
+                    document.markdown.strip(),
+                    "",
+                ],
+            )
+        return "\n".join(sections).strip() + "\n"
+
+    def export_json(self, session_id: str) -> dict[str, object]:
+        """Export a full structured session snapshot.
+
+        Args:
+            session_id: Session identifier.
+
+        Returns:
+            dict[str, object]: Structured export payload.
+        """
+        overview = self.get_session(session_id)
+        return {
+            "session": overview.model_dump(mode="json"),
+            "messages": [item.model_dump(mode="json") for item in self.list_messages(session_id)],
+            "documents": [item.model_dump(mode="json") for item in self.list_documents(session_id)],
+            "human_reviews": [item.model_dump(mode="json") for item in self.list_human_reviews(session_id)],
+        }
+
+    def review_pending_transition(
+        self,
+        *,
+        session_id: str,
+        approved: bool,
+        note: str | None = None,
+    ) -> SessionOverview:
+        """Approve or reject the pending human-reviewed transition.
+
+        Args:
+            session_id: Session identifier.
+            approved: Whether to approve the pending transition.
+            note: Optional reviewer note.
+
+        Returns:
+            SessionOverview: Updated session overview.
+
+        Raises:
+            no_pending_human_review: If the session has no pending human review.
+        """
+        with self.lock_manager.lock(session_id):
+            record = self.sessions.require(session_id)
+            state = self.sessions.to_state(record)
+            pending = state.pending_human_review
+            if pending is None:
+                raise ConflictError.no_pending_human_review()
+            review = HumanReviewRecord(
+                session_id=session_id,
+                from_stage=pending.from_stage,
+                proposed_next_stage=pending.to_stage,
+                decision=(HumanReviewDecision.APPROVED if approved else HumanReviewDecision.REJECTED),
+                note=note,
+            )
+            self.human_reviews.add(review)
+            if approved and pending.to_stage is not None:
+                state.current_stage = pending.to_stage
+            state.pending_human_review = None
+            self.sessions.save_state(session_id, state)
+            self.db_session.commit()
+            return self.sessions.overview(record, self.open_questions.list_open(session_id))
+
+    def list_human_reviews(self, session_id: str) -> list[HumanReviewRecord]:
+        """Return all human review decisions for a session.
+
+        Args:
+            session_id: Session identifier.
+
+        Returns:
+            list[HumanReviewRecord]: Ordered review decisions.
+        """
+        self.sessions.require(session_id)
+        return self.human_reviews.list_for_session(session_id)

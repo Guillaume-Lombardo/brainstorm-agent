@@ -43,6 +43,10 @@ class SessionRecord(Base):
         back_populates="session",
         cascade="all, delete-orphan",
     )
+    human_reviews: Mapped[list[HumanReviewDecisionRecord]] = relationship(
+        back_populates="session",
+        cascade="all, delete-orphan",
+    )
     open_questions: Mapped[list[OpenQuestionRecord]] = relationship(
         back_populates="session",
         cascade="all, delete-orphan",
@@ -123,3 +127,19 @@ class OpenQuestionRecord(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
 
     session: Mapped[SessionRecord] = relationship(back_populates="open_questions")
+
+
+class HumanReviewDecisionRecord(Base):
+    """Persistent human review decision for gated transitions."""
+
+    __tablename__ = "human_review_decisions"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    session_id: Mapped[str] = mapped_column(ForeignKey("sessions.id", ondelete="CASCADE"), nullable=False)
+    from_stage: Mapped[str] = mapped_column(String(64), nullable=False)
+    proposed_next_stage: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    decision: Mapped[str] = mapped_column(String(16), nullable=False)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+    session: Mapped[SessionRecord] = relationship(back_populates="human_reviews")
