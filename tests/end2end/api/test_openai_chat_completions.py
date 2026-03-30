@@ -53,3 +53,31 @@ def test_openai_compatible_chat_flow_preserves_session_state(tmp_path: Path) -> 
     assert problem_payload["brainstorm"]["current_stage"] == "stage_1_problem_framing"
     assert problem_payload["brainstorm"]["stage_clear_enough"] is False
     assert "users_actors" in problem_payload["brainstorm"]["transition_decision_reason"]
+
+
+def test_openai_responses_flow_supports_session_metadata(tmp_path: Path) -> None:
+    settings = Settings(
+        database_url=f"sqlite+pysqlite:///{tmp_path / 'responses-end2end.db'}",
+        llm_mode=LLMMode.HEURISTIC,
+        redis_url="redis://localhost:6399/0",
+        openai_facade_model_name="brainstorm-agent",
+    )
+    client = TestClient(create_app(settings=settings))
+
+    first = client.post(
+        "/v1/responses",
+        json={"model": "brainstorm-agent", "input": "Frame a product discovery agent."},
+    )
+    assert first.status_code == 200
+    session_id = first.json()["brainstorm"]["session_id"]
+
+    second = client.post(
+        "/v1/responses",
+        json={
+            "model": "brainstorm-agent",
+            "input": [{"role": "user", "content": "problem: discovery is inconsistent"}],
+            "metadata": {"session_id": session_id},
+        },
+    )
+    assert second.status_code == 200
+    assert second.json()["brainstorm"]["session_id"] == session_id

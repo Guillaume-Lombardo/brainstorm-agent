@@ -218,6 +218,83 @@ Copy/update this block for each initiative:
 #### Steps
 
 - [x] Add OpenAI-compatible schemas and facade service
+- [x] Document LiteLLM usage and session continuity
+- [x] Add automated coverage for the facade flow
+
+#### Validation
+
+- [x] `uv run ruff format .`
+- [x] `uv run ruff check .`
+- [x] `uv run ty check src tests`
+- [x] `uv run pytest -m unit`
+- [x] `uv run pytest -m integration`
+- [x] `uv run pytest -m end2end`
+- [x] `uv run pre-commit run --all-files`
+
+#### Notes / Decisions
+
+- Decision: Keep OpenAI compatibility as a facade over the session-oriented backend instead of replacing the native API.
+- Rationale: LiteLLM and generic OpenAI clients can integrate without changing the deterministic stateful domain model.
+- Follow-up: Extend the facade if `/v1/responses`, auth, streaming, or operational hardening becomes necessary.
+- ADR record: `docs/adr/0003-openai-compatible-facade.md`
+
+### Initiative: Hardening and bonus capabilities for production-style integration
+
+- Status: `done`
+- Owner: `agent`
+- Objective: Harden the backend for external consumption with auth, observability, human validation, exports, and broader OpenAI-compatible support.
+- In scope:
+  - optional API-key authentication
+  - request IDs, health details, and lightweight metrics
+  - optional human validation gate before stage transition
+  - session exports in Markdown and JSON
+  - SSE endpoints for native and OpenAI-compatible APIs
+  - `/v1/responses` compatibility
+- Out of scope:
+  - formal migration framework
+  - full OpenWebUI plugin implementation
+  - token-level true incremental model streaming
+- Constraints:
+  - keep existing API flows backward compatible by default
+  - keep auth optional and environment-driven
+  - keep human validation optional and disabled by default
+- Risks:
+  - schema growth across API and persistence layers
+  - transport-level streaming being mistaken for token streaming
+  - operational hardening without full migrations requires documented cleanup expectations
+- Acceptance criteria:
+  - auth can be enabled through env vars
+  - metrics and health endpoints expose operational state
+  - pending transitions can be approved or rejected through a human review endpoint
+  - exports are available in Markdown and JSON
+  - `/v1/responses` and SSE flows are covered by tests and docs
+- ADR impact: `required`
+- ADR reference(s): `docs/adr/0004-hardening-and-bonus-capabilities.md`
+
+#### Steps
+
+- [x] Add optional API-key auth, request IDs, health details, and in-process metrics
+- [x] Extend domain and persistence for human review decisions and optional transition gating
+- [x] Add Markdown/JSON exports and native SSE message streaming
+- [x] Add `/v1/responses` plus OpenAI-compatible streaming support
+- [x] Update docs, ADRs, env examples, and full validation
+
+#### Validation
+
+- [x] `uv run ruff format .`
+- [x] `uv run ruff check .`
+- [x] `uv run ty check src tests`
+- [x] `uv run pytest -m unit`
+- [x] `uv run pytest -m integration`
+- [x] `uv run pytest -m end2end`
+- [x] `uv run pre-commit run --all-files`
+
+#### Notes / Decisions
+
+- Decision: Human validation is implemented as an optional gate that holds a pending transition in session state rather than altering the LangGraph flow.
+- Rationale: This keeps the graph deterministic and synchronous while allowing explicit human control at the application-service layer.
+- Follow-up: Revisit true token streaming and formal DB migrations if this backend moves toward production deployment.
+- ADR record: `docs/adr/0004-hardening-and-bonus-capabilities.md`
 - [x] Add `/v1/models` and `/v1/chat/completions`
 - [x] Document LiteLLM configuration and local wiring
 - [x] Add tests for facade behavior and session continuity

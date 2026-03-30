@@ -8,13 +8,15 @@ from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
-from brainstorm_agent.core.enums import Modality, Stage
+from brainstorm_agent.core.enums import HumanReviewDecision, Modality, Stage
 from brainstorm_agent.core.models import (
     AssumptionItem,
     ConversationTurn,
     DecisionItem,
     FactItem,
+    HumanReviewRecord,
     OpenQuestionItem,
+    PendingHumanReview,
     RiskItem,
     SessionOverview,
     StepDocument,
@@ -54,6 +56,8 @@ class PostMessageResponse(BaseModel):
     step_markdown: str
     transition_decision_reason: str
     next_stage: Stage | None
+    requires_human_review: bool = False
+    pending_review: PendingHumanReview | None = None
 
 
 class SessionResponse(SessionOverview):
@@ -70,6 +74,33 @@ class DocumentsResponse(BaseModel):
     """Versioned documents response."""
 
     items: list[StepDocument]
+
+
+class HumanReviewRequest(BaseModel):
+    """Request payload for approving or rejecting a pending transition."""
+
+    decision: HumanReviewDecision
+    note: str | None = None
+
+
+class HumanReviewsResponse(BaseModel):
+    """List of human review decisions for a session."""
+
+    items: list[HumanReviewRecord]
+
+
+class ExportMarkdownResponse(BaseModel):
+    """Markdown export payload."""
+
+    session_id: str
+    markdown: str
+
+
+class ExportJsonResponse(BaseModel):
+    """Structured JSON export payload."""
+
+    session_id: str
+    payload: dict[str, Any]
 
 
 class OpenAIContentPart(BaseModel):
@@ -107,6 +138,31 @@ class OpenAIChatCompletionRequest(BaseModel):
 
     model: str
     messages: list[OpenAIChatMessage]
+    stream: bool = False
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    user: str | None = None
+
+
+class OpenAIResponsesInputMessage(BaseModel):
+    """OpenAI-compatible item for the `/v1/responses` input list."""
+
+    role: Literal["system", "developer", "user", "assistant", "tool"]
+    content: str | list[OpenAIContentPart] | None
+
+    def as_text(self) -> str:
+        """Return the input item content as plain text.
+
+        Returns:
+            str: Flattened text content.
+        """
+        return OpenAIChatMessage(role=self.role, content=self.content).as_text()
+
+
+class OpenAIResponsesRequest(BaseModel):
+    """OpenAI-compatible request payload for `/v1/responses`."""
+
+    model: str
+    input: str | list[OpenAIResponsesInputMessage]
     stream: bool = False
     metadata: dict[str, Any] = Field(default_factory=dict)
     user: str | None = None
@@ -172,5 +228,33 @@ class OpenAIChatCompletionResponse(BaseModel):
     created: int = Field(default_factory=lambda: int(datetime.now(tz=UTC).timestamp()))
     model: str
     choices: list[OpenAICompletionChoice]
+    usage: OpenAIUsage
+    brainstorm: OpenAIBrainstormPayload
+
+
+class OpenAIResponseOutputText(BaseModel):
+    """Text content item in OpenAI-compatible response output."""
+
+    type: Literal["output_text"] = "output_text"
+    text: str
+
+
+class OpenAIResponseOutputMessage(BaseModel):
+    """Output message in `/v1/responses` responses."""
+
+    id: str = Field(default_factory=lambda: f"msg-{uuid4()}")
+    type: Literal["message"] = "message"
+    role: Literal["assistant"] = "assistant"
+    content: list[OpenAIResponseOutputText]
+
+
+class OpenAIResponsesResponse(BaseModel):
+    """OpenAI-compatible `/v1/responses` payload."""
+
+    id: str = Field(default_factory=lambda: f"resp-{uuid4()}")
+    object: Literal["response"] = "response"
+    created_at: int = Field(default_factory=lambda: int(datetime.now(tz=UTC).timestamp()))
+    model: str
+    output: list[OpenAIResponseOutputMessage]
     usage: OpenAIUsage
     brainstorm: OpenAIBrainstormPayload

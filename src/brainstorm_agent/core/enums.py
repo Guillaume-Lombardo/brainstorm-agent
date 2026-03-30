@@ -89,3 +89,10 @@ class OpenQuestionStatus(StrEnum):
 
     OPEN = "open"
     RESOLVED = "resolved"
+
+
+class HumanReviewDecision(StrEnum):
+    """Decision taken during optional human review."""
+
+    APPROVED = "approved"
+    REJECTED = "rejected"

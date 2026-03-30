@@ -90,3 +90,61 @@ def test_openai_chat_completion_accepts_null_content_on_non_user_messages(tmp_pa
     assert response.status_code == 200
     payload = response.json()
     assert payload["choices"][0]["message"]["role"] == "assistant"
+
+
+def test_openai_chat_completion_streams_sse_chunks(tmp_path: Path) -> None:
+    client = TestClient(create_app(settings=_build_settings(tmp_path)))
+
+    with client.stream(
+        "POST",
+        "/v1/chat/completions",
+        json={
+            "model": "brainstorm-agent",
+            "messages": [{"role": "user", "content": "Stream this brainstorm response."}],
+            "stream": True,
+        },
+    ) as response:
+        body = "".join(response.iter_text())
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/event-stream")
+    assert "chat.completion.chunk" in body
+    assert "[DONE]" in body
+
+
+def test_openai_responses_returns_output_payload(tmp_path: Path) -> None:
+    client = TestClient(create_app(settings=_build_settings(tmp_path)))
+
+    response = client.post(
+        "/v1/responses",
+        json={
+            "model": "brainstorm-agent",
+            "input": "Help me structure a project discovery workflow.",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["object"] == "response"
+    assert payload["output"][0]["role"] == "assistant"
+    assert payload["brainstorm"]["session_id"] == response.headers["X-Brainstorm-Session-Id"]
+
+
+def test_openai_responses_support_streaming(tmp_path: Path) -> None:
+    client = TestClient(create_app(settings=_build_settings(tmp_path)))
+
+    with client.stream(
+        "POST",
+        "/v1/responses",
+        json={
+            "model": "brainstorm-agent",
+            "input": [{"role": "user", "content": "Continue in streaming mode."}],
+            "stream": True,
+        },
+    ) as response:
+        body = "".join(response.iter_text())
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/event-stream")
+    assert "response.created" in body
+    assert "response.completed" in body
