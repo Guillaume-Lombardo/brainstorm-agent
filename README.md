@@ -23,7 +23,7 @@ On every assistant turn it returns:
 
 Stage transitions are hybrid:
 
-- LLM or heuristic structured analysis
+- Typed structured analysis and conversational replies
 - deterministic code-level validation of required fields
 
 The service does not skip stages and does not persist critical state in Redis.
@@ -49,7 +49,7 @@ backend/src/brainstorm_agent/
 
 Supporting assets:
 
-- `backend/src/brainstorm_agent/resources/prompts/v1/`: packaged versioned prompt files
+- `backend/src/brainstorm_agent/resources/prompts/v2/`: packaged versioned prompt files
 - `docs/adr/`: architecture decisions
 - `examples/litellm/config.yaml`: example LiteLLM registration
 - `examples/litellm/config.openwebui.yaml`: LiteLLM config for OpenWebUI-oriented deployments
@@ -153,8 +153,8 @@ Core configuration:
 
 Recommended modes:
 
-- `LLM_MODE=heuristic` for local dry runs and tests
-- `LLM_MODE=openai` with `OPENAI_BASE_URL`, `OPENAI_API_KEY`, and `MODEL_NAME` for a real model backend or LiteLLM proxy
+- `LLM_MODE=fake` for deterministic tests (scripted responses; no network)
+- `LLM_MODE=openai` (default) with `OPENAI_BASE_URL`, `OPENAI_API_KEY`, and `MODEL_NAME` for a real model backend or LiteLLM proxy
 
 ## API
 
@@ -465,3 +465,33 @@ uv run pytest -m "unit or integration or end2end" --cov=src
 cd ..
 uv run --project backend pre-commit run --all-files
 ```
+
+### Typed stage contracts (prompt v2)
+
+Each stage has one Pydantic field contract. Analysis returns a patch: null leaves a field
+unchanged; a non-null value replaces it. Identified lists (including backlog and risks) merge
+by id. Facts, assumptions, decisions and questions also merge by stable ids; resolving a question
+requires its id in `resolved_question_ids`. Use `resolved_item_ids` to retract other identified items.
+`uncertainties` is the complete current list and replaces earlier uncertainties after clarification. No model decision can bypass deterministic stage gates.
+
+`LLM_OUTPUT_MODE=json_schema` sends a strict JSON schema. Set `json_object` or `tool` explicitly
+if the selected LiteLLM model does not support strict schemas. Unsupported-provider errors are
+surfaced; the service does not silently downgrade. Invalid JSON/schema gets exactly one repair
+attempt with the validation error, then an actionable error with no persisted partial turn.
+
+The asynchronous turn has analysis (maximum two calls), an optional findings-only challenge
+(`LLM_CHALLENGE_PASS=off|findings`, maximum two calls), and a conversational reply. The adapter
+exposes reply deltas; current HTTP streams retain their final-result envelope until the event API
+lot. Provider token counts are persisted per assistant turn in the session JSON and returned by
+the facade; fake mode reports zero. No word-count estimates are used.
+
+`LLM_MAX_TOKENS=4096` bounds each response. `LLM_CONTEXT_TURNS=8` bounds transcript context;
+previous stages contribute summaries only. Content follows the user's language, while headings
+and schema keys remain English. Prompt `v1` remains available; `v2` is the default.
+
+`REDIS_LOCK_TIMEOUT_SECONDS` must exceed `OPENAI_TIMEOUT_SECONDS` times 3 (challenge off)
+or 5 (findings). SDK transport retries are disabled. The default 180 seconds covers the 30-second
+per-call timeout in both modes. See [LiteLLM aliases](examples/litellm-models.yaml).
+
+OpenAI mode requires explicit `OPENAI_BASE_URL` and `OPENAI_API_KEY` before a provider client
+can be created. There is no implicit public endpoint or placeholder credential fallback.

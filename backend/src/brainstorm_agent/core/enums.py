@@ -81,7 +81,7 @@ class LLMMode(StrEnum):
     """Runtime LLM backends."""
 
     OPENAI = "openai"
-    HEURISTIC = "heuristic"
+    FAKE = "fake"
 
 
 class AuthMode(StrEnum):
@@ -105,3 +105,18 @@ class HumanReviewDecision(StrEnum):
 
     APPROVED = "approved"
     REJECTED = "rejected"
+
+
+class StructuredOutputMode(StrEnum):
+    """Provider output capability."""
+
+    JSON_SCHEMA = "json_schema"
+    JSON_OBJECT = "json_object"
+    TOOL = "tool"
+
+
+class ChallengePass(StrEnum):
+    """Optional findings-only challenge."""
+
+    OFF = "off"
+    FINDINGS = "findings"

@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 def _build_settings(tmp_path: Path) -> Settings:
     return Settings(
         database_url=f"sqlite+pysqlite:///{tmp_path / 'openai-facade.db'}",
-        llm_mode=LLMMode.HEURISTIC,
+        llm_mode=LLMMode.FAKE,
         redis_url="redis://localhost:6399/0",
         openai_facade_model_name="brainstorm-agent",
     )
@@ -31,7 +31,7 @@ def test_openai_facade_continues_existing_session(tmp_path: Path) -> None:
             "messages": [
                 {
                     "role": "user",
-                    "content": "A service that structures ambiguous software ideas into staged project framing artifacts.",
+                    "content": "pitch: A service that structures ambiguous software ideas into staged project framing artifacts.\nclear: Staged framing\nambiguities: Audience to confirm\nmissing: Adoption target",
                 },
             ],
         },

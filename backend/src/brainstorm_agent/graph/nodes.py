@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING
+from uuid import uuid4
 
 from brainstorm_agent.core.enums import Stage
 from brainstorm_agent.core.models import (
@@ -21,7 +22,7 @@ if TYPE_CHECKING:
     from brainstorm_agent.services.markdown import MarkdownRenderer
 
 
-type TurnNode = Callable[[TurnGraphState], dict[str, object]]
+type TurnNode = Callable[[TurnGraphState], Awaitable[dict[str, object]]]
 
 
 def make_extract_node(llm: BrainstormLLM) -> TurnNode:
@@ -34,11 +35,11 @@ def make_extract_node(llm: BrainstormLLM) -> TurnNode:
         TurnNode: Graph node that builds structured analysis.
     """
 
-    def extract_structured_state(state: TurnGraphState) -> dict[str, object]:
+    async def extract_structured_state(state: TurnGraphState) -> dict[str, object]:
         session_state = BrainstormSessionState.model_validate(state["session_state"])
         stage = Stage(state["current_stage"])
         current_stage_state = session_state.stage_states.get(stage.value)
-        analysis = llm.analyze(
+        analysis = await llm.analyze(
             stage=stage,
             user_message=state["user_message"],
             session_state=session_state,
@@ -46,6 +47,7 @@ def make_extract_node(llm: BrainstormLLM) -> TurnNode:
             if current_stage_state
             else None,
         )
+        analysis = merge_analysis(previous=current_stage_state, patch=analysis)
         return {"analysis": analysis.model_dump(mode="json")}
 
     return extract_structured_state
@@ -61,10 +63,10 @@ def make_challenge_node(llm: BrainstormLLM) -> TurnNode:
         TurnNode: Graph node that challenges ambiguity and contradictions.
     """
 
-    def challenge_contradictions(state: TurnGraphState) -> dict[str, object]:
+    async def challenge_contradictions(state: TurnGraphState) -> dict[str, object]:
         stage = Stage(state["current_stage"])
         analysis = AssistantAnalysis.model_validate(state["analysis"])
-        challenged = llm.challenge(stage=stage, analysis=analysis)
+        challenged = await llm.challenge(stage=stage, analysis=analysis)
         return {"analysis": challenged.model_dump(mode="json")}
 
     return challenge_contradictions
@@ -83,10 +85,10 @@ def apply_stage_rules(state: TurnGraphState) -> dict[str, object]:
     analysis = AssistantAnalysis.model_validate(state["analysis"])
     validation = validate_stage(
         stage=stage,
-        extracted_fields=analysis.extracted_fields,
+        extracted_fields=analysis.extracted_fields.model_dump(exclude_none=True),
         open_questions=analysis.open_questions,
     )
-    analysis.stage_is_clear_enough = analysis.stage_is_clear_enough and validation.stage_is_clear_enough
+    analysis.stage_is_clear_enough = validation.stage_is_clear_enough
     analysis.transition_decision_reason = validation.transition_decision_reason
     return {
         "analysis": analysis.model_dump(mode="json"),
@@ -94,26 +96,32 @@ def apply_stage_rules(state: TurnGraphState) -> dict[str, object]:
     }
 
 
-def make_render_node(renderer: MarkdownRenderer) -> TurnNode:
+def make_render_node(renderer: MarkdownRenderer, llm: BrainstormLLM) -> TurnNode:
     """Create the Markdown rendering node closure.
 
     Args:
-        renderer: Markdown renderer.
+        renderer (MarkdownRenderer): Markdown renderer.
+        llm (BrainstormLLM): Conversational reply adapter.
 
     Returns:
         TurnNode: Graph node that renders Markdown.
     """
 
-    def render_step_markdown(state: TurnGraphState) -> dict[str, object]:
+    async def render_step_markdown(state: TurnGraphState) -> dict[str, object]:
         analysis = AssistantAnalysis.model_validate(state["analysis"])
         validation = StageValidationResult.model_validate(state["validation"])
         stage = Stage(state["current_stage"])
+        analysis.assistant_message = await llm.reply(
+            stage=stage,
+            analysis=analysis,
+            user_message=state["user_message"],
+        )
         markdown = renderer.render(
             stage=stage,
             analysis=analysis,
             validation=validation,
         )
-        return {"markdown": markdown}
+        return {"markdown": markdown, "analysis": analysis.model_dump(mode="json")}
 
     return render_step_markdown
 
@@ -132,6 +140,8 @@ def decide_transition(state: TurnGraphState) -> dict[str, object]:
     next_stage = stage.next_stage() if analysis.stage_is_clear_enough else None
     current_stage = next_stage or stage
     output = AssistantTurnOutput(
+        prompt_tokens=analysis.prompt_tokens,
+        completion_tokens=analysis.completion_tokens,
         session_id=state["session_id"],
         current_stage=current_stage,
         processed_stage=stage,
@@ -149,3 +159,44 @@ def decide_transition(state: TurnGraphState) -> dict[str, object]:
         next_stage=next_stage,
     )
     return {"assistant_output": output.model_dump(mode="json")}
+
+
+def merge_analysis(*, previous: StageState | None, patch: AssistantAnalysis) -> AssistantAnalysis:
+    """Merge non-null field updates and stable item ids before gate validation.
+
+    Args:
+        previous (StageState | None): Persisted accumulated state.
+        patch (AssistantAnalysis): Typed provider update.
+
+    Returns:
+        AssistantAnalysis: Merged state; question resolutions are explicit.
+    """
+    known_ids = {item.id for item in previous.open_questions} if previous else set()
+    patch.open_questions = [
+        item if item.id in known_ids else item.model_copy(update={"id": str(uuid4())})
+        for item in {item.id: item for item in patch.open_questions}.values()
+    ]
+    if previous is None:
+        return patch
+    fields = previous.extracted_fields.model_dump(exclude_none=True)
+    updates = patch.extracted_fields.model_dump(exclude_none=True)
+    for name, value in updates.items():
+        if name in {"risks_by_category", "mvp_user_stories", "risk_spikes", "cross_cutting_work"}:
+            items = {item["id"]: item for item in fields.get(name, [])}
+            items.update({item["id"]: item for item in value})
+            fields[name] = list(items.values())
+        else:
+            fields[name] = value
+    for name in ("risks_by_category", "mvp_user_stories", "risk_spikes", "cross_cutting_work"):
+        if name in fields:
+            fields[name] = [item for item in fields[name] if item["id"] not in patch.resolved_item_ids]
+    patch.extracted_fields = type(patch.extracted_fields).model_validate(fields)
+    for collection in ("facts", "assumptions", "decisions", "risks", "open_questions"):
+        items = {item.id: item for item in getattr(previous, collection)}
+        for item in getattr(patch, collection):
+            items[item.id] = item
+        if collection == "open_questions":
+            items = {key: item for key, item in items.items() if key not in patch.resolved_question_ids}
+        items = {key: item for key, item in items.items() if key not in patch.resolved_item_ids}
+        setattr(patch, collection, list(items.values()))
+    return patch

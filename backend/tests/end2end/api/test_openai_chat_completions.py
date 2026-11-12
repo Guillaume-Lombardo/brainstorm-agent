@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 def test_openai_compatible_chat_flow_preserves_session_state(tmp_path: Path) -> None:
     settings = Settings(
         database_url=f"sqlite+pysqlite:///{tmp_path / 'openai-end2end.db'}",
-        llm_mode=LLMMode.HEURISTIC,
+        llm_mode=LLMMode.FAKE,
         redis_url="redis://localhost:6399/0",
         openai_facade_model_name="brainstorm-agent",
     )
@@ -28,7 +28,7 @@ def test_openai_compatible_chat_flow_preserves_session_state(tmp_path: Path) -> 
             "messages": [
                 {
                     "role": "user",
-                    "content": "An internal agent that guides teams through structured product framing before delivery starts.",
+                    "content": "pitch: An internal agent that guides teams through structured product framing before delivery starts.\nclear: Staged framing\nambiguities: Audience to confirm\nmissing: Adoption target",
                 },
             ],
         },
@@ -58,7 +58,7 @@ def test_openai_compatible_chat_flow_preserves_session_state(tmp_path: Path) -> 
 def test_openai_responses_flow_supports_session_metadata(tmp_path: Path) -> None:
     settings = Settings(
         database_url=f"sqlite+pysqlite:///{tmp_path / 'responses-end2end.db'}",
-        llm_mode=LLMMode.HEURISTIC,
+        llm_mode=LLMMode.FAKE,
         redis_url="redis://localhost:6399/0",
         openai_facade_model_name="brainstorm-agent",
     )

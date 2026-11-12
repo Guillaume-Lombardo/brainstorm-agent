@@ -17,18 +17,6 @@ if TYPE_CHECKING:
     from brainstorm_agent.core.models import AssistantTurnOutput
 
 
-def _approximate_token_count(content: str) -> int:
-    """Return a coarse token approximation for OpenAI-compatible usage fields.
-
-    Args:
-        content: Text content to estimate.
-
-    Returns:
-        int: Approximate token count.
-    """
-    return max(1, len(content.split())) if content.strip() else 0
-
-
 @dataclass
 class OpenAIChatFacadeResult:
     """Result of an OpenAI-compatible chat completion call."""
@@ -115,8 +103,8 @@ class OpenAIChatFacade:
             public_model_name=self.public_model_name,
             content=content,
             output=output,
-            prompt_tokens=_approximate_token_count(user_message),
-            completion_tokens=_approximate_token_count(content),
+            prompt_tokens=output.prompt_tokens,
+            completion_tokens=output.completion_tokens,
         )
 
     def _resolve_session_id(self, metadata: dict[str, object]) -> str:

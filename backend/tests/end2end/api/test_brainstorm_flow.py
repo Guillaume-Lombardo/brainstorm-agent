@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 def test_full_initial_transition_and_stage_blocking(tmp_path: Path) -> None:
     settings = Settings(
         database_url=f"sqlite+pysqlite:///{tmp_path / 'end2end.db'}",
-        llm_mode=LLMMode.HEURISTIC,
+        llm_mode=LLMMode.FAKE,
         redis_url="redis://localhost:6399/0",
     )
     client = TestClient(create_app(settings=settings))
@@ -25,7 +25,9 @@ def test_full_initial_transition_and_stage_blocking(tmp_path: Path) -> None:
 
     pitch_response = client.post(
         f"/api/v1/sessions/{session_id}/messages",
-        json={"content": "An internal agent to structure software project framing with staged deliverables."},
+        json={
+            "content": "pitch: An internal agent to structure software project framing with staged deliverables.\nclear: Staged framing\nambiguities: Audience to confirm\nmissing: Adoption target",
+        },
     )
     assert pitch_response.status_code == 200
     assert pitch_response.json()["current_stage"] == "stage_1_problem_framing"

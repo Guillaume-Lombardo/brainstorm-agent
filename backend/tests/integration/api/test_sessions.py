@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 def _build_settings(tmp_path: Path) -> Settings:
     return Settings(
         database_url=f"sqlite+pysqlite:///{tmp_path / 'api.db'}",
-        llm_mode=LLMMode.HEURISTIC,
+        llm_mode=LLMMode.FAKE,
         redis_url="redis://localhost:6399/0",
     )
 
@@ -30,7 +30,9 @@ def test_session_api_round_trip(tmp_path: Path) -> None:
 
     first_turn = client.post(
         f"/api/v1/sessions/{session_id}/messages",
-        json={"content": "A service that helps teams turn rough project ideas into structured plans."},
+        json={
+            "content": "pitch: A service that helps teams turn rough project ideas into structured plans.\nclear: Staged framing\nambiguities: Audience to confirm\nmissing: Adoption target",
+        },
     )
     assert first_turn.status_code == 200
     first_payload = first_turn.json()
@@ -76,7 +78,9 @@ def test_human_review_gate_blocks_transition_until_approved(tmp_path: Path) -> N
 
     first_turn = client.post(
         f"/api/v1/sessions/{session_id}/messages",
-        json={"content": "A service that helps teams structure product framing before delivery."},
+        json={
+            "content": "pitch: A service that helps teams structure product framing before delivery.\nclear: Staged framing\nambiguities: Audience to confirm\nmissing: Adoption target",
+        },
     )
     assert first_turn.status_code == 200
     payload = first_turn.json()
@@ -112,7 +116,9 @@ def test_human_review_gate_rejects_new_messages_until_resolved(tmp_path: Path) -
 
     first_turn = client.post(
         f"/api/v1/sessions/{session_id}/messages",
-        json={"content": "A service that helps teams structure product framing before delivery."},
+        json={
+            "content": "pitch: A service that helps teams structure product framing before delivery.\nclear: Staged framing\nambiguities: Audience to confirm\nmissing: Adoption target",
+        },
     )
     assert first_turn.status_code == 200
     assert first_turn.json()["requires_human_review"] is True
@@ -133,7 +139,9 @@ def test_session_message_stream_returns_sse_payload(tmp_path: Path) -> None:
     with client.stream(
         "POST",
         f"/api/v1/sessions/{session_id}/messages/stream",
-        json={"content": "A tool that structures project framing."},
+        json={
+            "content": "pitch: A tool that structures project framing.\nclear: Staged framing\nambiguities: Audience to confirm\nmissing: Adoption target",
+        },
     ) as response:
         body = "".join(response.iter_text())
 

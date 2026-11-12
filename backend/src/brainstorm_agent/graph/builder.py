@@ -40,7 +40,7 @@ def build_turn_graph(
     graph.add_node("extract_structured_state", cast("Any", make_extract_node(llm)))
     graph.add_node("challenge_contradictions", cast("Any", make_challenge_node(llm)))
     graph.add_node("apply_stage_rules", apply_stage_rules)
-    graph.add_node("render_step_markdown", cast("Any", make_render_node(renderer)))
+    graph.add_node("render_step_markdown", cast("Any", make_render_node(renderer, llm)))
     graph.add_node("decide_transition", decide_transition)
 
     graph.add_edge(START, "extract_structured_state")

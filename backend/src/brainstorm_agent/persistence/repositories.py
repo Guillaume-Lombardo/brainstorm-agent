@@ -427,17 +427,17 @@ class OpenQuestionRepository:
             OpenQuestionRecord.stage == stage.value,
         )
         existing = self.db_session.execute(existing_query).scalars().all()
-        by_question = {row.question: row for row in existing}
-        current_questions = {item.question for item in questions}
+        by_id = {row.id: row for row in existing}
+        current_ids = {item.id for item in questions}
 
         for row in existing:
-            if row.question not in current_questions:
+            if row.id not in current_ids:
                 row.status = OpenQuestionStatus.RESOLVED.value
                 row.updated_at = _utc_now()
 
         active_rows: list[OpenQuestionRecord] = []
         for item in questions:
-            row = by_question.get(item.question)
+            row = by_id.get(item.id)
             if row is None:
                 row = OpenQuestionRecord(
                     id=item.id,
@@ -450,6 +450,7 @@ class OpenQuestionRepository:
                 )
                 self.db_session.add(row)
             else:
+                row.question = item.question
                 row.why_it_matters = item.why_it_matters
                 row.blocking = item.blocking
                 row.status = item.status.value

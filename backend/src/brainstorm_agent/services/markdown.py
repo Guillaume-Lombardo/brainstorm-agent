@@ -92,7 +92,7 @@ class MarkdownRenderer:
         Returns:
             str: Rendered Markdown.
         """
-        self.prompt_loader.markdown_prompt()
+        template = self.prompt_loader.markdown_prompt()
         lines = [
             "# Structured Summary",
             "",
@@ -139,9 +139,17 @@ class MarkdownRenderer:
             "",
             *self._open_question_lines(analysis, with_details=False),
             "",
+            "### Stage Fields",
+            "",
+            *[
+                f"- {name}: {value}"
+                for name, value in analysis.extracted_fields.model_dump(exclude_none=True).items()
+            ],
+            "",
             "### Transition Decision",
             "",
             f"- Stage clear enough: {'yes' if validation.stage_is_clear_enough else 'no'}",
             f"- Reason: {validation.transition_decision_reason}",
         ]
-        return "\n".join(lines)
+        rendered = "\n".join(lines)
+        return template.replace("{document}", rendered) if "{document}" in template else rendered

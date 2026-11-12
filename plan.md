@@ -72,32 +72,32 @@
 
 #### Steps
 
-- [ ] Replace `extracted_fields: dict[str, Any]` with one Pydantic model per stage; the model is the
+- [x] Replace `extracted_fields: dict[str, Any]` with one Pydantic model per stage; the model is the
       single source for required fields, field descriptions, the prompt field list, validation and
       the JSON schema sent to the LLM.
-- [ ] Request structured outputs (`response_format` JSON schema, strict) generated from those models;
+- [x] Request structured outputs (`response_format` JSON schema, strict) generated from those models;
       add a configurable fallback (`json_object` or tool calling) for models without schema support
       (to verify for `glm-5.3-flash`).
-- [ ] On schema or JSON failure, retry once with the validation error fed back; then return an
+- [x] On schema or JSON failure, retry once with the validation error fed back; then return an
       actionable error (no silent partial state).
-- [ ] Patch semantics: the LLM returns field updates, new items and resolved item ids; the server
+- [x] Patch semantics: the LLM returns field updates, new items and resolved item ids; the server
       merges them into the accumulated stage state. Stable ids for facts, assumptions, decisions,
       risks, questions and backlog items across turns.
-- [ ] Prompt context: stage contract (fields + descriptions), current accumulated values and
+- [x] Prompt context: stage contract (fields + descriptions), current accumulated values and
       coverage, last N transcript turns, compact summaries of previous stages (no full session JSON
       dump).
-- [ ] Split the turn into a bounded structured analysis call and a conversational reply call that
+- [x] Split the turn into a bounded structured analysis call and a conversational reply call that
       can be streamed; the contradiction challenge becomes an optional pass returning findings only
       (`LLM_CHALLENGE_PASS=off|findings`).
-- [ ] Async LLM client and turn processing (`AsyncOpenAI`).
-- [ ] Remove canned stage-0 fillers; the heuristic adapter becomes an explicit deterministic test
+- [x] Async LLM client and turn processing (`AsyncOpenAI`).
+- [x] Remove canned stage-0 fillers; the heuristic adapter becomes an explicit deterministic test
       double (`LLM_MODE=fake`, scripted responses); `openai` becomes the documented default.
-- [ ] New prompt folder `v2` with the field lists and output contracts.
-- [ ] Real token usage from the LLM response in turn records and in the OpenAI-compatible facade.
-- [ ] Settings validation: session lock TTL greater than the worst-case turn duration.
-- [ ] Use or delete the unused Markdown rendering prompt.
-- [ ] LiteLLM example config with the `claude-opus-5-5` and `glm-5.3-flash` aliases.
-- [ ] Contract tests with recorded LLM responses (valid, invalid JSON, schema mismatch, partial
+- [x] New prompt folder `v2` with the field lists and output contracts.
+- [x] Real token usage from the LLM response in turn records and in the OpenAI-compatible facade.
+- [x] Settings validation: session lock TTL greater than the worst-case turn duration.
+- [x] Use or delete the unused Markdown rendering prompt.
+- [x] LiteLLM example config with the `claude-opus-5-5` and `glm-5.3-flash` aliases.
+- [x] Contract tests with recorded LLM responses (valid, invalid JSON, schema mismatch, partial
       patch, retry path).
 
 ### Lot 2: Quality gates and elicitation (patterns from Spec Kit, Rasa CALM, Kiro)

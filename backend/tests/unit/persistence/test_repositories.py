@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 def _build_settings(tmp_path: Path) -> Settings:
     return Settings(
         database_url=f"sqlite+pysqlite:///{tmp_path / 'unit-repositories.db'}",
-        llm_mode=LLMMode.HEURISTIC,
+        llm_mode=LLMMode.FAKE,
         redis_url="redis://localhost:6399/0",
     )
 
