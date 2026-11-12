@@ -4,13 +4,14 @@ Thanks for contributing.
 
 ## Prerequisites
 
-- Python 3.13+
+- Python 3.14+
 - `uv`
 - Optional: Docker (if your project needs local service dependencies)
 
 ## Local setup
 
 ```bash
+cd backend
 uv sync --group dev
 ```
 
@@ -20,7 +21,7 @@ uv sync --group dev
 2. Implement the change with tests.
 3. Keep docs/config in sync when behavior changes:
    - `README.md`
-   - `.env.template`
+   - `backend/.env.template`
 
 4. Open a Pull Request.
 
@@ -47,7 +48,9 @@ uv run ty check src tests
 uv run pytest -m unit
 uv run pytest -m integration --no-cov
 uv run pytest -m end2end --no-cov
-uv run pre-commit run --all-files
+uv run pytest -m "unit or integration or end2end" --cov=src
+cd ..
+uv run --project backend pre-commit run --all-files
 ```
 
 All checks must pass before requesting review.

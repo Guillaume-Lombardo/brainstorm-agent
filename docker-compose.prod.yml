@@ -2,9 +2,10 @@ services:
   app:
     build:
       context: .
+      dockerfile: backend/Dockerfile
     restart: unless-stopped
     env_file:
-      - .env
+      - backend/.env
     environment:
       AUTO_CREATE_SCHEMA: "false"
       RUN_DB_MIGRATIONS_ON_STARTUP: "true"

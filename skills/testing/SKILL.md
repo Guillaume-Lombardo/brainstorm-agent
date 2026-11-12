@@ -11,14 +11,14 @@ Guarantee correctness and regression safety across all test scopes.
 
 ## Test Topology
 
-- `tests/unit`: default fast scope.
-- `tests/integration`: component and backend interactions.
-- `tests/end2end`: full pipeline and CLI journeys.
-- Preferred target: mirror `src/brainstorm_agent` structure under `tests/unit` for new or moved tests.
-  - example: `src/brainstorm_agent/foo/bar.py` -> `tests/unit/foo/test_bar.py`
+- `backend/tests/unit`: default fast scope.
+- `backend/tests/integration`: component and backend interactions.
+- `backend/tests/end2end`: full pipeline and CLI journeys.
+- Preferred target: mirror `backend/src/brainstorm_agent` structure under `backend/tests/unit` for new or moved tests.
+  - example: `backend/src/brainstorm_agent/foo/bar.py` -> `backend/tests/unit/foo/test_bar.py`
   - current flat tests are acceptable during migration; avoid mixing conventions in the same feature area.
 
-Markers are auto-assigned by directory in `tests/conftest.py`.
+Markers are auto-assigned by directory in `backend/tests/conftest.py`.
 
 ## Workflow
 
@@ -41,3 +41,5 @@ Markers are auto-assigned by directory in `tests/conftest.py`.
 - Add offline/network-dependent scenarios when relevant.
 - Add representative fixtures for each supported document type.
 - When adding or moving unit tests, prefer the mirrored structure; migrate flat tests progressively when touching them.
+
+Run Python tests from `backend/`. Paths above are relative to the repository root.

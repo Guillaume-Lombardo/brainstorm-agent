@@ -8,11 +8,11 @@ WORKDIR /app
 
 RUN pip install --no-cache-dir uv
 
-COPY pyproject.toml uv.lock* README.md LICENSE alembic.ini ./
-COPY migrations ./migrations
-COPY docker ./docker
-COPY src ./src
-COPY .env.example ./.env.example
+COPY backend/pyproject.toml backend/uv.lock backend/README.md LICENSE backend/alembic.ini ./
+COPY backend/migrations ./migrations
+COPY backend/docker ./docker
+COPY backend/src ./src
+COPY backend/.env.template ./.env.template
 
 RUN uv sync --frozen --no-dev
 RUN chmod +x /app/docker/entrypoint.sh

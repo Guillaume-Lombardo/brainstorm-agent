@@ -5,8 +5,40 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: read
+  pull-requests: read
+
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+              - '.github/workflows/**'
+              - '.pre-commit-config.yaml'
+              - 'docker-compose*.yml'
+              - 'deploy/**'
+              - 'examples/**'
+            frontend:
+              - 'frontend/**'
+              - '.github/workflows/**'
+
+  # A future frontend job can use needs.changes.outputs.frontend.
   quality:
+    needs: changes
+    if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.backend == 'true'
+    defaults:
+      run:
+        working-directory: backend
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -33,13 +65,26 @@ jobs:
         run: uv run ty check src tests
 
       - name: Unit tests
-        run: uv run pytest -m unit --no-cov
+        run: uv run pytest -m unit
 
       - name: Integration tests
-        run: uv run pytest -m integration --no-cov
+        run: uv run pytest -m integration
 
       - name: End2end tests
-        run: uv run pytest -m end2end --no-cov
+        run: uv run pytest -m end2end
 
-      - name: Pre-commit
-        run: uv run pre-commit run --all-files
+      - name: Full-suite coverage gate
+        run: uv run pytest -m "unit or integration or end2end" --cov=src --cov-report=term-missing:skip-covered
+
+  repository-hooks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - uses: astral-sh/setup-uv@v5
+      - name: Install backend tooling
+        run: uv sync --project backend --group dev --frozen
+      - name: Pre-commit from repository root
+        run: uv run --project backend pre-commit run --all-files
