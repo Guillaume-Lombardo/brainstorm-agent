@@ -11,18 +11,17 @@ Standardize setup, checks, and local developer workflows.
 
 ## Setup
 
-- Run `uv sync --group dev`.
-- Add optional groups when needed:
-  - `uv sync --group bert`
-  - `uv sync --group elasticsearch`
-  - `uv sync --group opensearch`
-
+- From `backend/`, run `uv sync --group dev`.
 ## Hooks
 
-- Run `uv run pre-commit install`.
-- Run `uv run pre-commit run --all-files`.
+Run hooks from the repository root.
+
+- Run `uv run --project backend pre-commit install`.
+- Run `uv run --project backend pre-commit run --all-files`.
 
 ## Standard Validation Pipeline
+
+Run Python checks from `backend/`.
 
 1. Run `uv run ruff format .`.
 2. Run `uv run ruff check .`.

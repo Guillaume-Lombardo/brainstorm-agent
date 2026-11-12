@@ -39,3 +39,5 @@ Keep code consistent, typed, and easy to maintain.
 - `uv run ruff format .`
 - `uv run ruff check .`
 - `uv run ty check src tests`
+
+Run Python validation commands from `backend/`.

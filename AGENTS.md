@@ -78,6 +78,12 @@ They are bounded prompt assets used by the orchestrator for:
 No autonomous multi-agent runtime is part of V1.
 If sub-agents are added later, they must remain optional and subordinate to the orchestrator.
 
+## Repository Layout
+
+- `backend/`: source, tests, migrations, Python config, Dockerfile and env template
+- `frontend/`: future Next.js application (lot 7)
+- Root: governance, docs, skills, deployment, examples, Compose and CI
+
 ## AI Tooling Layout
 
 Use the following repository layout for AI-facing assets:
@@ -86,11 +92,11 @@ Use the following repository layout for AI-facing assets:
 - `agent.md`: concise execution contract referencing `AGENTS.md`
 - `SKILLS.md`: local skill index and usage guidance
 - `skills/`: reusable project-local delivery skills
-- `src/brainstorm_agent/resources/prompts/README.md`: prompt organization and versioning policy
-- `src/brainstorm_agent/resources/prompts/v*/system.md`: global system prompt
-- `src/brainstorm_agent/resources/prompts/v*/stages/*.md`: stage-specific prompts
-- `src/brainstorm_agent/resources/prompts/v*/evaluation/*.md`: evaluation prompts
-- `src/brainstorm_agent/resources/prompts/v*/rendering/*.md`: rendering prompts
+- `backend/src/brainstorm_agent/resources/prompts/README.md`: prompt organization and versioning policy
+- `backend/src/brainstorm_agent/resources/prompts/v*/system.md`: global system prompt
+- `backend/src/brainstorm_agent/resources/prompts/v*/stages/*.md`: stage-specific prompts
+- `backend/src/brainstorm_agent/resources/prompts/v*/evaluation/*.md`: evaluation prompts
+- `backend/src/brainstorm_agent/resources/prompts/v*/rendering/*.md`: rendering prompts
 
 Rules:
 
@@ -135,7 +141,7 @@ Keep separate modules for:
   - `docs/adr/README.md`
 - Create an ADR whenever architecture or structural choices are introduced or changed.
 - Before each push or PR, run one explicit dead-code pass.
-- Keep `README.md`, `.env.template`, and local validation config synchronized with behavior changes.
+- Keep `README.md`, `backend/.env.template`, and local validation config synchronized with behavior changes.
 - End each feature delivery with a GitHub PR.
 - After PR creation or update, poll CI and review status every 60 seconds until:
   - CI is complete, and
@@ -152,7 +158,7 @@ Keep separate modules for:
 
 ## Pre-PR Checklist
 
-Run locally:
+Run Python checks from `backend/` (heavy commands use the machine `heavy` wrapper):
 
 - `uv run ruff format .`
 - `uv run ruff check .`
@@ -160,15 +166,16 @@ Run locally:
 - `uv run pytest -m unit`
 - `uv run pytest -m integration`
 - `uv run pytest -m end2end`
-- `uv run pre-commit run --all-files`
+- `uv run pytest -m "unit or integration or end2end" --cov=src`
+- From the root: `uv run --project backend pre-commit run --all-files`
 
 Then verify:
 
 - dead code has been removed
 - modified code paths use Google-style docstrings with explicit types
-- `tests/unit` mirrors `src/brainstorm_agent` structure in touched areas
+- `backend/tests/unit` mirrors `backend/src/brainstorm_agent` structure in touched areas
 - `README.md` matches the current API and setup
-- `.env.template` matches the environment contract
+- `backend/.env.template` matches the environment contract
 - ADRs were added or updated when architecture changed
 
 ## Local Skills

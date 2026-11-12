@@ -28,10 +28,17 @@ Stage transitions are hybrid:
 
 The service does not skip stages and does not persist critical state in Redis.
 
-## Architecture
+## Repository layout
+
+- `backend/`: Python source, tests, migrations, packaging and Dockerfile
+- `frontend/`: reserved for Next.js (lot 7)
+- `docs/`, `skills/`: shared governance
+- `deploy/`, `docker-compose*.yml`, `examples/`: cross-service deployment
+
+## Backend architecture
 
 ```text
-src/brainstorm_agent/
+backend/src/brainstorm_agent/
   api/          FastAPI routes and dependency wiring
   core/         enums, schemas, stage contracts, validators
   graph/        LangGraph turn orchestration
@@ -42,19 +49,20 @@ src/brainstorm_agent/
 
 Supporting assets:
 
-- `src/brainstorm_agent/resources/prompts/v1/`: packaged versioned prompt files
+- `backend/src/brainstorm_agent/resources/prompts/v1/`: packaged versioned prompt files
 - `docs/adr/`: architecture decisions
 - `examples/litellm/config.yaml`: example LiteLLM registration
 - `examples/litellm/config.openwebui.yaml`: LiteLLM config for OpenWebUI-oriented deployments
 - `examples/openwebui/.env.example`: OpenWebUI OpenAI-compatible connection example
-- `migrations/`: Alembic schema history
-- `tests/unit`, `tests/integration`, `tests/end2end`
+- `backend/migrations/`: Alembic schema history
+- `backend/tests/unit`, `backend/tests/integration`, `backend/tests/end2end`
 
 ## Local setup
 
 ```bash
+cd backend
 uv sync --group dev
-cp .env.example .env
+cp .env.template .env
 uv run ruff format .
 uv run ruff check .
 uv run ty check src tests
@@ -83,6 +91,10 @@ uv run brainstorm-agent hash-api-key "replace-me" --pepper "server-side-secret"
 
 ## Docker Compose
 
+Run Compose commands from the repository root. Development uses
+`backend/.env.template`; production loads `backend/.env`.
+
+
 ```bash
 docker compose up --build
 ```
@@ -98,6 +110,9 @@ Formal schema upgrades now use Alembic. For local development you can still rely
 ```bash
 uv run brainstorm-agent migrate --revision head
 ```
+
+All Python CLI commands below run from `backend/`. Default prompts are packaged
+resources. A relative `PROMPT_BASE_PATH` override resolves from that working directory.
 
 ## Environment variables
 
@@ -416,8 +431,8 @@ The production overlay includes:
 Example startup:
 
 ```bash
-cp .env.example .env
-docker compose -f docker-compose.prod.yml up --build -d
+cp backend/.env.template backend/.env
+docker compose --env-file backend/.env -f docker-compose.prod.yml up --build -d
 ```
 
 By default the app entrypoint can run `alembic upgrade head` on startup when `RUN_DB_MIGRATIONS_ON_STARTUP=true`.
@@ -437,7 +452,7 @@ OpenWebUI can use LiteLLM as an OpenAI-compatible backend. The Open WebUI docs f
 
 ## Validation
 
-Quality gates used locally:
+Run Python quality gates from `backend/`:
 
 ```bash
 uv run ruff format .
@@ -446,5 +461,7 @@ uv run ty check src tests
 uv run pytest -m unit --no-cov
 uv run pytest -m integration --no-cov
 uv run pytest -m end2end --no-cov
-uv run pre-commit run --all-files
+uv run pytest -m "unit or integration or end2end" --cov=src
+cd ..
+uv run --project backend pre-commit run --all-files
 ```

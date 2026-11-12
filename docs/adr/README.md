@@ -15,3 +15,12 @@
 
 - Create an ADR for any long-term architectural decision.
 - Link the ADR in the corresponding PR.
+
+## Accepted decisions
+
+- [0001-ai-tooling-layout](0001-ai-tooling-layout.md)
+- [0002-backend-runtime-architecture](0002-backend-runtime-architecture.md)
+- [0003-openai-compatible-facade](0003-openai-compatible-facade.md)
+- [0004-hardening-and-bonus-capabilities](0004-hardening-and-bonus-capabilities.md)
+- [0005-production-hardening-stack](0005-production-hardening-stack.md)
+- [0006-monorepo-layout](0006-monorepo-layout.md)

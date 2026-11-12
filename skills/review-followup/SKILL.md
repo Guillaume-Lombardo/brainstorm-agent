@@ -46,3 +46,5 @@ Only resolve a thread when:
 
 - code or docs were actually updated to address it, or
 - a clear rationale is provided in PR discussion for rejecting it.
+
+Run Python validation commands from `backend/`.

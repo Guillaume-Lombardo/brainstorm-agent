@@ -5,9 +5,11 @@ description: Prepare and validate package release workflow for TestPyPI and PyPI
 
 # Release
 
+Run build commands from `backend/`.
+
 ## Steps
 
-1. Update `version` in `pyproject.toml`.
+1. Update `version` in `backend/pyproject.toml`.
 2. Run full quality pipeline.
 3. Build artifacts with `uv run --with build python -m build`.
 4. Check metadata with `uv run --with twine python -m twine check dist/*`.

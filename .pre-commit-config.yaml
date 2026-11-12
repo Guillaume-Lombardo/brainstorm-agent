@@ -42,11 +42,13 @@ repos:
     hooks:
       - id: ty
         name: ty (type checking)
-        entry: uv run ty check src/ tests/
+        entry: uv run --directory backend ty check src/ tests/
         language: system
         pass_filenames: false
+        files: ^backend/
       - id: pytest-unit
         name: pytest unit
-        entry: uv run pytest -m unit
+        entry: uv run --directory backend pytest -m unit
         language: system
         pass_filenames: false
+        files: ^backend/

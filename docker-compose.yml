@@ -2,8 +2,9 @@ services:
   app:
     build:
       context: .
+      dockerfile: backend/Dockerfile
     env_file:
-      - .env.example
+      - backend/.env.template
     environment:
       DATABASE_URL: postgresql+psycopg://brainstorm:brainstorm@postgres:5432/brainstorm # pragma: allowlist secret
       REDIS_URL: redis://redis:6379/0

@@ -52,17 +52,17 @@
 
 #### Steps
 
-- [ ] Move `src/`, `tests/`, `migrations/`, `alembic.ini`, `pyproject.toml`, `uv.lock`, `ruff.toml`,
+- [x] Move `src/`, `tests/`, `migrations/`, `alembic.ini`, `pyproject.toml`, `uv.lock`, `ruff.toml`,
       `.python-version`, `Dockerfile`, `docker/` and the backend env files to `backend/`.
-- [ ] Keep at the root: `AGENTS.md`, `agent.md`, `SKILLS.md`, `skills/`, `docs/`, `deploy/`, compose
+- [x] Keep at the root: `AGENTS.md`, `agent.md`, `SKILLS.md`, `skills/`, `docs/`, `deploy/`, compose
       files, `.github/`, `.pre-commit-config.yaml`, `README.md`, `plan.md`, license and community
       files.
-- [ ] Merge the duplicated `.env.example` / `.env.template` into one backend `.env.template`.
-- [ ] Update CI (working directory, path filters per app), pre-commit hooks, compose build contexts,
+- [x] Merge the duplicated `.env.example` / `.env.template` into one backend `.env.template`.
+- [x] Update CI (working directory, path filters per app), pre-commit hooks, compose build contexts,
       prompt base path defaults.
-- [ ] Update `AGENTS.md` (layout, pre-PR checklist commands), `README.md` (root overview + backend
+- [x] Update `AGENTS.md` (layout, pre-PR checklist commands), `README.md` (root overview + backend
       section), local skills that reference paths.
-- [ ] All existing checks green from `backend/`.
+- [x] All existing checks green from `backend/`.
 
 ### Lot 1: Make the agent loop work with a real OpenAI-compatible model
 
