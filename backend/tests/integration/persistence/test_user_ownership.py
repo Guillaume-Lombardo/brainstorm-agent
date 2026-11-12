@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from pathlib import Path
+    from pytest_mock import MockerFixture
 
 import pytest
 
@@ -18,7 +19,7 @@ from brainstorm_agent.services.users import UserService
 from brainstorm_agent.settings import Settings
 
 
-def test_shared_service_requires_owner_on_every_operation(tmp_path: Path) -> None:
+def test_shared_service_requires_owner_on_every_operation(tmp_path: Path, mocker: MockerFixture) -> None:
     settings = Settings(database_url=f"sqlite:///{tmp_path / 'owners.db'}")
     upgrade_database(database_url=settings.database_url)
     engine = create_engine_from_settings(settings)
@@ -30,6 +31,9 @@ def test_shared_service_requires_owner_on_every_operation(tmp_path: Path) -> Non
         service = SessionService(db_session=db, settings=settings, owner_id=first.id)
         session_id = service.create_session().session_id
         other = SessionService(db_session=db, settings=settings, owner_id=second.id)
+        mocker.patch.object(
+            other.lock_manager, "lock", side_effect=AssertionError("Unauthorized lock access")
+        )
         for operation in [
             other.get_session,
             other.list_messages,

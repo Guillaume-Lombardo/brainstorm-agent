@@ -164,6 +164,7 @@ class SessionService:
         Raises:
             pending_human_review_in_progress: If a human validation decision is still pending.
         """
+        self._require_owned(session_id)
         with self.lock_manager.lock(session_id):
             record = self._require_owned(session_id)
             state = self.sessions.to_state(record)
@@ -472,6 +473,7 @@ class SessionService:
         Raises:
             no_pending_human_review: If the session has no pending human review.
         """
+        self._require_owned(session_id)
         with self.lock_manager.lock(session_id):
             record = self._require_owned(session_id)
             state = self.sessions.to_state(record)
