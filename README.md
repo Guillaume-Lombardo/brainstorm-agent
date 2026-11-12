@@ -432,7 +432,7 @@ Example startup:
 
 ```bash
 cp backend/.env.template backend/.env
-docker compose -f docker-compose.prod.yml up --build -d
+docker compose --env-file backend/.env -f docker-compose.prod.yml up --build -d
 ```
 
 By default the app entrypoint can run `alembic upgrade head` on startup when `RUN_DB_MIGRATIONS_ON_STARTUP=true`.

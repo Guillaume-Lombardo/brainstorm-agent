@@ -20,6 +20,8 @@ multiple services and are mounted by root Compose files.
 
 Merge the identical backend env examples into `backend/.env.template`.
 Development Compose reads the template; production reads `backend/.env`.
+Production commands also pass `--env-file backend/.env` to preserve Compose
+interpolation of shared variables such as `LITELLM_MASTER_KEY`.
 The OpenWebUI env example remains separate because it configures another service.
 
 Python commands run from `backend/`. Root pre-commit hooks explicitly select
