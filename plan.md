@@ -10,7 +10,9 @@
   - extracted fields are overwritten on each turn instead of accumulated;
   - the heuristic mode only parses `key: value` lines and lets a one-character pitch pass stage 0
     by injecting canned ambiguities;
-  - transition validation only checks field presence;
+  - transition validation checks field presence plus a few hard-coded rules (3 risks minimum,
+    stage 3 relevance justification, no blocking question), but nothing about vagueness or
+    consistency;
   - the final deliverable is a flat backlog: no vertical slices, contracts or dependency graph that
     would allow parallel, integration-testable development;
   - streaming is a single final chunk, token usage counts words, the Redis lock TTL (30 s) is
@@ -156,7 +158,8 @@
 - [ ] Typed stage model:
   - [ ] slice 0 "walking skeleton": cross-cutting foundation and shared contracts (API schemas,
         events, shared data model);
-  - [ ] per slice: goal, backlog item ids, owned domain (from stage 3 aggregates/sub-systems),
+  - [ ] per slice: goal, backlog item ids, owned domain (from stage 3 aggregates/sub-systems, or
+        from stage 2 capabilities when stage 3 was declared not relevant),
         provided and consumed contracts, dependencies, integration scenarios (Given/When/Then or
         EARS), stubs needed to work without the other slices;
   - [ ] delivery waves derived from the dependency graph.
@@ -183,8 +186,10 @@
 - [ ] `users` table (email, display name, Argon2id password hash, OIDC issuer + subject, active
       flag, timestamps) with an Alembic migration.
 - [ ] `owner_id` on sessions with a migration assigning existing sessions to a bootstrap user.
-- [ ] Authorization check on every session route (owner only); existing API-key auth kept for
-      service clients (OpenAI-compatible facade).
+- [ ] Authorization enforced in the shared session service (owner only), so every route and the
+      OpenAI-compatible facade are covered.
+- [ ] Existing API-key auth kept for service clients, with each key mapped to an owning user
+      (facade sessions are owned by that user).
 - [ ] Recommended flow (to confirm in the ADR): Auth.js in Next.js with a Credentials provider
       (verified against the backend) and an OIDC provider enabled only when configured; the Next.js
       server calls the backend with a short-lived signed JWT (`sub` = user id) using the existing JWT
@@ -251,7 +256,8 @@
 
 - [ ] Frontend Dockerfile (Next.js standalone output).
 - [ ] Dev compose: backend, frontend, Postgres, Redis, LiteLLM (Docker work runs on `codex-dev`).
-- [ ] Prod compose and Caddy: `/` to the frontend, `/api` to the backend.
+- [ ] Prod compose and Caddy: `/api/v1` and `/v1` to the backend, everything else (including
+      Auth.js `/api/auth/*` and Next.js route handlers) to the frontend.
 - [ ] Root `README.md`, backend and frontend `.env.template`, validation commands updated.
 
 ### Later (not scheduled)
