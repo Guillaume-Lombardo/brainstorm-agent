@@ -1,375 +1,272 @@
 # plan.md
 
-## Purpose
+## Roadmap v2: working agent, delivery slicing, Next.js application (remaining work)
 
-This file is intentionally collaborative.
-Before major implementation, the agent and the user must align on scope, priorities, and constraints.
-The plan is then updated in this file and used as the execution reference.
+- Status: `planned`
+- Context: the 2026-11-12 audit found a solid infrastructure layer (auth, rate limiting, metrics,
+  migrations, deployment assets) but a product loop that does not work end to end:
+  - in `openai` mode the prompt never states the required field names checked by the validator,
+    there is no structured output, and no retry/repair on invalid JSON;
+  - extracted fields are overwritten on each turn instead of accumulated;
+  - the heuristic mode only parses `key: value` lines and lets a one-character pitch pass stage 0
+    by injecting canned ambiguities;
+  - transition validation only checks field presence;
+  - the final deliverable is a flat backlog: no vertical slices, contracts or dependency graph that
+    would allow parallel, integration-testable development;
+  - streaming is a single final chunk, token usage counts words, the Redis lock TTL (30 s) is
+    shorter than a worst-case turn (2 LLM calls x 30 s), sessions have no owner.
+- Target: a monorepo application with a `backend/` (FastAPI + LangGraph + Postgres, LLM reached
+  through LiteLLM with an OpenAI-compatible API) and a `frontend/` (Next.js + shadcn/ui).
+- Out of scope: OpenWebUI agent mode / Pipe Function (deferred), group or team management,
+  multi-agent personas, a "quick mode" that skips gates (conflicts with the no-skip rule).
+- Delivery: one PR per lot, in order. Lots 6 and 7 may overlap once the event contract of lot 6 is
+  merged.
 
-## Planning Protocol (Agent)
+### Decisions (validated with the user)
 
-For any non-trivial feature/refactor:
+- D1. Authentication: login/password in the frontend, plus OIDC when configured. Multi-user, every
+  session has an owner, no groups for now.
+- D2. Monorepo: backend moved to `backend/`, frontend in `frontend/`.
+- D3. Generated stage content follows the user's language; section headings and schema keys stay
+  in English.
+- D4. An earlier stage can be reopened; downstream stages are marked `stale` until revalidated.
+- D5. Non-critical gaps may be recorded as default assumptions, always flagged "to confirm";
+  critical fields can never default.
+- D6. Evaluation models through LiteLLM aliases: strong model `claude-opus-5-5` (Opus 5.5), cheap
+  model `glm-5.3-flash`.
+- D7. A new eighth stage `stage_7_delivery_slicing` follows backlog synthesis.
 
-1. Ask the user for missing context before coding.
-2. Confirm:
-   - business goal
-   - in-scope and out-of-scope
-   - constraints (time, compatibility, infra, dependencies)
-   - acceptance criteria
-3. Propose a short, testable implementation plan.
-4. Wait for user confirmation (or revisions).
-5. Execute and keep this file synchronized with decisions and status.
-6. For any architecture/structure decision, create or update an ADR in `docs/adr/` and reference it in the PR.
+### Defaults assumed (change if needed)
 
-## Discovery Questions
+- Users are created by an administrator through the CLI; no self sign-up in v1.
+- Password reset through the CLI only in v1.
+- Existing sessions are assigned to a bootstrap user by the ownership migration.
+- Prompts move to a new `v2` prompt folder (lot 1); `v1` stays untouched.
 
-Use these questions when scope is unclear:
+### Lot 0: Monorepo restructuring
 
-- What problem are we solving right now?
-- What is explicitly out of scope for this iteration?
-- Which interfaces/contracts must stay backward compatible?
-- What level of test coverage is required for acceptance?
-- Are there release or operational constraints to account for?
-
-## Plan Template
-
-Copy/update this block for each initiative:
-
-### Initiative: <name>
-
-- Status: `planned | in_progress | blocked | done`
-- Owner: `<user|agent|both>`
-- Objective:
-- In scope:
-- Out of scope:
-- Constraints:
-- Risks:
-- Acceptance criteria:
-- ADR impact: `none | required`
-- ADR reference(s): `docs/adr/NNNN-short-title.md` (required when ADR impact is `required`)
-
-#### Steps
-
-- [ ] Step 1
-- [ ] Step 2
-- [ ] Step 3
-
-#### Validation
-
-- [ ] `uv run ruff format .`
-- [ ] `uv run ruff check .`
-- [ ] `uv run ty check src tests`
-- [ ] `uv run pytest -m unit`
-- [ ] `uv run pytest -m integration`
-- [ ] `uv run pytest -m end2end`
-- [ ] `uv run pre-commit run --all-files`
-
-#### Notes / Decisions
-
-- Decision:
-- Rationale:
-- Follow-up:
-- ADR record: `docs/adr/NNNN-short-title.md` (or `none` with rationale)
-
-### Initiative: AI tooling alignment for structured brainstorming backend
-
-- Status: `done`
-- Owner: `both`
-- Objective: Align repository governance and prompt assets with the target backend before runtime implementation.
-- In scope:
-  - audit current repository structure and AI tooling
-  - define target AI tooling layout for agents, skills, and prompts
-  - create versioned prompt assets for the fixed business workflow
-  - update governance files to make the brainstorming backend the canonical product target
-- Out of scope:
-  - FastAPI implementation
-  - LangGraph runtime implementation
-  - database schema and infrastructure delivery
-- Constraints:
-  - no backend implementation before user validation
-  - keep prompts externalized and versionable
-  - preserve existing repo delivery rules
-- Risks:
-  - governance drift between `AGENTS.md`, `agent.md`, and `SKILLS.md`
-  - prompt structure becoming the only source of business truth
-- Acceptance criteria:
-  - repository state and gaps are documented
-  - target prompt and agent structure is explicit
-  - required prompt files exist and are readable
-  - governance files are coherent with the product brief
-- ADR impact: `required`
-- ADR reference(s): `docs/adr/0001-ai-tooling-layout.md`
+- Objective: move the backend under `backend/` without behavior change, ready for `frontend/`.
+- ADR impact: `required` (`docs/adr/0006-monorepo-layout.md`)
 
 #### Steps
 
-- [x] Audit repository structure, tooling, and current AI artifacts
-- [x] Define target architecture for agents, prompts, and responsibilities
-- [x] Update governance files and create versioned prompt assets
+- [ ] Move `src/`, `tests/`, `migrations/`, `alembic.ini`, `pyproject.toml`, `uv.lock`, `ruff.toml`,
+      `.python-version`, `Dockerfile`, `docker/` and the backend env files to `backend/`.
+- [ ] Keep at the root: `AGENTS.md`, `agent.md`, `SKILLS.md`, `skills/`, `docs/`, `deploy/`, compose
+      files, `.github/`, `.pre-commit-config.yaml`, `README.md`, `plan.md`, license and community
+      files.
+- [ ] Merge the duplicated `.env.example` / `.env.template` into one backend `.env.template`.
+- [ ] Update CI (working directory, path filters per app), pre-commit hooks, compose build contexts,
+      prompt base path defaults.
+- [ ] Update `AGENTS.md` (layout, pre-PR checklist commands), `README.md` (root overview + backend
+      section), local skills that reference paths.
+- [ ] All existing checks green from `backend/`.
 
-#### Validation
+### Lot 1: Make the agent loop work with a real OpenAI-compatible model
 
-- [x] `uv run ruff format .`
-- [x] `uv run ruff check .`
-- [x] `uv run ty check src tests`
-- [x] `uv run pytest -m unit`
-- [x] `uv run pytest -m integration`
-- [x] `uv run pytest -m end2end`
-- [x] `uv run pre-commit run --all-files`
-
-#### Notes / Decisions
-
-- Decision: Keep one source of truth in `AGENTS.md` and make `agent.md` a short pointer document.
-- Rationale: This removes duplicated governance and reduces instruction drift.
-- Follow-up: Implement runtime modules around the new prompt and workflow structure in a dedicated feature phase.
-- ADR record: `docs/adr/0001-ai-tooling-layout.md`
-
-### Initiative: Implement the structured brainstorming backend
-
-- Status: `done`
-- Owner: `agent`
-- Objective: Deliver a working FastAPI + LangGraph backend with persistent staged brainstorming sessions, OpenAI-compatible model access, and Docker-based local execution.
-- In scope:
-  - application settings and environment contract
-  - domain schemas and stage validation rules
-  - SQLAlchemy persistence for sessions, turns, documents, and transition decisions
-  - optional Redis integration for non-critical cache/coordination hooks
-  - LangGraph orchestration for one conversation turn
-  - FastAPI endpoints for session lifecycle and document retrieval
-  - Dockerfile, docker-compose, README, and tests
-- Out of scope:
-  - OpenWebUI-specific integration
-  - voice input implementation
-  - human review endpoint implementation beyond architecture-ready placeholders
-- Constraints:
-  - keep prompts externalized under `src/brainstorm_agent/resources/prompts/`
-  - use an OpenAI-compatible API through configurable `OPENAI_BASE_URL`, `OPENAI_API_KEY`, and `MODEL_NAME`
-  - keep stage progression deterministic through coded validation rules
-- Risks:
-  - LangGraph integration drift if state boundaries are unclear
-  - persistence complexity across sessions, documents, and versions
-  - overfitting the LLM adapter to one provider behavior
-- Acceptance criteria:
-  - local Docker Compose starts app, Postgres, and Redis
-  - session creation and message exchange work through HTTP
-  - a structured Markdown deliverable is persisted on each turn
-  - stage transitions are blocked when required fields are incomplete
-  - unit, integration, and end-to-end coverage exists for core flows
-- ADR impact: `required`
-- ADR reference(s): `docs/adr/0002-backend-runtime-architecture.md`
+- Objective: a free-form conversation through LiteLLM can complete every stage, with the state
+  accumulating across turns and strict, typed LLM outputs.
+- ADR impact: `required` (`docs/adr/0007-typed-stage-contracts-and-structured-outputs.md`)
 
 #### Steps
 
-- [x] Define runtime architecture, settings contract, and ADR
-- [x] Implement domain models, prompt loading, and validation rules
-- [x] Implement persistence models and repositories
-- [x] Implement LangGraph orchestration and LLM adapter
-- [x] Implement FastAPI routes and dependency wiring
-- [x] Add Docker assets, docs, and test coverage
+- [ ] Replace `extracted_fields: dict[str, Any]` with one Pydantic model per stage; the model is the
+      single source for required fields, field descriptions, the prompt field list, validation and
+      the JSON schema sent to the LLM.
+- [ ] Request structured outputs (`response_format` JSON schema, strict) generated from those models;
+      add a configurable fallback (`json_object` or tool calling) for models without schema support
+      (to verify for `glm-5.3-flash`).
+- [ ] On schema or JSON failure, retry once with the validation error fed back; then return an
+      actionable error (no silent partial state).
+- [ ] Patch semantics: the LLM returns field updates, new items and resolved item ids; the server
+      merges them into the accumulated stage state. Stable ids for facts, assumptions, decisions,
+      risks, questions and backlog items across turns.
+- [ ] Prompt context: stage contract (fields + descriptions), current accumulated values and
+      coverage, last N transcript turns, compact summaries of previous stages (no full session JSON
+      dump).
+- [ ] Split the turn into a bounded structured analysis call and a conversational reply call that
+      can be streamed; the contradiction challenge becomes an optional pass returning findings only
+      (`LLM_CHALLENGE_PASS=off|findings`).
+- [ ] Async LLM client and turn processing (`AsyncOpenAI`).
+- [ ] Remove canned stage-0 fillers; the heuristic adapter becomes an explicit deterministic test
+      double (`LLM_MODE=fake`, scripted responses); `openai` becomes the documented default.
+- [ ] New prompt folder `v2` with the field lists and output contracts.
+- [ ] Real token usage from the LLM response in turn records and in the OpenAI-compatible facade.
+- [ ] Settings validation: session lock TTL greater than the worst-case turn duration.
+- [ ] Use or delete the unused Markdown rendering prompt.
+- [ ] LiteLLM example config with the `claude-opus-5-5` and `glm-5.3-flash` aliases.
+- [ ] Contract tests with recorded LLM responses (valid, invalid JSON, schema mismatch, partial
+      patch, retry path).
 
-#### Validation
+### Lot 2: Quality gates and elicitation (patterns from Spec Kit, Rasa CALM, Kiro)
 
-- [x] `uv run ruff format .`
-- [x] `uv run ruff check .`
-- [x] `uv run ty check src tests`
-- [x] `uv run pytest -m unit`
-- [x] `uv run pytest -m integration`
-- [x] `uv run pytest -m end2end`
-- [x] `uv run pre-commit run --all-files`
-
-#### Notes / Decisions
-
-- Decision: Use a real LangGraph state graph for turn orchestration with rule-based transition checks outside the LLM.
-- Rationale: This satisfies the product constraint that stage progression must not depend only on free-form model output.
-- Follow-up: Reassess streaming and human-review hooks after the core synchronous API is stable.
-- ADR record: `docs/adr/0002-backend-runtime-architecture.md`
-- Note: `langgraph` currently emits a Python 3.14 warning through `langchain-core` Pydantic V1 compatibility code during tests, but validation still passes.
-
-### Initiative: Add an OpenAI-compatible facade for LiteLLM registration
-
-- Status: `done`
-- Owner: `agent`
-- Objective: Expose the brainstorming backend behind a minimal OpenAI-compatible surface so it can be registered in LiteLLM and consumed by generic OpenAI clients.
-- In scope:
-  - `GET /v1/models`
-  - `POST /v1/chat/completions`
-  - stable public model alias configuration
-  - session continuity through request metadata
-  - LiteLLM example configuration and usage documentation
-- Out of scope:
-  - full `/v1/responses` implementation
-  - streaming support on the OpenAI-compatible facade
-  - authentication on the facade beyond future-ready design
-- Constraints:
-  - keep the existing session API backward compatible
-  - preserve persistent server-side session state
-  - avoid moving business logic into FastAPI routes
-- Risks:
-  - generic OpenAI clients may not preserve custom session metadata automatically
-  - the facade could be mistaken for a fully generic OpenAI backend
-- Acceptance criteria:
-  - `/v1/models` exposes a stable alias for the brainstorming backend
-  - `/v1/chat/completions` can create or continue a brainstorming session
-  - the response includes a recoverable session identifier
-  - README documents LiteLLM registration and the session continuity contract
-  - automated tests cover the facade flow
-- ADR impact: `required`
-- ADR reference(s): `docs/adr/0003-openai-compatible-facade.md`
+- Objective: the gate blocks vague or contradictory answers through code, and each turn asks few,
+  prioritized questions.
+- ADR impact: `required` (declarative stage rules; extend ADR 0007)
 
 #### Steps
 
-- [x] Add OpenAI-compatible schemas and facade service
-- [x] Document LiteLLM usage and session continuity
-- [x] Add automated coverage for the facade flow
+- [ ] Coverage taxonomy: each stage field is `clear | partial | missing`; code is authoritative for
+      `missing`, the LLM proposes `partial` with a reason.
+- [ ] Declarative stage rules with rejections (condition + message), e.g.:
+  - [ ] measurable objectives contain a metric or a target value;
+  - [ ] at least 3 risks across at least 2 categories, no generic mitigation (`TBD`, empty);
+  - [ ] MVP scope items exist in the capability list;
+  - [ ] every backlog item links to an existing goal, risk or hypothesis id;
+  - [ ] stage 3 "not relevant" requires a justification (migrate the existing rule).
+- [ ] Readiness checklist per stage, rendered in the stage document (`passed/total`).
+- [ ] Question budget: at most 3 questions per turn, prioritized (scope > security/compliance > UX >
+      technical), each with `why_it_matters`, optional answer options and a recommended option.
+- [ ] Default assumptions for non-critical gaps (D5), flagged and listed for confirmation.
+- [ ] Timestamped `Clarifications` log (question -> answer) in each stage document.
+- [ ] Cross-stage consistency checks (impact-map actors vs stage 1 actors, backlog vs MVP scope).
+- [ ] Stage 6 backlog items carry objective, definition of done, link, and optional EARS acceptance
+      criteria ("WHEN ... THE SYSTEM SHALL ...").
+- [ ] Deterministic unit tests for every rule and for the transition decision table.
 
-#### Validation
+### Lot 3: Evaluation harness
 
-- [x] `uv run ruff format .`
-- [x] `uv run ruff check .`
-- [x] `uv run ty check src tests`
-- [x] `uv run pytest -m unit`
-- [x] `uv run pytest -m integration`
-- [x] `uv run pytest -m end2end`
-- [x] `uv run pre-commit run --all-files`
-
-#### Notes / Decisions
-
-- Decision: Keep OpenAI compatibility as a facade over the session-oriented backend instead of replacing the native API.
-- Rationale: LiteLLM and generic OpenAI clients can integrate without changing the deterministic stateful domain model.
-- Follow-up: Extend the facade if `/v1/responses`, auth, streaming, or operational hardening becomes necessary.
-- ADR record: `docs/adr/0003-openai-compatible-facade.md`
-
-### Initiative: Hardening and bonus capabilities for production-style integration
-
-- Status: `done`
-- Owner: `agent`
-- Objective: Harden the backend for external consumption with auth, observability, human validation, exports, and broader OpenAI-compatible support.
-- In scope:
-  - optional API-key authentication
-  - request IDs, health details, and lightweight metrics
-  - optional human validation gate before stage transition
-  - session exports in Markdown and JSON
-  - SSE endpoints for native and OpenAI-compatible APIs
-  - `/v1/responses` compatibility
-- Out of scope:
-  - formal migration framework
-  - full OpenWebUI plugin implementation
-  - token-level true incremental model streaming
-- Constraints:
-  - keep existing API flows backward compatible by default
-  - keep auth optional and environment-driven
-  - keep human validation optional and disabled by default
-- Risks:
-  - schema growth across API and persistence layers
-  - transport-level streaming being mistaken for token streaming
-  - operational hardening without full migrations requires documented cleanup expectations
-- Acceptance criteria:
-  - auth can be enabled through env vars
-  - metrics and health endpoints expose operational state
-  - pending transitions can be approved or rejected through a human review endpoint
-  - exports are available in Markdown and JSON
-  - `/v1/responses` and SSE flows are covered by tests and docs
-- ADR impact: `required`
-- ADR reference(s): `docs/adr/0004-hardening-and-bonus-capabilities.md`
+- Objective: measure whether the agent blocks and advances correctly, per model, before UI work
+  depends on it.
+- ADR impact: `none`
 
 #### Steps
 
-- [x] Add optional API-key auth, request IDs, health details, and in-process metrics
-- [x] Extend domain and persistence for human review decisions and optional transition gating
-- [x] Add Markdown/JSON exports and native SSE message streaming
-- [x] Add `/v1/responses` plus OpenAI-compatible streaming support
-- [x] Update docs, ADRs, env examples, and full validation
+- [ ] Golden scenarios in YAML: persona, hidden project facts, scripted or simulated answers, and
+      expectations (must block at stage X, must flag contradiction Y, must reach the last stage).
+- [ ] Simulated user driven by an LLM playing the persona with only its hidden facts.
+- [ ] Rubric-based LLM judge for document quality (specificity, traceability, no invented facts).
+- [ ] `brainstorm-agent eval` CLI with a report per model (D6): transition precision/recall, turns
+      per stage, schema failures, latency, token cost.
+- [ ] Default runs on `glm-5.3-flash`; `claude-opus-5-5` for the strong reference and the judge.
+- [ ] CI runs the recorded-fixture subset only; full evaluation runs on demand.
 
-#### Validation
+### Lot 4: Stage 7, Delivery slicing
 
-- [x] `uv run ruff format .`
-- [x] `uv run ruff check .`
-- [x] `uv run ty check src tests`
-- [x] `uv run pytest -m unit`
-- [x] `uv run pytest -m integration`
-- [x] `uv run pytest -m end2end`
-- [x] `uv run pre-commit run --all-files`
-
-#### Notes / Decisions
-
-- Decision: Human validation is implemented as an optional gate that holds a pending transition in session state rather than altering the LangGraph flow.
-- Rationale: This keeps the graph deterministic and synchronous while allowing explicit human control at the application-service layer.
-- Follow-up: Revisit true token streaming and formal DB migrations if this backend moves toward production deployment.
-- ADR record: `docs/adr/0004-hardening-and-bonus-capabilities.md`
-- [x] Add `/v1/models` and `/v1/chat/completions`
-- [x] Document LiteLLM configuration and local wiring
-- [x] Add tests for facade behavior and session continuity
-
-#### Validation
-
-- [x] `uv run ruff format .`
-- [x] `uv run ruff check .`
-- [x] `uv run ty check src tests`
-- [x] `uv run pytest -m unit`
-- [x] `uv run pytest -m integration`
-- [x] `uv run pytest -m end2end`
-- [x] `uv run pre-commit run --all-files`
-
-#### Notes / Decisions
-
-- Decision: Use `metadata.session_id` as the continuity handle on the OpenAI-compatible facade.
-- Rationale: It preserves the backend's persistent session model without forcing clients onto the first-party session API.
-- Follow-up: Consider `/v1/responses` and SSE after validating real LiteLLM/OpenWebUI usage.
-- ADR record: `docs/adr/0003-openai-compatible-facade.md`
-
-### Initiative: Production hardening stack
-
-- Status: `done`
-- Owner: `agent`
-- Objective: Add formal schema migrations, stronger authentication, broader observability, rate limiting, and production-oriented deployment/configuration for LiteLLM and OpenWebUI.
-- In scope:
-  - Alembic migrations for the current schema
-  - stronger auth with hashed API keys and JWT bearer support
-  - Redis-backed rate limiting
-  - improved observability endpoints and Prometheus metrics
-  - production deployment assets and startup flow
-  - LiteLLM and OpenWebUI production-oriented configuration examples
-- Out of scope:
-  - cloud-specific IaC
-  - managed identity providers
-  - full distributed tracing backend deployment
-- Constraints:
-  - preserve current API behavior by default where practical
-  - keep test ergonomics simple for local development
-  - avoid coupling the core workflow logic to deployment details
-- Risks:
-  - migration baseline mismatch with existing `create_all()` behavior
-  - auth surface complexity if multiple modes are added carelessly
-  - rate limiting semantics differing between Redis-backed and fallback modes
-- Acceptance criteria:
-  - schema can be upgraded through Alembic
-  - auth supports JWT and hashed API keys
-  - rate limiting returns deterministic `429` responses
-  - metrics and health/readiness are production-usable
-  - prod deployment docs/assets cover app, postgres, redis, litellm, and openwebui
-- ADR impact: `required`
-- ADR reference(s): `docs/adr/0005-production-hardening-stack.md`
+- Objective: the final deliverable splits the product into vertical slices that can be developed in
+  parallel and tested in integration.
+- ADR impact: `required` (`docs/adr/0008-delivery-slicing-stage.md`; canonical workflow change)
 
 #### Steps
 
-- [x] Add Alembic configuration and baseline migrations
-- [x] Implement robust auth modes and API-key hashing support
-- [x] Add Redis-backed rate limiting and metrics around auth/throttling
-- [x] Add production deployment assets and startup flow
-- [x] Add LiteLLM/OpenWebUI configuration examples and documentation
+- [ ] Add `stage_7_delivery_slicing` to the `Stage` enum and ordering (stages are stored as strings:
+      no schema migration).
+- [ ] Update the canonical workflow in `AGENTS.md`, `README.md`, `skills/brainstorm-workflow` and the
+      ADR index.
+- [ ] Typed stage model:
+  - [ ] slice 0 "walking skeleton": cross-cutting foundation and shared contracts (API schemas,
+        events, shared data model);
+  - [ ] per slice: goal, backlog item ids, owned domain (from stage 3 aggregates/sub-systems),
+        provided and consumed contracts, dependencies, integration scenarios (Given/When/Then or
+        EARS), stubs needed to work without the other slices;
+  - [ ] delivery waves derived from the dependency graph.
+- [ ] Stage prompt (`v2/stages/stage-7-delivery-slicing.md`) built from the story map backbone
+      (stage 2), event storming (stage 3) and impact map (stage 4).
+- [ ] Deterministic rules:
+  - [ ] every MVP backlog item belongs to exactly one slice;
+  - [ ] the dependency graph is acyclic;
+  - [ ] every contract has exactly one owning slice and every consumed contract exists;
+  - [ ] every slice has at least one integration scenario;
+  - [ ] cross-cutting work is assigned to slice 0.
+- [ ] Rendering: slice table, waves, contract matrix, one spec section per slice.
+- [ ] Export: one Markdown spec per slice and a backlog JSON with dependencies and waves (usable as
+      parallel work lots).
+- [ ] Evaluation scenarios extended to stage 7.
 
-#### Validation
+### Lot 5: Users, authentication and ownership
 
-- [x] `uv run ruff format .`
-- [x] `uv run ruff check .`
-- [x] `uv run ty check src tests`
-- [x] `uv run pytest -m unit`
-- [x] `uv run pytest -m integration`
-- [x] `uv run pytest -m end2end`
-- [x] `uv run pre-commit run --all-files`
+- Objective: multi-user backend with login/password and optional OIDC (D1).
+- ADR impact: `required` (`docs/adr/0009-user-authentication.md`)
 
-#### Notes / Decisions
+#### Steps
 
-- Decision: Implement auth as configurable modes so deployments can choose JWT, hashed API keys, or both without changing routes.
-- Rationale: This keeps the core HTTP contract stable while enabling stronger production security postures.
-- Follow-up: Revisit OpenID Connect or external auth gateways if multi-tenant deployment becomes necessary.
-- ADR record: `docs/adr/0005-production-hardening-stack.md`
+- [ ] `users` table (email, display name, Argon2id password hash, OIDC issuer + subject, active
+      flag, timestamps) with an Alembic migration.
+- [ ] `owner_id` on sessions with a migration assigning existing sessions to a bootstrap user.
+- [ ] Authorization check on every session route (owner only); existing API-key auth kept for
+      service clients (OpenAI-compatible facade).
+- [ ] Recommended flow (to confirm in the ADR): Auth.js in Next.js with a Credentials provider
+      (verified against the backend) and an OIDC provider enabled only when configured; the Next.js
+      server calls the backend with a short-lived signed JWT (`sub` = user id) using the existing JWT
+      mode; OIDC users are linked or provisioned by issuer + subject.
+- [ ] Login throttling with the existing rate limiter.
+- [ ] CLI: `user create`, `user set-password`, `user disable`.
+- [ ] Tests: password hashing, login success/failure, OIDC linking, ownership isolation between two
+      users.
+
+### Lot 6: Application API and event stream
+
+- Objective: a stable, typed contract for the Next.js frontend.
+- ADR impact: `required` (`docs/adr/0010-application-api-and-event-stream.md`)
+
+#### Steps
+
+- [ ] Typed SSE event stream per turn: `turn.started`, `analysis.status`, `message.delta`,
+      `document.updated`, `coverage.updated`, `stage.changed`, `review.required`, `turn.completed`,
+      `error`; documented in OpenAPI.
+- [ ] `GET /sessions` (paginated, owner-scoped), `PATCH /sessions/{id}` (title, archive), soft
+      delete.
+- [ ] Reopen an earlier stage with `stale` propagation to downstream stages (D4).
+- [ ] Direct edits: `PATCH` stage field values or items from the UI, then re-validate; comments on a
+      document section feed the next turn.
+- [ ] Review endpoint: approve, reject, request changes with a note.
+- [ ] Document version diff endpoint.
+- [ ] Final consolidated framing document export, slice specs and backlog JSON export.
+- [ ] CORS settings; OpenAPI-to-TypeScript generation script for the frontend.
+- [ ] Integration tests for reopen/stale, edits, event order; end-to-end SSE test.
+
+### Lot 7: Next.js frontend
+
+- Objective: a workspace where the user converses with the agent and sees the framing document,
+  stage progress, open questions and delivery slices evolve live.
+- ADR impact: covered by ADR 0009 and ADR 0010
+
+#### Steps
+
+- [ ] Scaffold `frontend/`: Next.js App Router, TypeScript strict, Tailwind, shadcn/ui, pnpm,
+      ESLint, Prettier, generated API types.
+- [ ] Auth.js: login/password page, "Sign in with SSO" shown only when OIDC is configured, sign-out,
+      protected routes.
+- [ ] Server-side proxy (route handlers) to the backend: credentials stay server-side, SSE relayed.
+- [ ] Sessions page: list, create, rename, archive.
+- [ ] Session workspace:
+  - [ ] chat panel with token streaming and status events;
+  - [ ] document panel: rendered Markdown per stage, version history, diff view;
+  - [ ] stage stepper (8 stages) with readiness checklist, coverage per field and `stale` markers;
+  - [ ] open questions panel: answer options as buttons, recommended option highlighted;
+  - [ ] review bar: approve, reject, request changes, reopen stage;
+  - [ ] inline field edit and section comments;
+  - [ ] delivery slicing view: slice cards, dependency graph, waves, contract matrix;
+  - [ ] export menu (Markdown, JSON, slice specs, backlog JSON).
+- [ ] Loading, empty and error states (LLM error, 401/403, 409 pending review, 429 rate limit).
+- [ ] Tests: Vitest + Testing Library for components; Playwright end-to-end against the backend in
+      `fake` LLM mode, including login.
+- [ ] Frontend lint, type check, tests and build in CI and pre-commit.
+
+### Lot 8: Packaging and deployment
+
+- ADR impact: `none` (extends ADR 0005)
+
+#### Steps
+
+- [ ] Frontend Dockerfile (Next.js standalone output).
+- [ ] Dev compose: backend, frontend, Postgres, Redis, LiteLLM (Docker work runs on `codex-dev`).
+- [ ] Prod compose and Caddy: `/` to the frontend, `/api` to the backend.
+- [ ] Root `README.md`, backend and frontend `.env.template`, validation commands updated.
+
+### Later (not scheduled)
+
+- [ ] MCP server exposing session tools (start, answer, document, approve, export slices).
+- [ ] Backlog and slice export to GitHub Issues and Linear.
+- [ ] OpenWebUI Pipe Function / agent mode, with facade session continuity fixed.
+- [ ] Groups / teams and shared sessions.
+- [ ] Project-type templates (stage depth presets).
+
+### Validation (every lot)
+
+- [ ] Backend (from `backend/` after lot 0): `uv run ruff format .`, `uv run ruff check .`,
+      `uv run ty check src tests`, `uv run pytest -m unit`, `uv run pytest -m integration`,
+      `uv run pytest -m end2end`
+- [ ] Frontend (lot 7+): `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`, `pnpm e2e`
+- [ ] `pre-commit run --all-files`
+- [ ] Dead-code pass, docs and `.env.template` in sync, ADR written when required
