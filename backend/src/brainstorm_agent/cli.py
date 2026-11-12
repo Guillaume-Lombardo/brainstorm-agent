@@ -3,13 +3,21 @@
 from __future__ import annotations
 
 import argparse
+from getpass import getpass
 
 import uvicorn
+from sqlalchemy import select
 
 from brainstorm_agent import __version__
 from brainstorm_agent.logging import configure_logging, get_logger
-from brainstorm_agent.persistence.session import upgrade_database
+from brainstorm_agent.persistence.models import UserRecord
+from brainstorm_agent.persistence.session import (
+    create_engine_from_settings,
+    create_session_factory,
+    upgrade_database,
+)
 from brainstorm_agent.services.auth import hash_api_key
+from brainstorm_agent.services.users import UserService, hash_password
 from brainstorm_agent.settings import get_settings
 
 
@@ -30,6 +38,13 @@ def build_parser() -> argparse.ArgumentParser:
     hash_parser = subparsers.add_parser("hash-api-key", help="Hash an API key for storage.")
     hash_parser.add_argument("value")
     hash_parser.add_argument("--pepper", default=None)
+    user_parser = subparsers.add_parser("user", help="Administer users (no public registration).")
+    user_commands = user_parser.add_subparsers(dest="user_command", required=True)
+    for operation in ("create", "set-password", "disable"):
+        operation_parser = user_commands.add_parser(operation)
+        operation_parser.add_argument("email")
+        if operation == "create":
+            operation_parser.add_argument("--display-name", required=True)
     return parser
 
 
@@ -49,6 +64,25 @@ def main() -> int:
     settings = get_settings()
     configure_logging(settings=settings)
     logger = get_logger("brainstorm_agent.cli")
+    if command == "user":
+        engine = create_engine_from_settings(settings)
+        try:
+            with create_session_factory(engine)() as db:
+                if args.user_command == "create":
+                    user = UserService(db).create(args.email, args.display_name, getpass("Password: "))
+                else:
+                    user = db.scalar(select(UserRecord).where(UserRecord.email == args.email.strip().lower()))
+                    if user is None:
+                        parser.error("User not found.")
+                    if args.user_command == "disable":
+                        user.active = False
+                    else:
+                        user.password_hash = hash_password(getpass("New password: "))
+                db.commit()
+                print(user.id)
+        finally:
+            engine.dispose()
+        return 0
     if command == "serve":
         logger.info("Starting API server", host=args.host or settings.host, port=args.port or settings.port)
         uvicorn.run(

@@ -105,7 +105,7 @@ class AuthenticationService:
                 matched_hash = peppered_candidate_hash if matches_peppered else legacy_candidate_hash
                 key_suffix = matched_hash[-12:]
                 return AuthenticatedPrincipal(
-                    subject=f"api-key:{key_suffix}",
+                    subject=self.settings.auth_api_key_owners.get(expected_hash, f"api-key:{key_suffix}"),
                     auth_mode=AuthMode.API_KEY,
                     token_id=key_suffix,
                 )
@@ -140,6 +140,7 @@ class AuthenticationService:
                 algorithms=[self.settings.jwt_algorithm],
                 audience=self.settings.jwt_audience,
                 issuer=self.settings.jwt_issuer,
+                options={"require": ["sub", "exp"]},
             )
         except InvalidTokenError:
             return None

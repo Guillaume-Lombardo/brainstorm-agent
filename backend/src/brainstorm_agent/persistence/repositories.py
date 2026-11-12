@@ -52,17 +52,24 @@ class SessionRepository:
         """
         self.db_session = db_session
 
-    def create(self, state: BrainstormSessionState) -> SessionRecord:
+    def create(
+        self,
+        state: BrainstormSessionState,
+        *,
+        owner_id: str = "00000000-0000-0000-0000-000000000001",
+    ) -> SessionRecord:
         """Create a session row.
 
         Args:
             state: Session state to persist.
+            owner_id: Owning user identifier.
 
         Returns:
             SessionRecord: Created ORM record.
         """
         record = SessionRecord(
             id=state.session_id,
+            owner_id=owner_id,
             current_stage=state.current_stage.value,
             state_payload=state.model_dump(mode="json"),
         )

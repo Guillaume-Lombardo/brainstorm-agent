@@ -38,6 +38,15 @@ class Settings(BaseSettings):
         validation_alias="AUTH_API_KEY_HASHES",
     )
     auth_api_key_pepper: str | None = Field(default=None, validation_alias="AUTH_API_KEY_PEPPER")
+    auth_api_key_owners: dict[str, str] = Field(default_factory=dict, validation_alias="AUTH_API_KEY_OWNERS")
+    auth_bridge_secret: str | None = Field(default=None, validation_alias="AUTH_BRIDGE_SECRET")
+    oidc_issuer: str | None = Field(default=None, validation_alias="OIDC_ISSUER")
+    login_rate_limit_requests: int = Field(default=5, gt=0, validation_alias="LOGIN_RATE_LIMIT_REQUESTS")
+    login_rate_limit_window_seconds: int = Field(
+        default=60,
+        gt=0,
+        validation_alias="LOGIN_RATE_LIMIT_WINDOW_SECONDS",
+    )
     jwt_secret_key: str | None = Field(default=None, validation_alias="JWT_SECRET_KEY")
     jwt_algorithm: str = Field(default="HS256", validation_alias="JWT_ALGORITHM")
     jwt_audience: str | None = Field(default=None, validation_alias="JWT_AUDIENCE")

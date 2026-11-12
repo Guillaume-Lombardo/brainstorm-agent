@@ -393,7 +393,7 @@ This works because the brainstorming backend now exposes `/v1/models` and `/v1/c
 uv run brainstorm-agent hash-api-key "replace-me" --pepper "server-side-secret"
 ```
 
-- Send hashed-key credentials through `X-API-Key`.
+- Send the raw API key through `X-API-Key`; map its normalized stored hash to an active user with `AUTH_API_KEY_OWNERS`.
 - Send JWT credentials through `Authorization: Bearer <token>`.
 - Enable Redis-backed throttling with `RATE_LIMIT_ENABLED=true`.
 - Every HTTP response includes an `X-Request-Id` header.
@@ -495,3 +495,41 @@ per-call timeout in both modes. See [LiteLLM aliases](examples/litellm-models.ya
 
 OpenAI mode requires explicit `OPENAI_BASE_URL` and `OPENAI_API_KEY` before a provider client
 can be created. There is no implicit public endpoint or placeholder credential fallback.
+
+### Users and session ownership
+
+Apply `uv run brainstorm-agent migrate` from `backend/`, then administer users:
+
+```bash
+uv run brainstorm-agent user create user@example.invalid --display-name "Example User"
+uv run brainstorm-agent user set-password user@example.invalid
+uv run brainstorm-agent user disable user@example.invalid
+```
+
+Passwords are read through a hidden terminal prompt. There is no public signup or
+password-reset endpoint. Existing sessions belong to bootstrap user
+`00000000-0000-0000-0000-000000000001` (`bootstrap@localhost.invalid`); set its password
+through the CLI if access to historical sessions is needed.
+
+For production enable authentication and configure JWT or hybrid mode. JWT `sub`
+must be an active backend user id, with a short-lived `exp`; configure matching
+`JWT_ISSUER` and `JWT_AUDIENCE`. Map every service API key to a user using
+`AUTH_API_KEY_OWNERS`, a JSON object from the stored normalized hash to user id.
+Keys without a mapping and disabled users are rejected. Sessions, documents,
+exports, reviews and OpenAI-compatible conversations are accessible only to their
+owner. A foreign session returns 404.
+
+The recommended frontend integration uses Auth.js Credentials on the Next.js
+server: POST `{email, password}` to `/api/v1/auth/verify`, with server-only
+`X-Auth-Bridge: <AUTH_BRIDGE_SECRET>`. Response: `{id, email, display_name}`.
+Next.js then signs short-lived backend JWTs for this user. The browser must never
+receive the bridge secret or JWT signing secret.
+
+With `OIDC_ISSUER` configured, the trusted Auth.js OIDC callback verifies tokens
+and email verification, then POSTs `{issuer, subject, email, display_name}` to
+`/api/v1/auth/oidc` with the same bridge authentication. Repeated issuer/subject
+pairs resolve the same user; email collisions return 409 and never link accounts
+automatically. A missing issuer disables OIDC. Both bridge routes are limited by
+`LOGIN_RATE_LIMIT_REQUESTS` (5) per `LOGIN_RATE_LIMIT_WINDOW_SECONDS` (60), per
+connecting server IP, returning 429 with `Retry-After`. Authentication-disabled
+development uses a single bootstrap owner. See [ADR 0009](docs/adr/0009-user-authentication.md).
