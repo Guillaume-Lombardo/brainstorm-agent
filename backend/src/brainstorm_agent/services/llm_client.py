@@ -21,6 +21,7 @@ from brainstorm_agent.core.models import (
     RiskItem,
     StageState,
 )
+from brainstorm_agent.core.quality_rules import reference_catalog
 from brainstorm_agent.core.stage_contracts import STAGE_CONTRACTS, STAGE_FIELD_ALIASES, STAGE_MODELS
 from brainstorm_agent.core.validation import validate_stage
 from brainstorm_agent.exceptions import LLMResponseError
@@ -513,14 +514,21 @@ class OpenAICompatibleBrainstormLLM:
         )
         context = {
             "current": current,
-            "coverage": {
-                name: name
-                not in validate_stage(
-                    stage=stage,
-                    extracted_fields=current.get("extracted_fields", {}),
-                    open_questions=[],
-                ).missing_fields
-                for name in STAGE_CONTRACTS[stage].required_fields
+            "coverage": validate_stage(
+                stage=stage,
+                extracted_fields=current.get("extracted_fields", {}),
+                open_questions=[],
+                partial_fields=current.get("partial_fields", {}),
+            ).model_dump(mode="json")["coverage"],
+            "reference_catalog": reference_catalog({
+                key: value.extracted_fields.model_dump(exclude_none=True)
+                for key, value in session_state.stage_states.items()
+                if key != stage.value
+            }),
+            "previous_fields": {
+                key: value.extracted_fields.model_dump(exclude_none=True)
+                for key, value in session_state.stage_states.items()
+                if key != stage.value
             },
             "transcript": session_state.transcript[-self.settings.llm_context_turns :]
             if self.settings.llm_context_turns
@@ -561,7 +569,7 @@ class OpenAICompatibleBrainstormLLM:
                 prompt=self.prompt_loader.contradiction_prompt() + analysis.model_dump_json(),
                 usage=analysis,
             )
-            analysis.uncertainties.extend(Findings.model_validate(result).findings)
+            analysis.contradictions.extend(Findings.model_validate(result).findings)
         return analysis
 
     async def stream_reply(
@@ -592,7 +600,7 @@ class OpenAICompatibleBrainstormLLM:
                     {
                         "role": "system",
                         "content": self.prompt_loader.system_prompt()
-                        + " Respond conversationally in the user's language. Ask targeted questions from the validated state; do not invent answers or claim an unapproved transition.",
+                        + " Respond conversationally in the user's language. Ask only the supplied selected questions (at most three), preserve their priority, reasons and options; do not invent answers or claim an unapproved transition.",
                     },
                     {"role": "user", "content": user_message + "\n" + analysis.model_dump_json()},
                 ],

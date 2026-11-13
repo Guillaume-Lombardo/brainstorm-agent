@@ -34,6 +34,11 @@ class BacklogItem(BaseModel):
     model_config = ConfigDict(extra="forbid")
     id: str = Field(default_factory=lambda: str(uuid4()))
     statement: str
+    objective: str = ""
+    definition_of_done: str = ""
+    link: str = ""
+    capability: str | None = None
+    ears_criteria: list[str] = Field(default_factory=list)
 
 
 class RiskField(BaseModel):

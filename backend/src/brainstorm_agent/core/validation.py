@@ -2,83 +2,95 @@
 
 from __future__ import annotations
 
-from brainstorm_agent.core.enums import Stage
-from brainstorm_agent.core.models import OpenQuestionItem, StageValidationResult
-from brainstorm_agent.core.stage_contracts import STAGE_CONTRACTS
+from typing import Any
 
-MINIMUM_RISK_ITEMS = 3
-
-
-def _is_present(value: object) -> bool:
-    """Return whether a field value should count as present.
-
-    Args:
-        value: Raw extracted field value.
-
-    Returns:
-        bool: `True` when the value is materially present.
-    """
-    if value is None:
-        return False
-    if isinstance(value, str):
-        return bool(value.strip())
-    if isinstance(value, (list, tuple, set)):
-        return any(_is_present(item) for item in value)
-    if isinstance(value, dict):
-        return any(_is_present(item) for item in value.values())
-    return True
+from brainstorm_agent.core.enums import OpenQuestionStatus, Stage
+from brainstorm_agent.core.models import (
+    CoverageStatus,
+    OpenQuestionItem,
+    ReadinessItem,
+    StageValidationResult,
+)
+from brainstorm_agent.core.quality_rules import STAGE_RULES, concrete
+from brainstorm_agent.core.stage_contracts import STAGE_CONTRACTS, STAGE_MODELS
 
 
-def validate_stage(
+def validate_stage(  # noqa: PLR0913 - independent gate inputs at the domain boundary
     *,
     stage: Stage,
-    extracted_fields: dict[str, object],
+    extracted_fields: dict[str, Any],
     open_questions: list[OpenQuestionItem],
+    partial_fields: dict[str, str] | None = None,
+    previous_fields: dict[str, Any] | None = None,
+    contradictions: list[str] | None = None,
 ) -> StageValidationResult:
-    """Validate a stage using coded rules.
+    """Evaluate field coverage and declarative readiness without trusting provider approval.
 
     Args:
-        stage: Active stage to validate.
-        extracted_fields: Structured fields extracted for the stage.
-        open_questions: Current open questions for the stage.
+        stage (Stage): Active stage.
+        extracted_fields (dict[str, Any]): Accumulated fields.
+        open_questions (list[OpenQuestionItem]): All retained questions.
+        partial_fields (dict[str, str] | None): Proposed partial coverage with reasons.
+        previous_fields (dict[str, Any] | None): Earlier stage field snapshots.
+        contradictions (list[str] | None): Unresolved contradictory findings.
 
     Returns:
-        StageValidationResult: Rule-based completeness decision.
+        StageValidationResult: Authoritative readiness checklist and decision.
     """
-    contract = STAGE_CONTRACTS[stage]
-    missing_fields = [
-        field_name
-        for field_name in contract.required_fields
-        if not _is_present(extracted_fields.get(field_name))
+    partial = partial_fields or {}
+    coverage = {
+        name: CoverageStatus.MISSING
+        if not concrete(extracted_fields.get(name))
+        else (CoverageStatus.PARTIAL if partial.get(name, "").strip() else CoverageStatus.CLEAR)
+        for name in STAGE_MODELS[stage].model_fields
+    }
+    required = (
+        *STAGE_CONTRACTS[stage].required_fields,
+        *(
+            name
+            for rule in STAGE_RULES.get(stage, ())
+            if rule.applies(extracted_fields)
+            for name in rule.required_fields
+        ),
+    )
+    checklist = [
+        ReadinessItem(
+            id=f"field:{name}",
+            passed=coverage[name] is CoverageStatus.CLEAR,
+            message=f"Required field {name}: {coverage[name].value}"
+            + (f" ({partial[name]})" if coverage[name] is CoverageStatus.PARTIAL else ""),
+        )
+        for name in required
     ]
-    blocking_questions = [item for item in open_questions if item.blocking]
-    blocking_reasons = [f"Missing required field: {field_name}" for field_name in missing_fields]
-
-    if stage is Stage.STAGE_3_EVENT_STORMING and not missing_fields:
-        relevant = str(extracted_fields.get("event_storming_relevant", "")).lower()
-        if relevant in {"false", "no", "0"} and not _is_present(extracted_fields.get("not_relevant_reason")):
-            blocking_reasons.append("Event storming irrelevance must be justified explicitly.")
-        if relevant in {"true", "yes", "1"} and not _is_present(extracted_fields.get("domain_events")):
-            blocking_reasons.append("Relevant event storming requires domain events.")
-
-    if stage is Stage.STAGE_5_RISK_STORMING:
-        risks = extracted_fields.get("risks_by_category", [])
-        if not isinstance(risks, list) or len(risks) < MINIMUM_RISK_ITEMS:
-            blocking_reasons.append("Risk storming needs at least three concrete risk items.")
-
-    if blocking_questions:
-        blocking_reasons.append("Blocking questions remain open.")
-
-    stage_is_clear_enough = not blocking_reasons
-    if stage_is_clear_enough:
-        reason = "All coded stage requirements are satisfied and no blocking questions remain."
-    else:
-        reason = "; ".join(blocking_reasons)
-
+    checklist.extend(
+        ReadinessItem(
+            id=rule.id,
+            passed=rule.condition(extracted_fields, previous_fields or {}),
+            message=rule.message,
+        )
+        for rule in STAGE_RULES.get(stage, ())
+    )
+    checklist.extend([
+        ReadinessItem(
+            id="blocking_questions",
+            passed=not any(q.blocking and q.status is OpenQuestionStatus.OPEN for q in open_questions),
+            message="Blocking questions remain open.",
+        ),
+        ReadinessItem(
+            id="contradictions",
+            passed=not contradictions,
+            message="Unresolved contradictions: " + "; ".join(contradictions or []),
+        ),
+    ])
+    reasons = [item.message for item in checklist if not item.passed]
     return StageValidationResult(
         stage=stage,
-        missing_fields=missing_fields,
-        blocking_reasons=blocking_reasons,
-        stage_is_clear_enough=stage_is_clear_enough,
-        transition_decision_reason=reason,
+        coverage=coverage,
+        readiness=checklist,
+        missing_fields=[name for name in required if coverage[name] is CoverageStatus.MISSING],
+        blocking_reasons=reasons,
+        stage_is_clear_enough=not reasons,
+        transition_decision_reason="; ".join(reasons)
+        if reasons
+        else "All coded stage requirements are satisfied and no blocking questions remain.",
     )

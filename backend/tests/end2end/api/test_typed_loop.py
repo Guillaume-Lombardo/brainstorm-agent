@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from brainstorm_agent.core.enums import LLMMode, Stage
-from brainstorm_agent.core.models import AssistantAnalysis, FactItem
+from brainstorm_agent.core.models import AssistantAnalysis, FactItem, OpenQuestionItem
 from brainstorm_agent.core.stage_contracts import STAGE_CONTRACTS, STAGE_MODELS
 from brainstorm_agent.persistence.session import (
     create_all,
@@ -27,6 +27,10 @@ def test_every_stage_accumulates_multiple_free_form_turns(tmp_path):
             contract = STAGE_CONTRACTS[stage]
             for name in contract.required_fields:
                 fields[name] = ["Confirmed answer"] if name in contract.list_fields else "Confirmed answer"
+            if stage is Stage.STAGE_0_PITCH:
+                fields["pitch_summary"] = "A tool to export monthly reports"
+            if stage is Stage.STAGE_1_PROBLEM_FRAMING:
+                fields["measurable_objectives"] = ["Reduce delay by 20 percent"]
             if stage is Stage.STAGE_3_EVENT_STORMING:
                 fields = {"event_storming_relevant": False, "not_relevant_reason": "No domain event workflow"}
             if stage is Stage.STAGE_5_RISK_STORMING:
@@ -34,7 +38,7 @@ def test_every_stage_accumulates_multiple_free_form_turns(tmp_path):
                     "risks_by_category": [
                         {
                             "id": f"risk-{i}",
-                            "category": "technical",
+                            "category": "technical" if i % 2 else "business",
                             "description": "Data loss",
                             "impact": "high",
                             "probability": "low",
@@ -46,7 +50,16 @@ def test_every_stage_accumulates_multiple_free_form_turns(tmp_path):
                 }
             if stage is Stage.STAGE_6_BACKLOG_SYNTHESIS:
                 fields = {
-                    name: [{"id": name, "statement": "Deliver validated scope"}]
+                    name: [
+                        {
+                            "id": name,
+                            "statement": "Deliver validated scope",
+                            "objective": "Reduce delay",
+                            "definition_of_done": "Delay measured",
+                            "link": "risk-0",
+                            "capability": "Confirmed answer",
+                        },
+                    ]
                     for name in contract.required_fields
                 }
             first_name = next(iter(fields))
@@ -59,7 +72,7 @@ def test_every_stage_accumulates_multiple_free_form_turns(tmp_path):
                     "risks_by_category": [
                         {
                             "id": f"risk-{i}",
-                            "category": "technical",
+                            "category": "technical" if i % 2 else "business",
                             "description": "Data loss",
                             "impact": "high",
                             "probability": "low",
@@ -100,3 +113,52 @@ def test_every_stage_accumulates_multiple_free_form_turns(tmp_path):
             )
         assert len(service.list_documents(session_id)) == 14
         assert len(service.list_messages(session_id)) == 29
+
+
+def test_vague_pitch_blocks_until_clarification_and_logs_answer(tmp_path):
+
+    settings = Settings(llm_mode=LLMMode.FAKE, database_url=f"sqlite+pysqlite:///{tmp_path / 'vague.db'}")
+    engine = create_engine_from_settings(settings)
+    create_all(engine)
+    fake = FakeBrainstormLLM(prompt_loader=PromptLoader())
+    fake.scripted_responses.append(
+        AssistantAnalysis(
+            summary="Vague",
+            assistant_message="Who uses this?",
+            extracted_fields=STAGE_MODELS[Stage.STAGE_0_PITCH].model_validate({
+                "pitch_summary": "app",
+                "clear_points": ["Reports"],
+                "ambiguities": ["Users"],
+                "missing_information": ["Frequency"],
+            }),
+            open_questions=[OpenQuestionItem(id="q1", question="Who uses this?")],
+        ),
+    )
+    with create_session_factory(engine)() as db:
+        service = SessionService(db_session=db, settings=settings, llm=fake)
+        session_id = service.create_session().session_id
+        first = service.process_user_message(session_id=session_id, content="An app")
+        assert not first.stage_clear_enough
+        question_id = first.open_questions[0].id
+        fake.scripted_responses.append(
+            AssistantAnalysis(
+                summary="Clarified",
+                assistant_message="Thanks",
+                extracted_fields=STAGE_MODELS[Stage.STAGE_0_PITCH].model_validate({
+                    "pitch_summary": "Accountants export monthly tax reports for clients",
+                }),
+                resolved_question_ids=[question_id],
+            ),
+        )
+        second = service.process_user_message(
+            session_id=session_id,
+            content="Accountants export monthly tax reports for clients",
+        )
+        assert second.stage_clear_enough
+        assert second.next_stage is Stage.STAGE_1_PROBLEM_FRAMING
+        assert "### Clarifications" in second.step_markdown
+        assert "Who uses this? -> Accountants" in second.step_markdown
+        assert "passed/total" in second.step_markdown
+        assert len(service.list_documents(session_id)) == 2
+        state = service.sessions.to_state(service.sessions.require(session_id))
+        assert state.stage_states[Stage.STAGE_0_PITCH].clarifications[0].question_id == question_id
