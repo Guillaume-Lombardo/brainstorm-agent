@@ -233,6 +233,9 @@ test("a French pitch gets readable gate questions and a formatted reply", async 
   await expect(panel.getByRole("listitem")).toHaveCount(3);
   await expect(panel).toContainText("Quels points de l'idée sont déjà clairs et arrêtés ?");
   await expect(panel).not.toContainText("Please clarify");
+  await expect(panel).not.toContainText("scope");
+  await expect(panel).toContainText("Bloquante");
+  await expect(panel).toContainText("Pourquoi cette question :");
   await expect(panel.locator('[data-recommended="true"]')).toHaveCount(3);
   await page.screenshot({ path: `${SCREENSHOTS}/07-questions-fr.png` });
 });

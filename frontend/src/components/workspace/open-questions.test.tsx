@@ -11,14 +11,35 @@ describe("OpenQuestions", () => {
     const question = questionFixture();
     const onAnswer = vi.fn();
     render(<OpenQuestions questions={[question]} disabled={false} onAnswer={onAnswer} />);
-    expect(screen.getByText("Blocking")).toBeInTheDocument();
-    expect(screen.getByText("Why it matters: It changes the data model.")).toBeInTheDocument();
-    const recommended = screen.getByRole("button", { name: /^Yes.*recommended/ });
+    expect(screen.getByText("Bloquante")).toBeInTheDocument();
+    expect(
+      screen.getByText("Pourquoi cette question : It changes the data model."),
+    ).toBeInTheDocument();
+    const recommended = screen.getByRole("button", { name: /^Yes.*recommandé/ });
     expect(recommended).toHaveAttribute("data-recommended", "true");
     expect(screen.getByRole("button", { name: "No" })).not.toHaveAttribute("data-recommended");
 
     await userEvent.click(screen.getByRole("button", { name: "No" }));
     expect(onAnswer).toHaveBeenCalledWith(question, "No");
+  });
+
+  it("uses French labels without exposing internal priority codes", () => {
+    render(
+      <OpenQuestions
+        questions={[questionFixture({ priority: "scope" })]}
+        disabled={false}
+        onAnswer={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("Bloquante")).toBeInTheDocument();
+    expect(screen.queryByText("scope")).not.toBeInTheDocument();
+    expect(
+      screen.getByText("Pourquoi cette question : It changes the data model."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Yes.*recommandé/ })).toHaveAttribute(
+      "data-recommended",
+      "true",
+    );
   });
 
   it("disables answers while a turn or review is pending", () => {
@@ -45,6 +66,6 @@ describe("OpenQuestions", () => {
 
   it("shows an empty state", () => {
     render(<OpenQuestions questions={[]} disabled={false} onAnswer={vi.fn()} />);
-    expect(screen.getByText("No open question for now.")).toBeInTheDocument();
+    expect(screen.getByText("Aucune question ouverte pour le moment.")).toBeInTheDocument();
   });
 });

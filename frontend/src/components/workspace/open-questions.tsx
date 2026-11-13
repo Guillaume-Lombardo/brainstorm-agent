@@ -15,20 +15,21 @@ export function OpenQuestions({
   onAnswer: (question: OpenQuestionItem, option: string) => void;
 }) {
   if (questions.length === 0) {
-    return <p className="p-4 text-sm text-muted-foreground">No open question for now.</p>;
+    return (
+      <p className="p-4 text-sm text-muted-foreground">Aucune question ouverte pour le moment.</p>
+    );
   }
   return (
     <ul className="flex flex-col gap-4 p-4">
       {questions.map((question, index) => (
         <li key={question.id ?? index} className="flex flex-col gap-2 rounded-xl border p-3">
           <div className="flex flex-wrap items-center gap-1">
-            {question.blocking ? <Badge variant="destructive">Blocking</Badge> : null}
-            {question.priority ? <Badge variant="outline">{question.priority}</Badge> : null}
+            {question.blocking ? <Badge variant="destructive">Bloquante</Badge> : null}
           </div>
           <p className="font-medium">{question.question}</p>
           {question.why_it_matters ? (
             <p className="text-xs text-muted-foreground">
-              Why it matters: {question.why_it_matters}
+              Pourquoi cette question : {question.why_it_matters}
             </p>
           ) : null}
           {(question.options ?? []).length > 0 ? (
@@ -48,13 +49,13 @@ export function OpenQuestions({
                   >
                     {recommended ? <SparklesIcon aria-hidden /> : null}
                     {option}
-                    {recommended ? <span className="sr-only"> (recommended)</span> : null}
+                    {recommended ? <span className="sr-only"> (recommandé)</span> : null}
                   </Button>
                 );
               })}
             </div>
           ) : (
-            <p className="text-xs text-muted-foreground italic">Answer in the conversation.</p>
+            <p className="text-xs text-muted-foreground italic">Répondez dans la conversation.</p>
           )}
         </li>
       ))}
