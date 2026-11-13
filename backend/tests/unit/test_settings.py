@@ -53,3 +53,18 @@ def test_settings_skip_mode_specific_validation_when_auth_disabled() -> None:
     settings = Settings(enable_auth=False, auth_mode=AuthMode.JWT)
 
     assert settings.effective_auth_mode is AuthMode.NONE
+
+
+@pytest.mark.parametrize(("challenge", "calls"), [("off", 3), ("findings", 5)])
+def test_session_lock_exceeds_all_call_timeouts(challenge, calls):
+    with pytest.raises(ValueError, match="worst-case"):
+        Settings(
+            llm_challenge_pass=challenge,
+            openai_timeout_seconds=10,
+            redis_lock_timeout_seconds=calls * 10,
+        )
+    assert Settings(
+        llm_challenge_pass=challenge,
+        openai_timeout_seconds=10,
+        redis_lock_timeout_seconds=calls * 10 + 1,
+    )

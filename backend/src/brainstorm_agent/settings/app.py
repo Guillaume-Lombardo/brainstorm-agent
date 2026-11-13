@@ -8,7 +8,7 @@ from typing import Annotated
 from pydantic import Field, computed_field, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
-from brainstorm_agent.core.enums import AuthMode, LLMMode
+from brainstorm_agent.core.enums import AuthMode, ChallengePass, LLMMode, StructuredOutputMode
 from brainstorm_agent.exceptions import SettingsError
 
 
@@ -53,7 +53,7 @@ class Settings(BaseSettings):
     )
     redis_url: str = Field(default="redis://redis:6379/0", validation_alias="REDIS_URL")
     redis_lock_timeout_seconds: float = Field(
-        default=30.0,
+        default=180.0,
         validation_alias="REDIS_LOCK_TIMEOUT_SECONDS",
     )
     redis_lock_blocking_timeout_seconds: float = Field(
@@ -61,11 +61,21 @@ class Settings(BaseSettings):
         validation_alias="REDIS_LOCK_BLOCKING_TIMEOUT_SECONDS",
     )
 
-    llm_mode: LLMMode = Field(default=LLMMode.HEURISTIC, validation_alias="LLM_MODE")
+    llm_mode: LLMMode = Field(default=LLMMode.OPENAI, validation_alias="LLM_MODE")
+    llm_output_mode: StructuredOutputMode = Field(
+        default=StructuredOutputMode.JSON_SCHEMA,
+        validation_alias="LLM_OUTPUT_MODE",
+    )
+    llm_challenge_pass: ChallengePass = Field(
+        default=ChallengePass.OFF,
+        validation_alias="LLM_CHALLENGE_PASS",
+    )
+    llm_context_turns: int = Field(default=8, ge=0, validation_alias="LLM_CONTEXT_TURNS")
+    llm_max_tokens: int = Field(default=4096, gt=0, validation_alias="LLM_MAX_TOKENS")
     openai_base_url: str | None = Field(default=None, validation_alias="OPENAI_BASE_URL")
     openai_api_key: str | None = Field(default=None, validation_alias="OPENAI_API_KEY")
     model_name: str = Field(default="gpt-4.1-mini", validation_alias="MODEL_NAME")
-    openai_timeout_seconds: float = Field(default=30.0, validation_alias="OPENAI_TIMEOUT_SECONDS")
+    openai_timeout_seconds: float = Field(default=30.0, gt=0, validation_alias="OPENAI_TIMEOUT_SECONDS")
     openai_facade_model_name: str = Field(
         default="brainstorm-agent",
         validation_alias="OPENAI_FACADE_MODEL_NAME",
@@ -83,8 +93,21 @@ class Settings(BaseSettings):
     rate_limit_requests: int = Field(default=60, validation_alias="RATE_LIMIT_REQUESTS")
     rate_limit_window_seconds: int = Field(default=60, validation_alias="RATE_LIMIT_WINDOW_SECONDS")
     rate_limit_namespace: str = Field(default="brainstorm-agent", validation_alias="RATE_LIMIT_NAMESPACE")
-    prompt_version: str = Field(default="v1", validation_alias="PROMPT_VERSION")
+    prompt_version: str = Field(default="v2", validation_alias="PROMPT_VERSION")
     prompt_base_path: str | None = Field(default=None, validation_alias="PROMPT_BASE_PATH")
+
+    def validate_provider_configuration(self) -> None:
+        """Require explicit provider routing before constructing a network client.
+
+        Raises:
+            ValueError: If openai mode has no explicit URL or credential.
+        """
+        if self.llm_mode is LLMMode.OPENAI and not (self.openai_base_url and self.openai_api_key):
+            raise ValueError(self._provider_configuration_error())
+
+    @staticmethod
+    def _provider_configuration_error() -> str:
+        return "LLM_MODE=openai requires explicit OPENAI_BASE_URL and OPENAI_API_KEY. Configure the provider or select LLM_MODE=fake."
 
     @field_validator("auth_api_keys", mode="before")
     @classmethod
@@ -136,6 +159,10 @@ class Settings(BaseSettings):
     def _rate_limit_error() -> str:
         return "RATE_LIMIT_REQUESTS must be greater than zero."
 
+    @staticmethod
+    def _lock_timeout_error() -> str:
+        return "REDIS_LOCK_TIMEOUT_SECONDS must exceed the worst-case turn duration (analysis retry, optional challenge retry, reply)."
+
     @model_validator(mode="after")
     def _validate_security_settings(self) -> Settings:
         """Validate auth and rate-limit configuration coherence.
@@ -146,6 +173,9 @@ class Settings(BaseSettings):
         Raises:
             ValueError: If the configuration is inconsistent.
         """
+        calls = 5 if self.llm_challenge_pass is ChallengePass.FINDINGS else 3
+        if self.redis_lock_timeout_seconds <= calls * self.openai_timeout_seconds:
+            raise ValueError(self._lock_timeout_error())
         effective_mode = self.effective_auth_mode
 
         if self.enable_auth and self.auth_mode is AuthMode.NONE:

@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
+from brainstorm_agent.async_runner import run_async
 from brainstorm_agent.core.enums import HumanReviewDecision, MessageRole, Modality, Stage
 from brainstorm_agent.core.models import (
     AssistantTurnOutput,
@@ -26,7 +27,7 @@ from brainstorm_agent.persistence.repositories import (
     SessionRepository,
     TransitionRepository,
 )
-from brainstorm_agent.services.llm_client import BrainstormLLM, build_llm
+from brainstorm_agent.services.llm_client import BrainstormLLM, OpenAICompatibleBrainstormLLM, build_llm
 from brainstorm_agent.services.locks import NoopSessionLockManager, SessionLockManager
 from brainstorm_agent.services.markdown import MarkdownRenderer
 from brainstorm_agent.services.prompt_loader import PromptLoader
@@ -73,6 +74,7 @@ class SessionService:
         self.db_session = db_session
         self.settings = settings
         self.prompt_loader = prompt_loader or self._default_prompt_loader(settings)
+        self._owns_llm = llm is None
         self.llm = llm or build_llm(settings=settings, prompt_loader=self.prompt_loader)
         self.renderer = MarkdownRenderer(self.prompt_loader)
         self.lock_manager = lock_manager or NoopSessionLockManager()
@@ -105,7 +107,7 @@ class SessionService:
         record = self.sessions.require(session_id)
         return self.sessions.overview(record, [])
 
-    def process_user_message(
+    async def aprocess_user_message(
         self,
         *,
         session_id: str,
@@ -134,16 +136,14 @@ class SessionService:
             if state.pending_human_review is not None:
                 raise ConflictError.pending_human_review_in_progress()
             current_stage = state.current_stage
-            self.messages.add(
-                ConversationTurn(
-                    session_id=session_id,
-                    role=MessageRole.USER,
-                    content=content,
-                    modality=modality,
-                    stage=current_stage,
-                ),
-            )
-            graph_output = self.graph.invoke(
+            if (
+                self._owns_llm
+                and isinstance(self.llm, OpenAICompatibleBrainstormLLM)
+                and self.llm.client.is_closed()
+            ):
+                self.llm = build_llm(settings=self.settings, prompt_loader=self.prompt_loader)
+                self.graph = build_turn_graph(llm=self.llm, renderer=self.renderer)
+            graph_output = await self._invoke_graph(
                 {
                     "session_id": session_id,
                     "session_state": state.model_dump(mode="json"),
@@ -192,10 +192,34 @@ class SessionService:
             else:
                 state.current_stage = output.current_stage
                 output.pending_review = None
+            state.transcript.extend([
+                {"role": "user", "content": content},
+                {"role": "assistant", "content": output.assistant_message},
+            ])
+            state.transcript = (
+                state.transcript[-self.settings.llm_context_turns :]
+                if self.settings.llm_context_turns
+                else []
+            )
+            self.messages.add(
+                ConversationTurn(
+                    session_id=session_id,
+                    role=MessageRole.USER,
+                    content=content,
+                    modality=modality,
+                    stage=current_stage,
+                ),
+            )
+            assistant_id = str(uuid4())
+            state.turn_usage[assistant_id] = {
+                "prompt_tokens": output.prompt_tokens,
+                "completion_tokens": output.completion_tokens,
+            }
             self.sessions.save_state(session_id, state)
             self.messages.add(
                 ConversationTurn(
                     session_id=session_id,
+                    id=assistant_id,
                     role=MessageRole.ASSISTANT,
                     content=output.assistant_message,
                     modality=Modality.TEXT,
@@ -242,6 +266,42 @@ class SessionService:
             self.db_session.commit()
             return output
 
+    async def _invoke_graph(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Run the async graph and close owned transports in the same event loop.
+
+        Args:
+            payload (dict[str, Any]): Initial graph state.
+
+        Returns:
+            dict[str, Any]: Completed graph state.
+        """
+        try:
+            return await self.graph.ainvoke(payload)
+        finally:
+            if self._owns_llm and isinstance(self.llm, OpenAICompatibleBrainstormLLM):
+                await self.llm.client.close()
+
+    def process_user_message(
+        self,
+        *,
+        session_id: str,
+        content: str,
+        modality: Modality = Modality.TEXT,
+    ) -> AssistantTurnOutput:
+        """Process a turn for synchronous API callers.
+
+        Args:
+            session_id (str): Session id.
+            content (str): User input.
+            modality (Modality): Input modality.
+
+        Returns:
+            AssistantTurnOutput: Committed assistant response.
+        """
+        return run_async(
+            self.aprocess_user_message(session_id=session_id, content=content, modality=modality),
+        )
+
     def get_session(self, session_id: str) -> SessionOverview:
         """Return the current session overview.
 
@@ -269,7 +329,13 @@ class SessionService:
             list[ConversationTurn]: Session message history.
         """
         self.sessions.require(session_id)
-        return self.messages.list_for_session(session_id)
+        usage = self.sessions.to_state(self.sessions.require(session_id)).turn_usage
+        turns = self.messages.list_for_session(session_id)
+        for turn in turns:
+            counts = usage.get(turn.id, {})
+            turn.prompt_tokens = counts.get("prompt_tokens", 0)
+            turn.completion_tokens = counts.get("completion_tokens", 0)
+        return turns
 
     def get_current_document(self, session_id: str) -> StepDocument:
         """Return the latest current document for a session.

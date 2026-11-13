@@ -24,3 +24,4 @@
 - [0004-hardening-and-bonus-capabilities](0004-hardening-and-bonus-capabilities.md)
 - [0005-production-hardening-stack](0005-production-hardening-stack.md)
 - [0006-monorepo-layout](0006-monorepo-layout.md)
+- [0007-typed-stage-contracts-and-structured-outputs](0007-typed-stage-contracts-and-structured-outputs.md)

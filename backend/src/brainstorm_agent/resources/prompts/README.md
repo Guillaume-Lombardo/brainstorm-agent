@@ -24,3 +24,10 @@ Prompts are externalized so they remain reviewable, testable, and easy to evolve
 
 - Minor wording changes may update the current version if contracts do not change.
 - Any output-shape or behavioral contract change should create a new prompt version directory.
+
+## v2
+
+v2 injects typed stage field descriptions and strict patch schemas at runtime. Field lists
+are derived from the Pydantic contracts, never duplicated in prompt assets. Previous stage
+context is summarized; current state and recent transcript are bounded separately. The rendering
+asset is a template consumed by the deterministic Markdown renderer. v1 remains unchanged.

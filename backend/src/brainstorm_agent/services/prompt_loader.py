@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 class PromptLoader:
     """Load versioned prompt assets from package resources or a configured directory."""
 
-    def __init__(self, *, version: str = "v1", base_path: Path | None = None) -> None:
+    def __init__(self, *, version: str = "v2", base_path: Path | None = None) -> None:
         """Initialize the prompt loader.
 
         Args:

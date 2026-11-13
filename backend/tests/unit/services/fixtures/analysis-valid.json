@@ -1,0 +1,8 @@
+{
+  "assistant_message": "Qui ?",
+  "extracted_fields": {
+    "problem_statement": "Temps perdu"
+  },
+  "stage": "stage_1_problem_framing",
+  "summary": "Les \u00e9quipes perdent du temps"
+}

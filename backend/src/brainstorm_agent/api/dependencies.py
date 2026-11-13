@@ -16,7 +16,6 @@ from brainstorm_agent.persistence.session import (
     upgrade_database,
 )
 from brainstorm_agent.services.auth import AuthenticationService
-from brainstorm_agent.services.llm_client import BrainstormLLM, build_llm
 from brainstorm_agent.services.locks import (
     NoopSessionLockManager,
     RedisSessionLockManager,
@@ -82,22 +81,6 @@ def get_prompt_loader(
         PromptLoader: Prompt loader backed by packaged resources.
     """
     return PromptLoader.from_settings(settings)
-
-
-def get_llm(
-    settings: Annotated[Settings, Depends(get_app_settings)],
-    prompt_loader: Annotated[PromptLoader, Depends(get_prompt_loader)],
-) -> BrainstormLLM:
-    """Build the configured LLM dependency.
-
-    Args:
-        settings: Application settings.
-        prompt_loader: Prompt loader.
-
-    Returns:
-        BrainstormLLM: Structured LLM implementation.
-    """
-    return build_llm(settings=settings, prompt_loader=prompt_loader)
 
 
 def get_lock_manager(request: Request) -> SessionLockManager:
@@ -186,7 +169,6 @@ def enforce_api_security(
 def get_session_service(
     db_session: Annotated[Session, Depends(get_db_session)],
     settings: Annotated[Settings, Depends(get_app_settings)],
-    llm: Annotated[BrainstormLLM, Depends(get_llm)],
     prompt_loader: Annotated[PromptLoader, Depends(get_prompt_loader)],
     lock_manager: Annotated[SessionLockManager, Depends(get_lock_manager)],
 ) -> SessionService:
@@ -195,7 +177,6 @@ def get_session_service(
     Args:
         db_session: Database session.
         settings: Application settings.
-        llm: Structured LLM adapter.
         prompt_loader: Prompt loader.
         lock_manager: Session lock manager.
 
@@ -205,7 +186,6 @@ def get_session_service(
     return SessionService(
         db_session=db_session,
         settings=settings,
-        llm=llm,
         prompt_loader=prompt_loader,
         lock_manager=lock_manager,
     )

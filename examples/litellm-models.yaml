@@ -1,0 +1,12 @@
+# Set upstream credentials in the LiteLLM environment, never in this file.
+model_list:
+  - model_name: claude-opus-5-5
+    litellm_params:
+      model: anthropic/claude-opus-5-5
+      api_key: os.environ/ANTHROPIC_API_KEY  # pragma: allowlist secret
+  - model_name: glm-5.3-flash
+    litellm_params:
+      model: openai/glm-5.3-flash
+      api_base: os.environ/GLM_API_BASE
+      api_key: os.environ/GLM_API_KEY  # pragma: allowlist secret
+# Select LLM_OUTPUT_MODE=json_object or tool if your upstream lacks strict JSON schema.

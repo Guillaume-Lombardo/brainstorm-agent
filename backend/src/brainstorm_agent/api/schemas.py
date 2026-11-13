@@ -41,6 +41,9 @@ class PostMessageRequest(BaseModel):
 class PostMessageResponse(BaseModel):
     """Response payload for one processed turn."""
 
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+
     session_id: str
     current_stage: Stage
     processed_stage: Stage

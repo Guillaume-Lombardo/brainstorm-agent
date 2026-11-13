@@ -25,6 +25,8 @@ class _FakeSessionService:
     def process_user_message(self, *, session_id: str, content: str) -> AssistantTurnOutput:
         self.processed_messages.append((session_id, content))
         return AssistantTurnOutput(
+            prompt_tokens=123,
+            completion_tokens=45,
             session_id=session_id,
             current_stage=Stage.STAGE_1_PROBLEM_FRAMING,
             processed_stage=Stage.STAGE_0_PITCH,
@@ -53,6 +55,8 @@ def test_openai_facade_creates_session_when_missing_metadata() -> None:
     assert result.session_id == "session-1"
     assert session_service.processed_messages == [("session-1", "Clarify my project pitch")]
     assert "# Structured Summary" in result.content
+    assert result.prompt_tokens == 123
+    assert result.completion_tokens == 45
 
 
 def test_openai_facade_reuses_metadata_session_id() -> None:

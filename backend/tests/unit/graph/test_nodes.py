@@ -1,0 +1,71 @@
+from __future__ import annotations
+
+from brainstorm_agent.core.enums import Stage
+from brainstorm_agent.core.models import AssistantAnalysis, FactItem, OpenQuestionItem, StageState
+from brainstorm_agent.core.stage_contracts import BacklogFields, BacklogItem, ProblemFields
+from brainstorm_agent.graph.nodes import merge_analysis
+
+
+def test_patch_preserves_fields_ids_and_resolves_questions():
+    previous = StageState(
+        stage=Stage.STAGE_1_PROBLEM_FRAMING,
+        extracted_fields=ProblemFields(problem_statement="Slow discovery"),
+        facts=[FactItem(id="fact-1", statement="Confirmed")],
+        open_questions=[OpenQuestionItem(id="question-1", question="Who?")],
+    )
+    patch = AssistantAnalysis(
+        stage=previous.stage,
+        summary="More detail",
+        assistant_message="Continue",
+        extracted_fields=ProblemFields(users_actors=["Teams"]),
+        facts=[FactItem(id="fact-2", statement="New fact")],
+        resolved_question_ids=["question-1"],
+    )
+    result = merge_analysis(previous=previous, patch=patch)
+    assert result.extracted_fields.get("problem_statement") == "Slow discovery"
+    assert result.extracted_fields.get("users_actors") == ["Teams"]
+    assert [item.id for item in result.facts] == ["fact-1", "fact-2"]
+    assert result.open_questions == []
+
+
+def test_identified_backlog_patch_preserves_empty_lists_and_retracts_by_id():
+    previous = StageState(
+        stage=Stage.STAGE_6_BACKLOG_SYNTHESIS,
+        extracted_fields=BacklogFields(
+            mvp_user_stories=[
+                BacklogItem(id="story-1", statement="Original"),
+                BacklogItem(id="story-2", statement="Remove"),
+            ],
+        ),
+    )
+    patch = AssistantAnalysis(
+        stage=previous.stage,
+        summary="Update",
+        assistant_message="Continue",
+        extracted_fields=BacklogFields(mvp_user_stories=[]),
+    )
+    assert (
+        len(merge_analysis(previous=previous, patch=patch).extracted_fields.model_dump()["mvp_user_stories"])
+        == 2
+    )
+    patch = AssistantAnalysis(
+        stage=previous.stage,
+        summary="Update",
+        assistant_message="Continue",
+        extracted_fields=BacklogFields(mvp_user_stories=[BacklogItem(id="story-1", statement="Revised")]),
+        resolved_item_ids=["story-2"],
+    )
+    result = merge_analysis(previous=previous, patch=patch).extracted_fields.model_dump()["mvp_user_stories"]
+    assert [item["id"] for item in result] == ["story-1"]
+    assert result[0]["statement"] == "Revised"
+
+
+def test_clarified_uncertainty_disappears_from_current_state():
+    previous = StageState(stage=Stage.STAGE_1_PROBLEM_FRAMING, uncertainties=["Target users are unknown"])
+    patch = AssistantAnalysis(
+        stage=previous.stage,
+        summary="Users clarified",
+        assistant_message="Continue",
+        uncertainties=[],
+    )
+    assert merge_analysis(previous=previous, patch=patch).uncertainties == []
