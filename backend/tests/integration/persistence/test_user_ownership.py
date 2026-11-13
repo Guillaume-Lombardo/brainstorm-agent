@@ -95,7 +95,7 @@ def test_duplicate_user_error_hides_password_hash(tmp_path: Path) -> None:
         assert stored_hash is not None
         db.commit()
         db.add(
-            UserRecord(id="duplicate", email=user.email, display_name="Duplicate", password_hash=stored_hash)
+            UserRecord(id="duplicate", email=user.email, display_name="Duplicate", password_hash=stored_hash),
         )
         with pytest.raises(IntegrityError) as captured:
             db.flush()

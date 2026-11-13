@@ -165,7 +165,7 @@ def test_login_budget_isolated_by_identity_and_flow(tmp_path: Path) -> None:
             auth_bridge_secret=BRIDGE["X-Auth-Bridge"],
             login_rate_limit_requests=2,
             oidc_issuer="https://identity.example.invalid",
-        )
+        ),
     )
     with app.state.session_factory() as db:
         UserService(db).create("bob@example.invalid", "Bob", "bob-password")
@@ -174,12 +174,16 @@ def test_login_budget_isolated_by_identity_and_flow(tmp_path: Path) -> None:
     for email in ["alice@example.invalid", " ALICE@example.invalid "]:
         assert (
             client.post(
-                "/api/v1/auth/verify", headers=BRIDGE, json={"email": email, "password": "wrong"}
+                "/api/v1/auth/verify",
+                headers=BRIDGE,
+                json={"email": email, "password": "wrong"},  # pragma: allowlist secret
             ).status_code
             == 401
         )
     limited = client.post(
-        "/api/v1/auth/verify", headers=BRIDGE, json={"email": "alice@example.invalid", "password": "wrong"}
+        "/api/v1/auth/verify",
+        headers=BRIDGE,
+        json={"email": "alice@example.invalid", "password": "wrong"},  # pragma: allowlist secret
     )
     assert limited.status_code == 429
     assert int(limited.headers["Retry-After"]) > 0
@@ -187,7 +191,7 @@ def test_login_budget_isolated_by_identity_and_flow(tmp_path: Path) -> None:
         client.post(
             "/api/v1/auth/verify",
             headers=BRIDGE,
-            json={"email": "bob@example.invalid", "password": "bob-password"},
+            json={"email": "bob@example.invalid", "password": "bob-password"},  # pragma: allowlist secret
         ).status_code
         == 200
     )
