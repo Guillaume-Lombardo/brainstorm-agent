@@ -48,6 +48,7 @@ from brainstorm_agent.core.models import (
     StageValidationResult,
     StepDocument,
 )
+from brainstorm_agent.core.stage_contracts import DeliveryFields
 from brainstorm_agent.exceptions import ConflictError, NotFoundError
 from brainstorm_agent.graph.builder import build_turn_graph
 from brainstorm_agent.graph.nodes import apply_stage_rules
@@ -60,6 +61,7 @@ from brainstorm_agent.persistence.repositories import (
     SessionRepository,
     TransitionRepository,
 )
+from brainstorm_agent.services.delivery import export_backlog_json, export_slice_specs
 from brainstorm_agent.services.llm_client import BrainstormLLM, OpenAICompatibleBrainstormLLM, build_llm
 from brainstorm_agent.services.locks import NoopSessionLockManager, SessionLockManager
 from brainstorm_agent.services.markdown import MarkdownRenderer
@@ -878,33 +880,68 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
         )
         return DocumentDiff(stage=stage, from_version=from_version, to_version=to_version, diff=diff)
 
-    def export_backlog(self, session_id: str) -> BacklogExport:
-        """Export existing backlog items; slicing metadata is deferred to lot 4.
+    def _delivery_context(self, session_id: str) -> tuple[DeliveryFields, dict[str, Any]]:
+        """Load owned delivery data and previous stage fields.
 
         Args:
             session_id (str): Owned session.
 
         Returns:
-            BacklogExport: Existing typed backlog items.
+            tuple[DeliveryFields, dict[str, Any]]: Domain export inputs.
+
+        Raises:
+            ConflictError: Delivery state is missing or stale.
         """
         state = self.sessions.to_state(self._require_owned(session_id))
-        backlog = state.stage_states.get(Stage.STAGE_6_BACKLOG_SYNTHESIS.value)
-        fields = backlog.extracted_fields.model_dump(exclude_none=True) if backlog else {}
-        return BacklogExport(
-            items=[dict(item, collection=key) for key, values in fields.items() for item in values],
-        )
+        delivery = state.stage_states.get(Stage.STAGE_7_DELIVERY_SLICING.value)
+        if delivery is None or delivery.stale:
+            message = "Delivery slicing must be completed and revalidated before export."
+            raise ConflictError(message)
+        fields = DeliveryFields.model_validate(delivery.extracted_fields.model_dump())
+        previous = {
+            key: item.extracted_fields.model_dump(exclude_none=True)
+            for key, item in state.stage_states.items()
+            if key != Stage.STAGE_7_DELIVERY_SLICING.value
+        }
+        return fields, previous
 
-    def export_slice_specs(self, session_id: str) -> SliceSpecsExport:
-        """Return documented empty specs until delivery slicing exists.
+    def export_backlog(self, session_id: str) -> BacklogExport:
+        """Export authoritative slice assignments, dependencies and waves.
 
         Args:
             session_id (str): Owned session.
 
         Returns:
-            SliceSpecsExport: Explicit unavailable status.
+            BacklogExport: Domain-validated delivery backlog.
+
+        Raises:
+            ConflictError: The delivery plan fails its deterministic checks.
         """
-        self._require_owned(session_id)
-        return SliceSpecsExport()
+        fields, previous = self._delivery_context(session_id)
+        try:
+            return BacklogExport.model_validate_json(export_backlog_json(fields, previous))
+        except ValueError as exc:
+            message = "Delivery plan is not ready for export."
+            raise ConflictError(message) from exc
+
+    def export_slice_specs(self, session_id: str) -> SliceSpecsExport:
+        """Export one Markdown specification per domain-validated slice.
+
+        Args:
+            session_id (str): Owned session.
+
+        Returns:
+            SliceSpecsExport: Slice filename to specification mapping.
+
+        Raises:
+            ConflictError: The delivery plan fails its deterministic checks.
+        """
+        fields, previous = self._delivery_context(session_id)
+        try:
+            return SliceSpecsExport(specs=export_slice_specs(fields, previous))
+        except ValueError as exc:
+            message = "Delivery plan is not ready for export."
+            raise ConflictError(message) from exc
 
     def prepare_turn(self, session_id: str) -> None:
         """Authorize before sending stream headers.

@@ -44,8 +44,9 @@ TypeScript are committed under `frontend/src/lib/backend/generated/`; `pnpm gene
 regenerates both without starting an HTTP server. The mock UI keeps its presentation types where
 the shapes differ; real HTTP wiring is lot 7b.
 
-Consolidated Markdown and JSON exports remain available. Backlog JSON exports existing stage 6
-items. Slice specs explicitly return `available: false, specs: []` until lot 4 exists.
+Consolidated Markdown and JSON exports remain available. Backlog JSON and slice specifications delegate to the delivery export functions introduced in
+lot 4. Backlog exports include effective dependencies, full items and delivery waves; slice specs
+map safe filenames to Markdown. Missing, invalid or stale delivery plans return 409.
 CORS is disabled by default and accepts an explicit configured origin allowlist.
 
 ## Consequences

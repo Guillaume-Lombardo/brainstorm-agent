@@ -22,7 +22,7 @@ export const STAGES = [
   "stage_7_delivery_slicing",
 ] as const;
 
-export type StageId = (typeof STAGES)[number];
+export type StageId = components["schemas"]["Stage"];
 
 export const STAGE_LABELS: Record<StageId, string> = {
   stage_0_pitch: "Pitch",

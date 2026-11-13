@@ -239,7 +239,7 @@ export interface paths {
     };
     /**
      * Export Backlog
-     * @description Export backlog JSON; dependencies and waves await delivery slicing.
+     * @description Export validated backlog assignments, dependencies and delivery waves.
      *
      *     Args:
      *         session_id (str): Request parameter or session service.
@@ -320,7 +320,7 @@ export interface paths {
     };
     /**
      * Export Specs
-     * @description Return empty specs with available=false until lot 4.
+     * @description Export validated standalone Markdown slice specifications.
      *
      *     Args:
      *         session_id (str): Request parameter or session service.
@@ -903,19 +903,14 @@ export interface components {
     };
     /**
      * BacklogExport
-     * @description Backlog with empty dependencies and waves until delivery slicing exists.
+     * @description Validated backlog, effective dependencies and delivery waves.
      */
     BacklogExport: {
-      /** Dependencies */
-      dependencies?: {
-        [key: string]: string;
-      }[];
-      /** Items */
-      items?: {
-        [key: string]: unknown;
-      }[];
+      backlog: components["schemas"]["BacklogFields"];
+      /** Slices */
+      slices: components["schemas"]["ExportedSlice"][];
       /** Waves */
-      waves?: string[][];
+      waves: string[][];
     };
     /**
      * BacklogFields
@@ -1106,6 +1101,52 @@ export interface components {
       statement: string;
     };
     /**
+     * DeliveryContract
+     * @description Shared interface with a stable identifier and concrete specification.
+     */
+    DeliveryContract: {
+      /** Id */
+      id: string;
+      /** Specification */
+      specification: string;
+    };
+    /**
+     * DeliveryFields
+     * @description Stage 7 contracts; waves are derived by the domain, never supplied by a model.
+     */
+    DeliveryFields: {
+      /**
+       * Slices
+       * @description Vertical slices including slice-0 walking skeleton and shared contracts. Replace the complete slice list on update.
+       * @default null
+       */
+      slices: components["schemas"]["DeliverySlice"][] | null;
+    };
+    /**
+     * DeliverySlice
+     * @description One independently developable delivery unit; slice-0 is the foundation.
+     */
+    DeliverySlice: {
+      /** Backlog Item Ids */
+      backlog_item_ids?: string[];
+      /** Consumed Contracts */
+      consumed_contracts?: string[];
+      /** Dependencies */
+      dependencies?: string[];
+      /** Goal */
+      goal: string;
+      /** Id */
+      id: string;
+      /** Integration Scenarios */
+      integration_scenarios?: components["schemas"]["IntegrationScenario"][];
+      /** Owned Domain */
+      owned_domain?: string[];
+      /** Provided Contracts */
+      provided_contracts?: components["schemas"]["DeliveryContract"][];
+      /** Stubs */
+      stubs?: string[];
+    };
+    /**
      * DocumentDiff
      * @description Unified line diff of two immutable versions of one stage.
      */
@@ -1215,6 +1256,32 @@ export interface components {
       session_id: string;
     };
     /**
+     * ExportedSlice
+     * @description Delivery slice enriched with its computed wave.
+     */
+    ExportedSlice: {
+      /** Backlog Item Ids */
+      backlog_item_ids?: string[];
+      /** Consumed Contracts */
+      consumed_contracts?: string[];
+      /** Dependencies */
+      dependencies?: string[];
+      /** Goal */
+      goal: string;
+      /** Id */
+      id: string;
+      /** Integration Scenarios */
+      integration_scenarios?: components["schemas"]["IntegrationScenario"][];
+      /** Owned Domain */
+      owned_domain?: string[];
+      /** Provided Contracts */
+      provided_contracts?: components["schemas"]["DeliveryContract"][];
+      /** Stubs */
+      stubs?: string[];
+      /** Wave */
+      wave: number;
+    };
+    /**
      * FactItem
      * @description Structured fact captured during a turn.
      */
@@ -1320,6 +1387,32 @@ export interface components {
        * @default null
        */
       value_hypotheses: string[] | null;
+    };
+    /**
+     * IntegrationScenario
+     * @description An executable integration example in GWT or EARS form.
+     */
+    IntegrationScenario: {
+      /**
+       * Ears
+       * @default null
+       */
+      ears: string | null;
+      /**
+       * Given
+       * @default
+       */
+      given: string;
+      /**
+       * Then
+       * @default
+       */
+      then: string;
+      /**
+       * When
+       * @default
+       */
+      when: string;
     };
     /**
      * MessageDelta
@@ -2036,17 +2129,19 @@ export interface components {
     };
     /**
      * SliceSpecsExport
-     * @description Empty specs until lot 4 introduces delivery slicing.
+     * @description Standalone Markdown artifacts keyed by safe slice filename.
      */
     SliceSpecsExport: {
       /**
        * Available
-       * @default false
+       * @default true
        * @constant
        */
-      available: false;
+      available: true;
       /** Specs */
-      specs?: string[];
+      specs: {
+        [key: string]: string;
+      };
     };
     /**
      * Stage
@@ -2060,7 +2155,8 @@ export interface components {
       | "stage_3_event_storming"
       | "stage_4_impact_mapping"
       | "stage_5_risk_storming"
-      | "stage_6_backlog_synthesis";
+      | "stage_6_backlog_synthesis"
+      | "stage_7_delivery_slicing";
     /**
      * StageChanged
      * @description Committed stage transition.
@@ -2081,7 +2177,8 @@ export interface components {
       | components["schemas"]["EventFields"]
       | components["schemas"]["ImpactFields"]
       | components["schemas"]["RiskFields"]
-      | components["schemas"]["BacklogFields"];
+      | components["schemas"]["BacklogFields"]
+      | components["schemas"]["DeliveryFields"];
     /**
      * StagePatch
      * @description Replace supplied fields or identified item collections, then validate.

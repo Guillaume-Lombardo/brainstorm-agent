@@ -641,7 +641,7 @@ acyclic graph. Waves derive from explicit dependencies, contract owners and the 
 `services.delivery.export_slice_specs(fields, previous_fields)` returns filename-to-Markdown contents;
 `export_backlog_json(fields, previous_fields)` returns JSON including backlog, dependencies and waves.
 Both reject invalid plans. `previous_fields` maps stage string identifiers to serialized fields.
-HTTP export endpoints are delivered separately in lot 6. Fake mode accepts `slices: <JSON array>`
+HTTP export endpoints are exposed by lot 6. Fake mode accepts `slices: <JSON array>`
 or scripted typed responses. No environment variables or SQL migration are introduced.
 
 ## Evaluation
@@ -721,7 +721,7 @@ are unchanged. OpenAPI documents the full event union.
 - GET `/sessions/{id}/stages/{stage}/documents`: immutable versions.
 - GET `/sessions/{id}/stages/{stage}/documents/diff?from_version=1&to_version=2`: unified diff.
 - GET `/sessions/{id}/export/markdown|json|backlog_json|slice_specs`: consolidated document,
-  snapshot, existing backlog, or explicit empty slice specs pending lot 4.
+  snapshot, backlog with slice assignments, dependencies and waves, or validated slice specifications. Missing, invalid or stale delivery plans return 409.
 
 Session snapshots expose stage coverage, readiness, prioritized question options, clarifications
 and stale markers. `CORS_ORIGINS` is an explicit JSON allowlist, empty by default.

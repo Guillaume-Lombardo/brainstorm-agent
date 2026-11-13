@@ -202,24 +202,16 @@
         "type": "object"
       },
       "BacklogExport": {
-        "description": "Backlog with empty dependencies and waves until delivery slicing exists.",
+        "description": "Validated backlog, effective dependencies and delivery waves.",
         "properties": {
-          "dependencies": {
-            "items": {
-              "additionalProperties": {
-                "type": "string"
-              },
-              "type": "object"
-            },
-            "title": "Dependencies",
-            "type": "array"
+          "backlog": {
+            "$ref": "#/components/schemas/BacklogFields"
           },
-          "items": {
+          "slices": {
             "items": {
-              "additionalProperties": true,
-              "type": "object"
+              "$ref": "#/components/schemas/ExportedSlice"
             },
-            "title": "Items",
+            "title": "Slices",
             "type": "array"
           },
           "waves": {
@@ -233,6 +225,11 @@
             "type": "array"
           }
         },
+        "required": [
+          "backlog",
+          "slices",
+          "waves"
+        ],
         "title": "BacklogExport",
         "type": "object"
       },
@@ -591,6 +588,125 @@
         "title": "DecisionItem",
         "type": "object"
       },
+      "DeliveryContract": {
+        "additionalProperties": false,
+        "description": "Shared interface with a stable identifier and concrete specification.",
+        "properties": {
+          "id": {
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "specification": {
+            "minLength": 1,
+            "title": "Specification",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "specification"
+        ],
+        "title": "DeliveryContract",
+        "type": "object"
+      },
+      "DeliveryFields": {
+        "additionalProperties": false,
+        "description": "Stage 7 contracts; waves are derived by the domain, never supplied by a model.",
+        "properties": {
+          "slices": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/DeliverySlice"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Vertical slices including slice-0 walking skeleton and shared contracts. Replace the complete slice list on update.",
+            "gate_required": true,
+            "title": "Slices"
+          }
+        },
+        "title": "DeliveryFields",
+        "type": "object"
+      },
+      "DeliverySlice": {
+        "additionalProperties": false,
+        "description": "One independently developable delivery unit; slice-0 is the foundation.",
+        "properties": {
+          "backlog_item_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Backlog Item Ids",
+            "type": "array"
+          },
+          "consumed_contracts": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Consumed Contracts",
+            "type": "array"
+          },
+          "dependencies": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Dependencies",
+            "type": "array"
+          },
+          "goal": {
+            "minLength": 1,
+            "title": "Goal",
+            "type": "string"
+          },
+          "id": {
+            "minLength": 1,
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "title": "Id",
+            "type": "string"
+          },
+          "integration_scenarios": {
+            "items": {
+              "$ref": "#/components/schemas/IntegrationScenario"
+            },
+            "title": "Integration Scenarios",
+            "type": "array"
+          },
+          "owned_domain": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Owned Domain",
+            "type": "array"
+          },
+          "provided_contracts": {
+            "items": {
+              "$ref": "#/components/schemas/DeliveryContract"
+            },
+            "title": "Provided Contracts",
+            "type": "array"
+          },
+          "stubs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Stubs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "goal"
+        ],
+        "title": "DeliverySlice",
+        "type": "object"
+      },
       "DocumentDiff": {
         "description": "Unified line diff of two immutable versions of one stage.",
         "properties": {
@@ -830,6 +946,83 @@
           "markdown"
         ],
         "title": "ExportMarkdownResponse",
+        "type": "object"
+      },
+      "ExportedSlice": {
+        "additionalProperties": false,
+        "description": "Delivery slice enriched with its computed wave.",
+        "properties": {
+          "backlog_item_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Backlog Item Ids",
+            "type": "array"
+          },
+          "consumed_contracts": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Consumed Contracts",
+            "type": "array"
+          },
+          "dependencies": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Dependencies",
+            "type": "array"
+          },
+          "goal": {
+            "minLength": 1,
+            "title": "Goal",
+            "type": "string"
+          },
+          "id": {
+            "minLength": 1,
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "title": "Id",
+            "type": "string"
+          },
+          "integration_scenarios": {
+            "items": {
+              "$ref": "#/components/schemas/IntegrationScenario"
+            },
+            "title": "Integration Scenarios",
+            "type": "array"
+          },
+          "owned_domain": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Owned Domain",
+            "type": "array"
+          },
+          "provided_contracts": {
+            "items": {
+              "$ref": "#/components/schemas/DeliveryContract"
+            },
+            "title": "Provided Contracts",
+            "type": "array"
+          },
+          "stubs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Stubs",
+            "type": "array"
+          },
+          "wave": {
+            "title": "Wave",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "goal",
+          "wave"
+        ],
+        "title": "ExportedSlice",
         "type": "object"
       },
       "FactItem": {
@@ -1074,6 +1267,41 @@
           }
         },
         "title": "ImpactFields",
+        "type": "object"
+      },
+      "IntegrationScenario": {
+        "additionalProperties": false,
+        "description": "An executable integration example in GWT or EARS form.",
+        "properties": {
+          "ears": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Ears"
+          },
+          "given": {
+            "default": "",
+            "title": "Given",
+            "type": "string"
+          },
+          "then": {
+            "default": "",
+            "title": "Then",
+            "type": "string"
+          },
+          "when": {
+            "default": "",
+            "title": "When",
+            "type": "string"
+          }
+        },
+        "title": "IntegrationScenario",
         "type": "object"
       },
       "MessageDelta": {
@@ -2595,22 +2823,25 @@
         "type": "object"
       },
       "SliceSpecsExport": {
-        "description": "Empty specs until lot 4 introduces delivery slicing.",
+        "description": "Standalone Markdown artifacts keyed by safe slice filename.",
         "properties": {
           "available": {
-            "const": false,
-            "default": false,
+            "const": true,
+            "default": true,
             "title": "Available",
             "type": "boolean"
           },
           "specs": {
-            "items": {
+            "additionalProperties": {
               "type": "string"
             },
             "title": "Specs",
-            "type": "array"
+            "type": "object"
           }
         },
+        "required": [
+          "specs"
+        ],
         "title": "SliceSpecsExport",
         "type": "object"
       },
@@ -2623,7 +2854,8 @@
           "stage_3_event_storming",
           "stage_4_impact_mapping",
           "stage_5_risk_storming",
-          "stage_6_backlog_synthesis"
+          "stage_6_backlog_synthesis",
+          "stage_7_delivery_slicing"
         ],
         "title": "Stage",
         "type": "string"
@@ -2673,6 +2905,9 @@
           },
           {
             "$ref": "#/components/schemas/BacklogFields"
+          },
+          {
+            "$ref": "#/components/schemas/DeliveryFields"
           }
         ]
       },
@@ -3954,7 +4189,7 @@
     },
     "/api/v1/sessions/{session_id}/export/backlog_json": {
       "get": {
-        "description": "Export backlog JSON; dependencies and waves await delivery slicing.\n\nArgs:\n    session_id (str): Request parameter or session service.\n    service (Service): Request parameter or session service.\n\nReturns:\n    BacklogExport: Application service result.",
+        "description": "Export validated backlog assignments, dependencies and delivery waves.\n\nArgs:\n    session_id (str): Request parameter or session service.\n    service (Service): Request parameter or session service.\n\nReturns:\n    BacklogExport: Application service result.",
         "operationId": "export_backlog_api_v1_sessions__session_id__export_backlog_json_get",
         "parameters": [
           {
@@ -4179,7 +4414,7 @@
     },
     "/api/v1/sessions/{session_id}/export/slice_specs": {
       "get": {
-        "description": "Return empty specs with available=false until lot 4.\n\nArgs:\n    session_id (str): Request parameter or session service.\n    service (Service): Request parameter or session service.\n\nReturns:\n    SliceSpecsExport: Application service result.",
+        "description": "Export validated standalone Markdown slice specifications.\n\nArgs:\n    session_id (str): Request parameter or session service.\n    service (Service): Request parameter or session service.\n\nReturns:\n    SliceSpecsExport: Application service result.",
         "operationId": "export_specs_api_v1_sessions__session_id__export_slice_specs_get",
         "parameters": [
           {

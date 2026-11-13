@@ -5,6 +5,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from brainstorm_agent.core.delivery import DeliverySlice
 from brainstorm_agent.core.enums import Stage  # noqa: TC001
 from brainstorm_agent.core.models import (  # noqa: TC001
     AssistantTurnOutput,
@@ -13,6 +14,7 @@ from brainstorm_agent.core.models import (  # noqa: TC001
     StageState,
     StepDocument,
 )
+from brainstorm_agent.core.stage_contracts import BacklogFields  # noqa: TC001
 
 
 class ReviewAction(StrEnum):
@@ -85,19 +87,25 @@ class DocumentDiff(BaseModel):
     diff: str
 
 
-class BacklogExport(BaseModel):
-    """Backlog with empty dependencies and waves until delivery slicing exists."""
+class ExportedSlice(DeliverySlice):
+    """Delivery slice enriched with its computed wave."""
 
-    items: list[dict[str, Any]] = Field(default_factory=list)
-    dependencies: list[dict[str, str]] = Field(default_factory=list)
-    waves: list[list[str]] = Field(default_factory=list)
+    wave: int
+
+
+class BacklogExport(BaseModel):
+    """Validated backlog, effective dependencies and delivery waves."""
+
+    backlog: BacklogFields
+    slices: list[ExportedSlice]
+    waves: list[list[str]]
 
 
 class SliceSpecsExport(BaseModel):
-    """Empty specs until lot 4 introduces delivery slicing."""
+    """Standalone Markdown artifacts keyed by safe slice filename."""
 
-    available: Literal[False] = False
-    specs: list[str] = Field(default_factory=list)
+    available: Literal[True] = True
+    specs: dict[str, str]
 
 
 class TurnStarted(BaseModel):

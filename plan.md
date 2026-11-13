@@ -207,7 +207,7 @@
 Implementation decisions (validated lot 6 scope): preserve legacy endpoints; add typed application
 endpoints backed by the existing owner-only session service. Persist metadata, comments and stale
 markers additively in session JSON. Generate the versioned OpenAPI snapshot and frontend types.
-Reuse lot 2 validators and elicitation metadata; delivery slicing exports stay explicitly unavailable.
+Reuse lot 2 validators and elicitation metadata; exports delegate to lot 4 delivery functions.
 
 #### Steps
 

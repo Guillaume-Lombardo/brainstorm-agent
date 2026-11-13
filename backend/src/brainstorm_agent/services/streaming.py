@@ -7,6 +7,8 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from contextlib import aclosing
 from typing import TYPE_CHECKING, cast
 
+from anyio import CancelScope
+
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
@@ -59,8 +61,11 @@ async def stream_in_worker(
             yield event
         await asyncio.wrap_future(worker)
     finally:
-        worker_loop, worker_task = await asyncio.shield(asyncio.wrap_future(ready))
-        if not worker_task.done():
-            worker_loop.call_soon_threadsafe(worker_task.cancel)
-        await asyncio.shield(asyncio.wrap_future(worker))
-        executor.shutdown(wait=False)
+        with CancelScope(shield=True):
+            try:
+                worker_loop, worker_task = await asyncio.shield(asyncio.wrap_future(ready))
+                if not worker_task.done():
+                    worker_loop.call_soon_threadsafe(worker_task.cancel)
+                await asyncio.shield(asyncio.wrap_future(worker))
+            finally:
+                executor.shutdown(wait=False)

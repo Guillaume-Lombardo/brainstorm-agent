@@ -9,7 +9,8 @@ from fastapi.testclient import TestClient
 
 from brainstorm_agent.api.dependencies import get_session_service
 from brainstorm_agent.api.main import create_app
-from brainstorm_agent.core.enums import LLMMode
+from brainstorm_agent.core.enums import LLMMode, Stage
+from brainstorm_agent.core.models import StageState
 from brainstorm_agent.persistence.repositories import SessionRepository
 from brainstorm_agent.services.session_service import SessionService
 from brainstorm_agent.services.users import UserService
@@ -90,8 +91,8 @@ def test_reopen_edits_versions_comments_and_exports(tmp_path: Path) -> None:
         client.post(base + "/messages", json={"content": "pitch: Confirm revised pitch"}).status_code == 200
     )
     assert client.get(base).json()["comments"][0]["consumed"]
-    assert client.get(base + "/export/slice_specs").json() == {"available": False, "specs": []}
-    assert client.get(base + "/export/backlog_json").json()["items"] == []
+    assert client.get(base + "/export/slice_specs").status_code == 409
+    assert client.get(base + "/export/backlog_json").status_code == 409
     assert client.get(base + "/export/markdown").status_code == 200
 
 
@@ -219,3 +220,63 @@ def test_identical_edit_preserves_partial_coverage(tmp_path: Path) -> None:
     result = client.patch(base + f"/stages/{STAGE}/fields/pitch_summary", json={"value": original}).json()
     assert result["stage_states"][STAGE]["coverage"]["pitch_summary"] == "partial"
     assert result["pending_human_review"] is None
+
+
+def test_delivery_exports_use_domain_plan_and_reject_stale_or_invalid(tmp_path: Path) -> None:
+    client = client_for(tmp_path)
+    assert isinstance(client.app, FastAPI)
+    sid = client.post("/api/v1/sessions").json()["session_id"]
+    base = f"/api/v1/sessions/{sid}"
+    with client.app.state.session_factory() as db:
+        repository = SessionRepository(db)
+        state = repository.to_state(repository.require(sid))
+        for stage, fields in {
+            "stage_2_user_story_mapping": {"capabilities": ["Reporting"]},
+            "stage_3_event_storming": {"event_storming_relevant": False},
+            "stage_6_backlog_synthesis": {
+                "mvp_user_stories": [{"id": "story", "statement": "Export reports"}],
+            },
+            "stage_7_delivery_slicing": {
+                "slices": [
+                    {
+                        "id": "slice-0",
+                        "goal": "Walking skeleton",
+                        "provided_contracts": [{"id": "api", "specification": "GET /reports"}],
+                        "integration_scenarios": [
+                            {"given": "Running", "when": "Health requested", "then": "Ready"},
+                        ],
+                    },
+                    {
+                        "id": "reports",
+                        "goal": "Export reports",
+                        "owned_domain": ["Reporting"],
+                        "backlog_item_ids": ["story"],
+                        "consumed_contracts": ["api"],
+                        "integration_scenarios": [
+                            {"ears": "WHEN export requested THE SYSTEM SHALL return CSV"},
+                        ],
+                    },
+                ],
+            },
+        }.items():
+            state.stage_states[stage] = StageState.model_validate({
+                "stage": stage,
+                "extracted_fields": fields,
+            })
+        state.current_stage = Stage.STAGE_7_DELIVERY_SLICING
+        repository.save_state(sid, state)
+        db.commit()
+    specs = client.get(base + "/export/slice_specs").json()
+    assert set(specs["specs"]) == {"slice-0.md", "reports.md"}
+    assert "Effective dependencies" in specs["specs"]["reports.md"]
+    backlog = client.get(base + "/export/backlog_json").json()
+    assert backlog["waves"] == [["slice-0"], ["reports"]]
+    assert backlog["slices"][1]["dependencies"] == ["slice-0"]
+    assert backlog["backlog"]["mvp_user_stories"][0]["id"] == "story"
+    assert (
+        client.patch(base + "/stages/stage_7_delivery_slicing", json={"fields": {"slices": []}}).status_code
+        == 200
+    )
+    assert client.get(base + "/export/slice_specs").status_code == 409
+    assert client.post(base + "/stages/stage_6_backlog_synthesis/reopen").status_code == 200
+    assert client.get(base + "/export/backlog_json").status_code == 409

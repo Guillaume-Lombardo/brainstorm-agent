@@ -111,7 +111,11 @@ class StreamingReply(Protocol):
     """Optional incremental conversational provider capability."""
 
     def stream_reply(
-        self, *, stage: Stage, analysis: AssistantAnalysis, user_message: str,
+        self,
+        *,
+        stage: Stage,
+        analysis: AssistantAnalysis,
+        user_message: str,
     ) -> AsyncIterator[str]:
         """Return provider deltas as they arrive.
 

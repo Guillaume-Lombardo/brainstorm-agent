@@ -202,7 +202,7 @@ def document_diff(
 
 @router.get("/{session_id}/export/backlog_json")
 def export_backlog(session_id: str, service: Service) -> BacklogExport:
-    """Export backlog JSON; dependencies and waves await delivery slicing.
+    """Export validated backlog assignments, dependencies and delivery waves.
 
     Args:
         session_id (str): Request parameter or session service.
@@ -216,7 +216,7 @@ def export_backlog(session_id: str, service: Service) -> BacklogExport:
 
 @router.get("/{session_id}/export/slice_specs")
 def export_specs(session_id: str, service: Service) -> SliceSpecsExport:
-    """Return empty specs with available=false until lot 4.
+    """Export validated standalone Markdown slice specifications.
 
     Args:
         session_id (str): Request parameter or session service.
