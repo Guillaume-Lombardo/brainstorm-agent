@@ -69,6 +69,9 @@ export function DeliveryView({
       </p>
     );
   }
+  // The validated plan carries the dependencies the backend resolved (implicit ones on
+  // the first slice and on contract providers); the draft slices only list explicit ones.
+  let shown = slices;
   let waves: string[][] | null = null;
   let notice: ReactNode = null;
   if (!ready) {
@@ -80,9 +83,10 @@ export function DeliveryView({
   } else if ("pending" in loaded) {
     notice = "Waves appear once the delivery plan passes its deterministic checks.";
   } else {
+    shown = loaded.plan.slices;
     waves = loaded.plan.waves;
   }
-  return <DeliverySlicingView slices={slices} waves={waves} notice={notice} />;
+  return <DeliverySlicingView slices={shown} waves={waves} notice={notice} />;
 }
 
 export function DeliverySlicingView({
