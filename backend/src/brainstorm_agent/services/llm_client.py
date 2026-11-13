@@ -626,9 +626,14 @@ class OpenAICompatibleBrainstormLLM:
                     {
                         "role": "system",
                         "content": self.prompt_loader.system_prompt()
-                        + " Respond conversationally in the user's language. Ask only the supplied selected questions (at most three), preserve their priority, reasons and options; do not invent answers or claim an unapproved transition.",
+                        + " Respond conversationally in the user's language. Ask only the supplied selected questions (at most three), preserve their priority, reasons and options; do not invent answers or claim an unapproved transition."
+                        + " This is a conversational reply, not a structured task: write prose only, never output JSON, code blocks or the internal analysis itself.",
                     },
-                    {"role": "user", "content": user_message + "\n" + analysis.model_dump_json()},
+                    {
+                        "role": "user",
+                        "content": f"User message:\n{user_message}\n\n"
+                        f"Internal analysis (context only, never quote it):\n{analysis.model_dump_json()}",
+                    },
                 ],
             )
             async for chunk in stream:
