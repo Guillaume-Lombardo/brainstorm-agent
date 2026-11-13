@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import argparse
 from getpass import getpass
+from pathlib import Path
 
 import uvicorn
 from sqlalchemy import select
 
 from brainstorm_agent import __version__
+from brainstorm_agent.async_runner import run_async
+from brainstorm_agent.evaluation.runner import default_scenarios, evaluate
 from brainstorm_agent.logging import configure_logging, get_logger
 from brainstorm_agent.persistence.models import UserRecord
 from brainstorm_agent.persistence.session import (
@@ -45,6 +48,11 @@ def build_parser() -> argparse.ArgumentParser:
         operation_parser.add_argument("email")
         if operation == "create":
             operation_parser.add_argument("--display-name", required=True)
+    evaluation = subparsers.add_parser("eval", help="Evaluate golden scenarios (fake mode is offline).")
+    evaluation.add_argument("--model", action="append", dest="models")
+    evaluation.add_argument("--judge-model", default="claude-opus-5-5")
+    evaluation.add_argument("--scenarios", type=Path, default=default_scenarios())
+    evaluation.add_argument("--output", type=Path, default=Path(".evaluation-reports"))
     return parser
 
 
@@ -62,6 +70,20 @@ def main() -> int:
         return 0
 
     settings = get_settings()
+    if command == "eval":
+        return (
+            0
+            if run_async(
+                evaluate(
+                    settings=settings,
+                    models=args.models or ["glm-5.3-flash"],
+                    scenarios_dir=args.scenarios,
+                    output_dir=args.output,
+                    judge_model=args.judge_model,
+                ),
+            )
+            else 1
+        )
     configure_logging(settings=settings)
     logger = get_logger("brainstorm_agent.cli")
     if command == "user":

@@ -643,3 +643,51 @@ acyclic graph. Waves derive from explicit dependencies, contract owners and the 
 Both reject invalid plans. `previous_fields` maps stage string identifiers to serialized fields.
 HTTP export endpoints are delivered separately in lot 6. Fake mode accepts `slices: <JSON array>`
 or scripted typed responses. No environment variables or SQL migration are introduced.
+
+## Evaluation
+
+Run the packaged golden corpus without network access (also exercised by CI):
+
+```bash
+cd backend
+LLM_MODE=fake uv run brainstorm-agent eval --output ../.evaluation-reports
+```
+
+To evaluate a LiteLLM alias, configure `OPENAI_BASE_URL` and `OPENAI_API_KEY` in
+`backend/.env`, then run on demand:
+
+```bash
+LLM_MODE=openai uv run brainstorm-agent eval --model glm-5.3-flash \
+  --model claude-opus-5-5 --judge-model claude-opus-5-5 \
+  --output ../.evaluation-reports
+```
+
+The default target is `glm-5.3-flash`; the strong reference, simulator and judge
+use `claude-opus-5-5`. No live evaluation runs in tests or CI. The command returns
+1 when an expectation fails, 0 when all pass. Missing provider configuration
+fails before any call. Reports (`report.md`, `report.json`) are overwritten in the
+selected directory, which must stay outside version control (the default
+`.evaluation-reports/` is ignored). Reports contain project information.
+
+Use `--scenarios DIRECTORY` for custom YAML scenarios. Each file contains `id`,
+`persona`, `hidden_facts`, `answer_mode` (`scripted` or `simulated`), `must_complete`
+and `turns`. Each turn has `stage`, `answer`, `should_advance`, optional
+`contradiction` (case-insensitive expected substring), and `recorded_analysis`.
+Replay uses recorded typed analysis through the production graph, never recorded
+gate decisions. Live mode ignores recorded analysis. Simulated mode sends only the
+persona, hidden facts and the last assistant questions to the simulator; scripted
+mode sends `answer`. Oracle checkpoints bound the number of turns. Divergence is
+reported as failure without resetting or skipping stages. Stage 7 must be accepted
+to complete the workflow. The four bundled scenarios cover vagueness,
+contradiction, all eight stages, and justified event-storming irrelevance.
+
+Reports include micro-averaged transition precision/recall (null if undefined),
+turns per oracle stage, exhausted schema failures, total wall latency, target token
+usage and separate simulator/judge usage. Stage 7 acceptance is a positive gate
+decision. Failed attempts count as non-advancement; divergent checkpoints count as
+missed expectations. Latency includes simulator and judge work. Token cost means
+token counts, not currency; provider retries that fail before producing analysis
+may not expose usage. Replay labels results `recorded-fixtures`, never a measured
+model score. Live document judging scores specificity, traceability and absence
+of invented facts from 0 to 4, with an evidence rationale; rubric scores are
+reported separately from deterministic gate expectations.

@@ -1,0 +1,15 @@
+id: vague-pitch
+persona: Accountant designing monthly report exports for a small practice.
+hidden_facts:
+- An app
+turns:
+- stage: stage_0_pitch
+  answer: An app
+  should_advance: false
+  recorded_analysis:
+    stage: stage_0_pitch
+    summary: An app
+    assistant_message: Please continue with the next project details.
+    extracted_fields:
+      pitch_summary: app
+must_complete: false

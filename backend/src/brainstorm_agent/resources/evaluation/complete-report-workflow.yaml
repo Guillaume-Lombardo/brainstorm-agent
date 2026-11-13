@@ -1,0 +1,286 @@
+id: complete-report-workflow
+persona: Accountant designing monthly report exports for a small practice.
+hidden_facts:
+- 'Confirmed project facts: {''pitch_summary'': ''Accountants export monthly reports
+  for clients'', ''clear_points'': [''Monthly reports''], ''ambiguities'': [''Export
+  format to confirm''], ''missing_information'': [''Retention to confirm'']}'
+- 'Confirmed project facts: {''problem_statement'': ''Monthly reports'', ''users_actors'':
+  [''Monthly reports''], ''measurable_objectives'': [''Reduce delay by 20 percent''],
+  ''constraints'': [''Monthly reports''], ''non_goals'': [''Monthly reports''], ''hypotheses'':
+  [''Monthly reports''], ''initial_risks'': [''Monthly reports''], ''five_w_one_h'':
+  ''Monthly reports''}'
+- 'Confirmed project facts: {''actors_personas'': [''Monthly reports''], ''user_journeys'':
+  [''Monthly reports''], ''capabilities'': [''Monthly reports''], ''mvp_scope'': [''Monthly
+  reports''], ''dependencies'': [''Monthly reports''], ''functional_gaps'': [''Monthly
+  reports''], ''edge_cases'': [''Monthly reports'']}'
+- 'Confirmed project facts: {''event_storming_relevant'': True, ''domain_events'':
+  [''Report exported''], ''commands'': [''Export report''], ''actors'': [''Monthly
+  reports''], ''business_rules'': [''Only accountants export reports''], ''complexity_hotspots'':
+  [''Retention''], ''aggregates'': [''Monthly reports'']}'
+- 'Confirmed project facts: {''business_goal'': ''Monthly reports'', ''influential_actors'':
+  [''Monthly reports''], ''expected_behaviors'': [''Monthly reports''], ''deliverables'':
+  [''Monthly reports''], ''value_hypotheses'': [''Monthly reports'']}'
+- 'Confirmed project facts: {''risks_by_category'': [{''id'': ''risk-0'', ''category'':
+  ''business'', ''description'': ''Data loss'', ''impact'': ''high'', ''probability'':
+  ''low'', ''mitigation'': ''Daily backup'', ''action'': ''Restore drill''}, {''id'':
+  ''risk-1'', ''category'': ''technical'', ''description'': ''Data loss'', ''impact'':
+  ''high'', ''probability'': ''low'', ''mitigation'': ''Daily backup'', ''action'':
+  ''Restore drill''}, {''id'': ''risk-2'', ''category'': ''business'', ''description'':
+  ''Data loss'', ''impact'': ''high'', ''probability'': ''low'', ''mitigation'': ''Daily
+  backup'', ''action'': ''Restore drill''}]}'
+- 'Confirmed project facts: {''mvp_user_stories'': [{''id'': ''mvp_user_stories'',
+  ''statement'': ''Export monthly reports'', ''objective'': ''Reduce delay'', ''definition_of_done'':
+  ''Delay measured'', ''link'': ''risk-0'', ''capability'': ''Monthly reports''}],
+  ''risk_spikes'': [{''id'': ''risk_spikes'', ''statement'': ''Export monthly reports'',
+  ''objective'': ''Reduce delay'', ''definition_of_done'': ''Delay measured'', ''link'':
+  ''risk-0'', ''capability'': ''Monthly reports''}], ''cross_cutting_work'': [{''id'':
+  ''cross_cutting_work'', ''statement'': ''Export monthly reports'', ''objective'':
+  ''Reduce delay'', ''definition_of_done'': ''Delay measured'', ''link'': ''risk-0'',
+  ''capability'': ''Monthly reports''}]}'
+- 'Confirmed project facts: {''slices'': [{''id'': ''slice-0'', ''goal'': ''Walking
+  skeleton and report export'', ''owned_domain'': [''Monthly reports''], ''backlog_item_ids'':
+  [''mvp_user_stories'', ''risk_spikes'', ''cross_cutting_work''], ''integration_scenarios'':
+  [{''ears'': ''WHEN export requested THE SYSTEM SHALL return reports''}]}]}'
+turns:
+- stage: stage_0_pitch
+  answer: 'Confirmed project facts: {''pitch_summary'': ''Accountants export monthly
+    reports for clients'', ''clear_points'': [''Monthly reports''], ''ambiguities'':
+    [''Export format to confirm''], ''missing_information'': [''Retention to confirm'']}'
+  should_advance: true
+  recorded_analysis:
+    stage: stage_0_pitch
+    summary: 'Confirmed project facts: {''pitch_summary'': ''Accountants export monthly
+      reports for clients'', ''clear_points'': [''Monthly reports''], ''ambiguities'':
+      [''Export format to confirm''], ''missing_information'': [''Retention to confirm'']}'
+    assistant_message: Please continue with the next project details.
+    extracted_fields:
+      pitch_summary: Accountants export monthly reports for clients
+      clear_points:
+      - Monthly reports
+      ambiguities:
+      - Export format to confirm
+      missing_information:
+      - Retention to confirm
+- stage: stage_1_problem_framing
+  answer: 'Confirmed project facts: {''problem_statement'': ''Monthly reports'', ''users_actors'':
+    [''Monthly reports''], ''measurable_objectives'': [''Reduce delay by 20 percent''],
+    ''constraints'': [''Monthly reports''], ''non_goals'': [''Monthly reports''],
+    ''hypotheses'': [''Monthly reports''], ''initial_risks'': [''Monthly reports''],
+    ''five_w_one_h'': ''Monthly reports''}'
+  should_advance: true
+  recorded_analysis:
+    stage: stage_1_problem_framing
+    summary: 'Confirmed project facts: {''problem_statement'': ''Monthly reports'',
+      ''users_actors'': [''Monthly reports''], ''measurable_objectives'': [''Reduce
+      delay by 20 percent''], ''constraints'': [''Monthly reports''], ''non_goals'':
+      [''Monthly reports''], ''hypotheses'': [''Monthly reports''], ''initial_risks'':
+      [''Monthly reports''], ''five_w_one_h'': ''Monthly reports''}'
+    assistant_message: Please continue with the next project details.
+    extracted_fields:
+      problem_statement: Monthly reports
+      users_actors:
+      - Monthly reports
+      measurable_objectives:
+      - Reduce delay by 20 percent
+      constraints:
+      - Monthly reports
+      non_goals:
+      - Monthly reports
+      hypotheses:
+      - Monthly reports
+      initial_risks:
+      - Monthly reports
+      five_w_one_h: Monthly reports
+- stage: stage_2_user_story_mapping
+  answer: 'Confirmed project facts: {''actors_personas'': [''Monthly reports''], ''user_journeys'':
+    [''Monthly reports''], ''capabilities'': [''Monthly reports''], ''mvp_scope'':
+    [''Monthly reports''], ''dependencies'': [''Monthly reports''], ''functional_gaps'':
+    [''Monthly reports''], ''edge_cases'': [''Monthly reports'']}'
+  should_advance: true
+  recorded_analysis:
+    stage: stage_2_user_story_mapping
+    summary: 'Confirmed project facts: {''actors_personas'': [''Monthly reports''],
+      ''user_journeys'': [''Monthly reports''], ''capabilities'': [''Monthly reports''],
+      ''mvp_scope'': [''Monthly reports''], ''dependencies'': [''Monthly reports''],
+      ''functional_gaps'': [''Monthly reports''], ''edge_cases'': [''Monthly reports'']}'
+    assistant_message: Please continue with the next project details.
+    extracted_fields:
+      actors_personas:
+      - Monthly reports
+      user_journeys:
+      - Monthly reports
+      capabilities:
+      - Monthly reports
+      mvp_scope:
+      - Monthly reports
+      dependencies:
+      - Monthly reports
+      functional_gaps:
+      - Monthly reports
+      edge_cases:
+      - Monthly reports
+- stage: stage_3_event_storming
+  answer: 'Confirmed project facts: {''event_storming_relevant'': True, ''domain_events'':
+    [''Report exported''], ''commands'': [''Export report''], ''actors'': [''Monthly
+    reports''], ''business_rules'': [''Only accountants export reports''], ''complexity_hotspots'':
+    [''Retention''], ''aggregates'': [''Monthly reports'']}'
+  should_advance: true
+  recorded_analysis:
+    stage: stage_3_event_storming
+    summary: 'Confirmed project facts: {''event_storming_relevant'': True, ''domain_events'':
+      [''Report exported''], ''commands'': [''Export report''], ''actors'': [''Monthly
+      reports''], ''business_rules'': [''Only accountants export reports''], ''complexity_hotspots'':
+      [''Retention''], ''aggregates'': [''Monthly reports'']}'
+    assistant_message: Please continue with the next project details.
+    extracted_fields:
+      event_storming_relevant: true
+      domain_events:
+      - Report exported
+      commands:
+      - Export report
+      actors:
+      - Monthly reports
+      business_rules:
+      - Only accountants export reports
+      complexity_hotspots:
+      - Retention
+      aggregates:
+      - Monthly reports
+- stage: stage_4_impact_mapping
+  answer: 'Confirmed project facts: {''business_goal'': ''Monthly reports'', ''influential_actors'':
+    [''Monthly reports''], ''expected_behaviors'': [''Monthly reports''], ''deliverables'':
+    [''Monthly reports''], ''value_hypotheses'': [''Monthly reports'']}'
+  should_advance: true
+  recorded_analysis:
+    stage: stage_4_impact_mapping
+    summary: 'Confirmed project facts: {''business_goal'': ''Monthly reports'', ''influential_actors'':
+      [''Monthly reports''], ''expected_behaviors'': [''Monthly reports''], ''deliverables'':
+      [''Monthly reports''], ''value_hypotheses'': [''Monthly reports'']}'
+    assistant_message: Please continue with the next project details.
+    extracted_fields:
+      business_goal: Monthly reports
+      influential_actors:
+      - Monthly reports
+      expected_behaviors:
+      - Monthly reports
+      deliverables:
+      - Monthly reports
+      value_hypotheses:
+      - Monthly reports
+- stage: stage_5_risk_storming
+  answer: 'Confirmed project facts: {''risks_by_category'': [{''id'': ''risk-0'',
+    ''category'': ''business'', ''description'': ''Data loss'', ''impact'': ''high'',
+    ''probability'': ''low'', ''mitigation'': ''Daily backup'', ''action'': ''Restore
+    drill''}, {''id'': ''risk-1'', ''category'': ''technical'', ''description'': ''Data
+    loss'', ''impact'': ''high'', ''probability'': ''low'', ''mitigation'': ''Daily
+    backup'', ''action'': ''Restore drill''}, {''id'': ''risk-2'', ''category'': ''business'',
+    ''description'': ''Data loss'', ''impact'': ''high'', ''probability'': ''low'',
+    ''mitigation'': ''Daily backup'', ''action'': ''Restore drill''}]}'
+  should_advance: true
+  recorded_analysis:
+    stage: stage_5_risk_storming
+    summary: 'Confirmed project facts: {''risks_by_category'': [{''id'': ''risk-0'',
+      ''category'': ''business'', ''description'': ''Data loss'', ''impact'': ''high'',
+      ''probability'': ''low'', ''mitigation'': ''Daily backup'', ''action'': ''Restore
+      drill''}, {''id'': ''risk-1'', ''category'': ''technical'', ''description'':
+      ''Data loss'', ''impact'': ''high'', ''probability'': ''low'', ''mitigation'':
+      ''Daily backup'', ''action'': ''Restore drill''}, {''id'': ''risk-2'', ''category'':
+      ''business'', ''description'': ''Data loss'', ''impact'': ''high'', ''probability'':
+      ''low'', ''mitigation'': ''Daily backup'', ''action'': ''Restore drill''}]}'
+    assistant_message: Please continue with the next project details.
+    extracted_fields:
+      risks_by_category:
+      - id: risk-0
+        category: business
+        description: Data loss
+        impact: high
+        probability: low
+        mitigation: Daily backup
+        action: Restore drill
+      - id: risk-1
+        category: technical
+        description: Data loss
+        impact: high
+        probability: low
+        mitigation: Daily backup
+        action: Restore drill
+      - id: risk-2
+        category: business
+        description: Data loss
+        impact: high
+        probability: low
+        mitigation: Daily backup
+        action: Restore drill
+- stage: stage_6_backlog_synthesis
+  answer: 'Confirmed project facts: {''mvp_user_stories'': [{''id'': ''mvp_user_stories'',
+    ''statement'': ''Export monthly reports'', ''objective'': ''Reduce delay'', ''definition_of_done'':
+    ''Delay measured'', ''link'': ''risk-0'', ''capability'': ''Monthly reports''}],
+    ''risk_spikes'': [{''id'': ''risk_spikes'', ''statement'': ''Export monthly reports'',
+    ''objective'': ''Reduce delay'', ''definition_of_done'': ''Delay measured'', ''link'':
+    ''risk-0'', ''capability'': ''Monthly reports''}], ''cross_cutting_work'': [{''id'':
+    ''cross_cutting_work'', ''statement'': ''Export monthly reports'', ''objective'':
+    ''Reduce delay'', ''definition_of_done'': ''Delay measured'', ''link'': ''risk-0'',
+    ''capability'': ''Monthly reports''}]}'
+  should_advance: true
+  recorded_analysis:
+    stage: stage_6_backlog_synthesis
+    summary: 'Confirmed project facts: {''mvp_user_stories'': [{''id'': ''mvp_user_stories'',
+      ''statement'': ''Export monthly reports'', ''objective'': ''Reduce delay'',
+      ''definition_of_done'': ''Delay measured'', ''link'': ''risk-0'', ''capability'':
+      ''Monthly reports''}], ''risk_spikes'': [{''id'': ''risk_spikes'', ''statement'':
+      ''Export monthly reports'', ''objective'': ''Reduce delay'', ''definition_of_done'':
+      ''Delay measured'', ''link'': ''risk-0'', ''capability'': ''Monthly reports''}],
+      ''cross_cutting_work'': [{''id'': ''cross_cutting_work'', ''statement'': ''Export
+      monthly reports'', ''objective'': ''Reduce delay'', ''definition_of_done'':
+      ''Delay measured'', ''link'': ''risk-0'', ''capability'': ''Monthly reports''}]}'
+    assistant_message: Please continue with the next project details.
+    extracted_fields:
+      mvp_user_stories:
+      - id: mvp_user_stories
+        statement: Export monthly reports
+        objective: Reduce delay
+        definition_of_done: Delay measured
+        link: risk-0
+        capability: Monthly reports
+      risk_spikes:
+      - id: risk_spikes
+        statement: Export monthly reports
+        objective: Reduce delay
+        definition_of_done: Delay measured
+        link: risk-0
+        capability: Monthly reports
+      cross_cutting_work:
+      - id: cross_cutting_work
+        statement: Export monthly reports
+        objective: Reduce delay
+        definition_of_done: Delay measured
+        link: risk-0
+        capability: Monthly reports
+- stage: stage_7_delivery_slicing
+  answer: 'Confirmed project facts: {''slices'': [{''id'': ''slice-0'', ''goal'':
+    ''Walking skeleton and report export'', ''owned_domain'': [''Monthly reports''],
+    ''backlog_item_ids'': [''mvp_user_stories'', ''risk_spikes'', ''cross_cutting_work''],
+    ''integration_scenarios'': [{''ears'': ''WHEN export requested THE SYSTEM SHALL
+    return reports''}]}]}'
+  should_advance: true
+  recorded_analysis:
+    stage: stage_7_delivery_slicing
+    summary: 'Confirmed project facts: {''slices'': [{''id'': ''slice-0'', ''goal'':
+      ''Walking skeleton and report export'', ''owned_domain'': [''Monthly reports''],
+      ''backlog_item_ids'': [''mvp_user_stories'', ''risk_spikes'', ''cross_cutting_work''],
+      ''integration_scenarios'': [{''ears'': ''WHEN export requested THE SYSTEM SHALL
+      return reports''}]}]}'
+    assistant_message: Please continue with the next project details.
+    extracted_fields:
+      slices:
+      - id: slice-0
+        goal: Walking skeleton and report export
+        owned_domain:
+        - Monthly reports
+        backlog_item_ids:
+        - mvp_user_stories
+        - risk_spikes
+        - cross_cutting_work
+        integration_scenarios:
+        - ears: WHEN export requested THE SYSTEM SHALL return reports
+must_complete: true

@@ -1,0 +1,24 @@
+id: contradictory-confidentiality
+persona: Accountant designing monthly report exports for a small practice.
+hidden_facts:
+- Reports must be both public and confidential
+turns:
+- stage: stage_0_pitch
+  answer: Reports must be both public and confidential
+  should_advance: false
+  recorded_analysis:
+    stage: stage_0_pitch
+    summary: Reports must be both public and confidential
+    assistant_message: Please continue with the next project details.
+    extracted_fields:
+      pitch_summary: Accountants export monthly reports for clients
+      clear_points:
+      - Monthly reports
+      ambiguities:
+      - Export format to confirm
+      missing_information:
+      - Retention to confirm
+    contradictions:
+    - Reports cannot be both public and confidential
+  contradiction: public and confidential
+must_complete: false
