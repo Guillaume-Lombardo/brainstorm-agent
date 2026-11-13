@@ -353,8 +353,8 @@ RULE_QUESTIONS: dict[str, Wording] = {
     ),
     "backlog_traceability": Wording(
         _text(
-            "For each backlog item, what are its objective, its definition of done and the goal, risk or assumption it serves?",
-            "Pour chaque élément du backlog, quels sont son objectif, sa définition de terminé et l'objectif, le risque ou l'hypothèse qu'il sert ?",
+            "For each backlog item, what are its objective, its definition of done and the goal, risk or assumption it serves (any EARS criteria written as WHEN ... THE SYSTEM SHALL ...)?",
+            "Pour chaque élément du backlog, quels sont son objectif, sa définition de terminé et l'objectif, le risque ou l'hypothèse qu'il sert (critères EARS éventuels au format WHEN ... THE SYSTEM SHALL ...) ?",
         ),
         _text(
             "Every backlog item must trace back to an earlier goal, risk or assumption.",
