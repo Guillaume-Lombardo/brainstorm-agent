@@ -30,6 +30,8 @@ export function describeError(error: unknown): ErrorDescription {
       };
     case "not_found":
       return { title: "Not found", description: error.message, signIn: false };
+    case "conflict":
+      return { title: "Not possible right now", description: error.message, signIn: false };
     case "review_pending":
       return {
         title: "Review pending",

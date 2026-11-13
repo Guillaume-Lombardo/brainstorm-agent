@@ -8,8 +8,10 @@ import {
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
-import { STAGE_LABELS, type StageId, type StageState, type StageStatus } from "@/lib/backend/types";
+import { STAGE_LABELS, STAGES, type SessionOverview, type Stage } from "@/lib/backend/types";
 import { cn } from "@/lib/utils";
+
+import { stageState, stageStatus, type StageStatus } from "./view-model";
 
 const STATUS_ICON: Record<StageStatus, typeof CircleIcon> = {
   locked: LockIcon,
@@ -33,57 +35,57 @@ export function stageStatusLabel(status: StageStatus): string {
 
 /** Vertical stepper of the eight stages with status and stale markers. */
 export function StageStepper({
-  stages,
-  currentStage,
+  session,
   selected,
   onSelect,
 }: {
-  stages: StageState[];
-  currentStage: StageId;
-  selected: StageId;
-  onSelect: (stage: StageId) => void;
+  session: SessionOverview;
+  selected: Stage;
+  onSelect: (stage: Stage) => void;
 }) {
   return (
     <nav aria-label="Stages">
       <ol className="flex flex-col gap-1">
-        {stages.map((stage, index) => {
-          const Icon = STATUS_ICON[stage.status];
-          const passed = stage.readiness.filter((check) => check.passed).length;
+        {STAGES.map((id, index) => {
+          const status = stageStatus(session, id);
+          const Icon = STATUS_ICON[status];
+          const readiness = stageState(session, id)?.readiness ?? [];
+          const passed = readiness.filter((check) => check.passed).length;
           return (
-            <li key={stage.stage}>
+            <li key={id}>
               <button
                 type="button"
-                disabled={stage.status === "locked"}
-                aria-current={stage.stage === currentStage ? "step" : undefined}
-                aria-pressed={stage.stage === selected}
-                onClick={() => onSelect(stage.stage)}
+                disabled={status === "locked"}
+                aria-current={id === session.current_stage ? "step" : undefined}
+                aria-pressed={id === selected}
+                onClick={() => onSelect(id)}
                 className={cn(
                   "flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50",
-                  stage.stage === selected && "bg-muted font-medium",
+                  id === selected && "bg-muted font-medium",
                 )}
               >
                 <Icon
                   aria-hidden
                   className={cn(
                     "size-4 shrink-0",
-                    stage.status === "validated" && "text-emerald-600",
-                    stage.status === "stale" && "text-amber-600",
-                    stage.status === "awaiting_review" && "text-sky-600",
+                    status === "validated" && "text-emerald-600",
+                    status === "stale" && "text-amber-600",
+                    status === "awaiting_review" && "text-sky-600",
                   )}
                 />
                 <span className="flex-1 truncate">
-                  {index}. {STAGE_LABELS[stage.stage]}
+                  {index}. {STAGE_LABELS[id]}
                 </span>
-                {stage.status === "stale" ? (
+                {status === "stale" ? (
                   <Badge variant="outline" className="border-amber-500 text-amber-700">
                     stale
                   </Badge>
-                ) : stage.status !== "locked" ? (
+                ) : readiness.length > 0 ? (
                   <span className="text-xs text-muted-foreground" aria-label="Readiness">
-                    {passed}/{stage.readiness.length}
+                    {passed}/{readiness.length}
                   </span>
                 ) : null}
-                <span className="sr-only">{STATUS_LABEL[stage.status]}</span>
+                <span className="sr-only">{STATUS_LABEL[status]}</span>
               </button>
             </li>
           );

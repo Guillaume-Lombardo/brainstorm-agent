@@ -16,37 +16,34 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   STAGE_LABELS,
-  type PendingReview,
   type ReviewAction,
-  type StageId,
-  type StageState,
+  type SessionOverview,
+  type Stage,
 } from "@/lib/backend/types";
+
+import { canReopen, stageStatus } from "./view-model";
 
 type NoteAction = Exclude<ReviewAction, "approve">;
 
 /** Human review controls: approve, reject, request changes, reopen a stage. */
 export function ReviewBar({
-  pendingReview,
+  session,
   selected,
-  earlierValidated,
   disabled,
   onReview,
   onReopen,
 }: {
-  pendingReview: PendingReview | null;
-  selected: StageState;
-  /** Every stage before `selected` is validated (reopening is ordered). */
-  earlierValidated: boolean;
+  session: SessionOverview;
+  selected: Stage;
   disabled: boolean;
-  onReview: (stage: StageId, action: ReviewAction, note?: string) => Promise<void>;
-  onReopen: (stage: StageId) => Promise<void>;
+  onReview: (stage: Stage, action: ReviewAction, note?: string) => Promise<void>;
+  onReopen: (stage: Stage) => Promise<void>;
 }) {
   const [noteAction, setNoteAction] = useState<NoteAction | null>(null);
   const [note, setNote] = useState("");
-  const reopenable =
-    (selected.status === "validated" || selected.status === "stale") &&
-    earlierValidated &&
-    pendingReview?.stage !== selected.stage;
+  const pendingReview = session.pending_human_review ?? null;
+  const status = stageStatus(session, selected);
+  const reopenable = canReopen(session, selected);
 
   if (!pendingReview && !reopenable) {
     return null;
@@ -61,12 +58,12 @@ export function ReviewBar({
       {pendingReview ? (
         <>
           <span className="flex-1 font-medium">
-            {STAGE_LABELS[pendingReview.stage]} is ready for your review.
+            {STAGE_LABELS[pendingReview.from_stage]} is ready for your review.
           </span>
           <Button
             size="sm"
             disabled={disabled}
-            onClick={() => void onReview(pendingReview.stage, "approve")}
+            onClick={() => void onReview(pendingReview.from_stage, "approve")}
           >
             <CheckIcon />
             Approve
@@ -95,18 +92,18 @@ export function ReviewBar({
         <>
           {!pendingReview ? (
             <span className="flex-1 text-muted-foreground">
-              {STAGE_LABELS[selected.stage]} is {selected.status}. Reopening marks later stages
-              stale.
+              {STAGE_LABELS[selected]} is {status === "stale" ? "stale" : "validated"}. Reopening
+              marks later stages stale.
             </span>
           ) : null}
           <Button
             size="sm"
             variant="outline"
             disabled={disabled}
-            onClick={() => void onReopen(selected.stage)}
+            onClick={() => void onReopen(selected)}
           >
             <RotateCcwIcon />
-            Reopen {STAGE_LABELS[selected.stage]}
+            Reopen {STAGE_LABELS[selected]}
           </Button>
         </>
       ) : null}
@@ -137,7 +134,7 @@ export function ReviewBar({
               }
               const action = noteAction;
               setNoteAction(null);
-              void onReview(pendingReview.stage, action, note.trim() || undefined).then(() =>
+              void onReview(pendingReview.from_stage, action, note.trim() || undefined).then(() =>
                 setNote(""),
               );
             }}

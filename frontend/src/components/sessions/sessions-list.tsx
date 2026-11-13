@@ -19,9 +19,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api/client";
-import { STAGE_LABELS, STAGES, type SessionSummary } from "@/lib/backend/types";
+import { STAGE_LABELS, STAGES, type SessionOverview } from "@/lib/backend/types";
 
-type TitleDialog = { mode: "create" } | { mode: "rename"; session: SessionSummary };
+type TitleDialog = { mode: "create" } | { mode: "rename"; session: SessionOverview };
 
 function formatDate(value: string): string {
   return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(
@@ -30,14 +30,14 @@ function formatDate(value: string): string {
 }
 
 export function SessionsList() {
-  const [sessions, setSessions] = useState<SessionSummary[] | null>(null);
+  const [sessions, setSessions] = useState<SessionOverview[] | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [includeArchived, setIncludeArchived] = useState(false);
   const [dialog, setDialog] = useState<TitleDialog | null>(null);
 
   const load = useCallback(async () => {
     try {
-      setSessions(await api.listSessions(includeArchived));
+      setSessions((await api.listSessions(includeArchived)).items);
       setError(null);
     } catch (caught) {
       setError(caught);
@@ -48,9 +48,9 @@ export function SessionsList() {
     let active = true;
     api
       .listSessions(includeArchived)
-      .then((list) => {
+      .then((page) => {
         if (active) {
-          setSessions(list);
+          setSessions(page.items);
           setError(null);
         }
       })
@@ -64,9 +64,9 @@ export function SessionsList() {
     };
   }, [includeArchived]);
 
-  async function toggleArchive(session: SessionSummary) {
+  async function toggleArchive(session: SessionOverview) {
     try {
-      await api.updateSession(session.id, { archived: !session.archived });
+      await api.updateSession(session.session_id, { archived: !session.archived });
       await load();
     } catch (caught) {
       setError(caught);
@@ -115,21 +115,24 @@ export function SessionsList() {
       {sessions && sessions.length > 0 ? (
         <ul className="flex flex-col divide-y rounded-xl border">
           {sessions.map((session) => (
-            <li key={session.id} className="flex items-center gap-3 p-4">
+            <li key={session.session_id} className="flex items-center gap-3 p-4">
               <div className="flex min-w-0 flex-1 flex-col gap-1">
                 <Link
-                  href={`/sessions/${session.id}`}
+                  href={`/sessions/${session.session_id}`}
                   className="truncate font-medium hover:underline"
                 >
                   {session.title}
                 </Link>
                 <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                   <Badge variant="secondary">
-                    Stage {STAGES.indexOf(session.currentStage)} ·{" "}
-                    {STAGE_LABELS[session.currentStage]}
+                    Stage {STAGES.indexOf(session.current_stage)} ·{" "}
+                    {STAGE_LABELS[session.current_stage]}
                   </Badge>
                   {session.archived ? <Badge variant="outline">Archived</Badge> : null}
-                  <span>Updated {formatDate(session.updatedAt)}</span>
+                  {session.pending_human_review ? (
+                    <Badge variant="outline">Review pending</Badge>
+                  ) : null}
+                  <span>Updated {formatDate(session.updated_at)}</span>
                 </div>
               </div>
               <Button
@@ -187,10 +190,10 @@ function SessionTitleDialog({
     try {
       if (dialog.mode === "create") {
         const created = await api.createSession(title);
-        router.push(`/sessions/${created.id}`);
+        router.push(`/sessions/${created.session_id}`);
         return;
       }
-      await api.updateSession(dialog.session.id, { title });
+      await api.updateSession(dialog.session.session_id, { title });
       setError(null);
       await onSaved();
     } catch (caught) {

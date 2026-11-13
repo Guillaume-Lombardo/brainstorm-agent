@@ -1,7 +1,10 @@
-import type { ChatMessage, SessionDetail, TurnEvent } from "@/lib/backend/types";
+import type { SessionOverview, SessionSnapshot, TurnEvent } from "@/lib/backend/types";
+
+import { chatMessages, type ChatMessage } from "./view-model";
 
 export interface StreamingTurn {
   turnId: string | null;
+  /** Tentative reply text (`message.delta`), discarded if the turn fails. */
   text: string;
   status: string | null;
 }
@@ -14,26 +17,29 @@ export interface TurnFailure {
 }
 
 export interface WorkspaceState {
-  session: SessionDetail;
+  session: SessionOverview;
+  messages: ChatMessage[];
   streaming: StreamingTurn | null;
   turnError: TurnFailure | null;
-  /** Incremented on every `document.updated` so the document panel refetches. */
+  /** Incremented when the stage documents may have changed, so panels refetch. */
   documentRevision: number;
   /** Composer text; a failed turn puts its message back here. */
   draft: string;
 }
 
 export type WorkspaceAction =
-  | { type: "session.replaced"; session: SessionDetail }
+  | { type: "snapshot.loaded"; snapshot: SessionSnapshot }
+  | { type: "session.updated"; session: SessionOverview }
   | { type: "turn.submitted"; message: ChatMessage }
   | { type: "turn.event"; event: TurnEvent }
   | { type: "turn.failed"; error: TurnFailure }
   | { type: "turn.closed" }
   | { type: "draft.changed"; draft: string };
 
-export function initialWorkspaceState(session: SessionDetail): WorkspaceState {
+export function initialWorkspaceState(snapshot: SessionSnapshot): WorkspaceState {
   return {
-    session,
+    session: snapshot.session,
+    messages: chatMessages(snapshot.messages),
     streaming: null,
     turnError: null,
     documentRevision: 0,
@@ -41,59 +47,34 @@ export function initialWorkspaceState(session: SessionDetail): WorkspaceState {
   };
 }
 
-function withoutLocalMessages(session: SessionDetail): SessionDetail {
-  return {
-    ...session,
-    messages: session.messages.filter((message) => !message.id.startsWith("local-")),
-  };
-}
-
-function lastLocalMessage(session: SessionDetail): string | null {
-  const local = session.messages.filter((message) => message.id.startsWith("local-"));
-  return local.at(-1)?.content ?? null;
-}
+const STATUS_ANALYZING = "Analyzing your message…";
+const STATUS_DOCUMENT = "Updating the stage document…";
 
 function failTurn(state: WorkspaceState, error: TurnFailure): WorkspaceState {
+  const local = state.messages.filter((message) => message.local);
   return {
     ...state,
-    session: withoutLocalMessages(state.session),
+    messages: state.messages.filter((message) => !message.local),
     streaming: null,
     turnError: error,
-    draft: lastLocalMessage(state.session) ?? state.draft,
+    draft: local.at(-1)?.content ?? state.draft,
   };
 }
 
 function applyEvent(state: WorkspaceState, event: TurnEvent): WorkspaceState {
   const { session } = state;
+  const streaming: StreamingTurn = state.streaming ?? { turnId: null, text: "", status: null };
   switch (event.type) {
     case "turn.started":
-      return { ...state, streaming: { turnId: event.turnId, text: "", status: null } };
+      return { ...state, streaming: { turnId: event.turn_id, text: "", status: STATUS_ANALYZING } };
     case "analysis.status":
-      return {
-        ...state,
-        streaming: { turnId: null, text: "", ...state.streaming, status: event.message },
-      };
+      return { ...state, streaming: { ...streaming, status: STATUS_ANALYZING } };
     case "message.delta":
-      return {
-        ...state,
-        streaming: {
-          turnId: null,
-          status: null,
-          ...state.streaming,
-          text: (state.streaming?.text ?? "") + event.delta,
-        },
-      };
+      return { ...state, streaming: { ...streaming, text: streaming.text + event.delta } };
     case "document.updated":
       return {
         ...state,
-        session: {
-          ...session,
-          stages: session.stages.map((stage) =>
-            stage.stage === event.document.stage
-              ? { ...stage, documentVersion: event.document.version }
-              : stage,
-          ),
-        },
+        streaming: { ...streaming, status: STATUS_DOCUMENT },
         documentRevision: state.documentRevision + 1,
       };
     case "coverage.updated":
@@ -101,44 +82,44 @@ function applyEvent(state: WorkspaceState, event: TurnEvent): WorkspaceState {
         ...state,
         session: {
           ...session,
-          stages: session.stages.map((stage) =>
-            stage.stage === event.stage.stage ? event.stage : stage,
-          ),
+          stage_states: { ...session.stage_states, [event.stage.stage]: event.stage },
         },
       };
     case "stage.changed":
-      return { ...state, session: { ...session, currentStage: event.to } };
+      return { ...state, session: { ...session, current_stage: event.to_stage } };
     case "review.required":
-      return { ...state, session: { ...session, pendingReview: event.review } };
-    case "questions.updated":
-      return { ...state, session: { ...session, openQuestions: event.questions } };
-    case "turn.completed": {
-      const confirmed = session.messages.map((message) =>
-        message.id.startsWith("local-")
-          ? { ...message, id: `user-${message.id.slice(6)}` }
-          : message,
-      );
+      return { ...state, session: { ...session, pending_human_review: event.review } };
+    case "turn.completed":
       return {
         ...state,
-        session: { ...session, messages: [...confirmed, event.message] },
+        messages: [
+          ...state.messages.map((message) => ({ ...message, local: undefined })),
+          { id: event.turn_id, role: "assistant", content: event.output.assistant_message },
+        ],
         streaming: null,
       };
-    }
     case "error":
-      return failTurn(state, { code: event.code, message: event.message });
+      return failTurn(state, { code: "llm_error", message: event.message });
   }
 }
 
 /** Pure reducer applying user actions and streamed turn events to the workspace. */
 export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction): WorkspaceState {
   switch (action.type) {
-    case "session.replaced":
+    case "snapshot.loaded":
+      return {
+        ...state,
+        session: action.snapshot.session,
+        messages: chatMessages(action.snapshot.messages),
+        documentRevision: state.documentRevision + 1,
+      };
+    case "session.updated":
       return { ...state, session: action.session, documentRevision: state.documentRevision + 1 };
     case "turn.submitted":
       return {
         ...state,
-        session: { ...state.session, messages: [...state.session.messages, action.message] },
-        streaming: { turnId: null, text: "", status: "Sending" },
+        messages: [...state.messages, { ...action.message, local: true }],
+        streaming: { turnId: null, text: "", status: "Sending…" },
         turnError: null,
         draft: "",
       };
@@ -147,7 +128,7 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
     case "turn.failed":
       return failTurn(state, action.error);
     case "turn.closed":
-      // A stream that ends without `turn.completed` must not leave the UI busy;
+      // A stream that ends without a terminal event must not leave the UI busy;
       // the caller reloads the session to show what the backend kept.
       return state.streaming
         ? {
