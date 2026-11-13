@@ -30,6 +30,10 @@ x-backend-env: &backend-env
   OPENAI_BASE_URL: ${BRAINSTORM_LLM_BASE_URL:-http://10.16.0.117:4000/v1}
   OPENAI_API_KEY: ${BRAINSTORM_LLM_API_KEY:?set BRAINSTORM_LLM_API_KEY as a Dockhand secret variable}
   MODEL_NAME: ${BRAINSTORM_MODEL_NAME:-claude-opus-5-5}
+  # Anthropic rejects the strict tool and json_schema grammars of the stage analysis as too large
+  # (400 "compiled grammar is too large"); json_object keeps the schema in the prompt and the
+  # backend validates and repairs the output.
+  LLM_OUTPUT_MODE: ${BRAINSTORM_LLM_OUTPUT_MODE:-json_object}
   # A detailed stage analysis is a JSON document of several thousand tokens: 4096 truncates it.
   LLM_MAX_TOKENS: ${BRAINSTORM_LLM_MAX_TOKENS:-32768}
   # Opus 5.5 can spend several minutes on a detailed analysis. The frontend proxy still drops

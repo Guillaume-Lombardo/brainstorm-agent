@@ -550,8 +550,10 @@ by id. Facts, assumptions, decisions and questions also merge by stable ids; res
 requires its id in `resolved_question_ids`. Use `resolved_item_ids` to retract other identified items.
 `uncertainties` is the complete current list and replaces earlier uncertainties after clarification. No model decision can bypass deterministic stage gates.
 
-`LLM_OUTPUT_MODE=json_schema` sends a strict JSON schema. Set `json_object` or `tool` explicitly
-if the selected LiteLLM model does not support strict schemas. Unsupported-provider errors are
+`LLM_OUTPUT_MODE=json_schema` sends a strict JSON schema, and `tool` a strict tool schema. Set
+`json_object` if the selected LiteLLM model does not support strict schemas: Anthropic models reject
+the stage analysis grammar as too large (400 "compiled grammar is too large"), so the docker-box
+stack defaults to `json_object`. Unsupported-provider errors are
 surfaced; the service does not silently downgrade. Invalid JSON/schema gets exactly one repair
 attempt with the validation error, then an actionable error with no persisted partial turn.
 
