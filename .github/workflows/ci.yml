@@ -32,7 +32,6 @@ jobs:
               - 'frontend/**'
               - '.github/workflows/**'
 
-  # A future frontend job can use needs.changes.outputs.frontend.
   quality:
     needs: changes
     if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.backend == 'true'
@@ -76,6 +75,47 @@ jobs:
       - name: Full-suite coverage gate
         run: uv run pytest -m "unit or integration or end2end" --cov=src --cov-report=term-missing:skip-covered
 
+  frontend:
+    needs: changes
+    if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.frontend == 'true'
+    defaults:
+      run:
+        working-directory: frontend
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          package_json_file: frontend/package.json
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Format check
+        run: pnpm format:check
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Type check
+        run: pnpm typecheck
+
+      - name: Unit and component tests
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
   repository-hooks:
     runs-on: ubuntu-latest
     steps:
@@ -86,5 +126,16 @@ jobs:
       - uses: astral-sh/setup-uv@v5
       - name: Install backend tooling
         run: uv sync --project backend --group dev --frozen
+      # The frontend pre-commit hooks run pnpm scripts.
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: frontend/package.json
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: Install frontend tooling
+        run: pnpm --dir frontend install --frozen-lockfile
       - name: Pre-commit from repository root
         run: uv run --project backend pre-commit run --all-files
