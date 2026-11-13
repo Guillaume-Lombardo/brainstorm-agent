@@ -11,6 +11,7 @@ repos:
       - id: check-json
       - id: check-symlinks
       - id: check-yaml
+        exclude: ^frontend/pnpm-lock\.yaml$
       - id: check-toml
       - id: debug-statements
       - id: detect-private-key
@@ -37,6 +38,13 @@ repos:
     rev: v1.5.0
     hooks:
       - id: detect-secrets
+        exclude: ^frontend/pnpm-lock\.yaml$
+
+  - repo: https://github.com/AleksaC/hadolint-py
+    rev: v2.15.1
+    hooks:
+      - id: hadolint
+        files: ^frontend/Dockerfile$
 
   - repo: local
     hooks:
@@ -52,3 +60,27 @@ repos:
         language: system
         pass_filenames: false
         files: ^backend/
+      - id: frontend-format
+        name: frontend prettier
+        entry: pnpm --dir frontend format:check
+        language: system
+        pass_filenames: false
+        files: ^frontend/
+      - id: frontend-lint
+        name: frontend eslint
+        entry: pnpm --dir frontend lint
+        language: system
+        pass_filenames: false
+        files: ^frontend/
+      - id: frontend-typecheck
+        name: frontend typecheck
+        entry: pnpm --dir frontend typecheck
+        language: system
+        pass_filenames: false
+        files: ^frontend/
+      - id: frontend-test
+        name: frontend vitest
+        entry: pnpm --dir frontend test
+        language: system
+        pass_filenames: false
+        files: ^frontend/
