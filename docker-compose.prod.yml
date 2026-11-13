@@ -1,68 +1,128 @@
+# Self-hosted production stack: Caddy, frontend, backend, Postgres, Redis and a
+# bundled LiteLLM gateway. Secrets are required variables, never defaults:
+#
+#   docker compose --env-file .env.prod -f docker-compose.prod.yml up --build -d
+#
+# The variables are the ones of deploy/docker-box/README.md, plus
+# BRAINSTORM_SITE_ADDRESS (a domain lets Caddy obtain TLS certificates) and the
+# LiteLLM upstream (LLM_UPSTREAM_BASE_URL, LLM_UPSTREAM_API_KEY). Optional
+# backend and frontend tuning goes in backend/.env and frontend/.env.
+name: brainstorm-agent
+
+x-backend-env: &backend-env
+  HOST: 0.0.0.0
+  APP_ENV: prod
+  DATABASE_URL: postgresql+psycopg://brainstorm:${BRAINSTORM_POSTGRES_PASSWORD:?BRAINSTORM_POSTGRES_PASSWORD is required}@postgres:5432/brainstorm
+  REDIS_URL: redis://redis:6379/0
+  AUTO_CREATE_SCHEMA: "false"
+  RUN_DB_MIGRATIONS_ON_STARTUP: "false"
+  ENABLE_AUTH: "true"
+  AUTH_MODE: jwt
+  JWT_SECRET_KEY: ${BRAINSTORM_JWT_SECRET:?BRAINSTORM_JWT_SECRET is required}
+  JWT_ISSUER: brainstorm-frontend
+  JWT_AUDIENCE: brainstorm-backend
+  AUTH_BRIDGE_SECRET: ${BRAINSTORM_AUTH_BRIDGE_SECRET:?BRAINSTORM_AUTH_BRIDGE_SECRET is required}
+  RATE_LIMIT_ENABLED: "true"
+  LLM_MODE: ${BRAINSTORM_LLM_MODE:-openai}
+  OPENAI_BASE_URL: http://litellm:4000/v1
+  OPENAI_API_KEY: ${BRAINSTORM_LLM_API_KEY:?BRAINSTORM_LLM_API_KEY is required}
+  MODEL_NAME: ${BRAINSTORM_MODEL_NAME:-glm-5.3-flash}
+  OPENAI_TIMEOUT_SECONDS: ${BRAINSTORM_LLM_TIMEOUT_SECONDS:-60}
+  REDIS_LOCK_TIMEOUT_SECONDS: ${BRAINSTORM_REDIS_LOCK_TIMEOUT_SECONDS:-300}
+
+x-backend-env-file: &backend-env-file
+  - path: backend/.env
+    required: false
+
 services:
-  app:
+  caddy:
+    build: ./deploy/caddy
+    restart: unless-stopped
+    environment:
+      BRAINSTORM_SITE_ADDRESS: ${BRAINSTORM_SITE_ADDRESS:-:80}
+    ports:
+      - "${BRAINSTORM_HTTP_PORT:-80}:80"
+      - "${BRAINSTORM_HTTPS_PORT:-443}:443"
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    env_file:
+      - path: frontend/.env
+        required: false
+    environment:
+      AUTH_URL: ${BRAINSTORM_PUBLIC_URL:?BRAINSTORM_PUBLIC_URL is required}
+      AUTH_SECRET: ${BRAINSTORM_AUTH_SECRET:?BRAINSTORM_AUTH_SECRET is required}
+      BACKEND_MODE: http
+      BACKEND_URL: http://backend:8000
+      BACKEND_JWT_SECRET: ${BRAINSTORM_JWT_SECRET:?BRAINSTORM_JWT_SECRET is required}
+      BACKEND_JWT_ISSUER: brainstorm-frontend
+      BACKEND_JWT_AUDIENCE: brainstorm-backend
+      AUTH_BRIDGE_SECRET: ${BRAINSTORM_AUTH_BRIDGE_SECRET:?BRAINSTORM_AUTH_BRIDGE_SECRET is required}
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  backend:
     build:
       context: .
       dockerfile: backend/Dockerfile
     restart: unless-stopped
-    env_file:
-      - backend/.env
-    environment:
-      AUTO_CREATE_SCHEMA: "false"
-      RUN_DB_MIGRATIONS_ON_STARTUP: "true"
-      DATABASE_URL: postgresql+psycopg://brainstorm:brainstorm@postgres:5432/brainstorm # pragma: allowlist secret
-      REDIS_URL: redis://redis:6379/0
+    env_file: *backend-env-file
+    environment: *backend-env
     depends_on:
+      init:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
-        condition: service_started
-    expose:
-      - "8000"
+        condition: service_healthy
+      litellm:
+        condition: service_healthy
+
+  # Migrations and idempotent administrator bootstrap, then exit.
+  init:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    command: ["/app/docker/init.sh"]
+    restart: "no"
+    env_file: *backend-env-file
+    environment:
+      <<: *backend-env
+      BOOTSTRAP_ADMIN_EMAIL: ${BRAINSTORM_ADMIN_EMAIL:?BRAINSTORM_ADMIN_EMAIL is required}
+      BOOTSTRAP_ADMIN_DISPLAY_NAME: ${BRAINSTORM_ADMIN_DISPLAY_NAME:-Administrator}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BRAINSTORM_ADMIN_PASSWORD:?BRAINSTORM_ADMIN_PASSWORD is required}
+    healthcheck:
+      disable: true
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   litellm:
-    image: docker.litellm.ai/berriai/litellm:main-latest
+    image: docker.litellm.ai/berriai/litellm:v1.106.1
     restart: unless-stopped
     command: ["--config", "/app/config.yaml", "--port", "4000"]
     environment:
-      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-change-me} # pragma: allowlist secret
+      LITELLM_MASTER_KEY: ${BRAINSTORM_LLM_API_KEY:?BRAINSTORM_LLM_API_KEY is required}
+      LLM_UPSTREAM_BASE_URL: ${LLM_UPSTREAM_BASE_URL:-}
+      LLM_UPSTREAM_API_KEY: ${LLM_UPSTREAM_API_KEY:-}
     volumes:
-      - ./examples/litellm/config.openwebui.yaml:/app/config.yaml:ro
-    depends_on:
-      app:
-        condition: service_started
-    expose:
-      - "4000"
-
-  openwebui:
-    image: ghcr.io/open-webui/open-webui:main
-    restart: unless-stopped
-    environment:
-      ENABLE_OLLAMA_API: "false"
-      ENABLE_OPENAI_API: "true"
-      OPENAI_API_BASE_URL: http://litellm:4000/v1
-      OPENAI_API_KEY: ${LITELLM_MASTER_KEY:-change-me} # pragma: allowlist secret
-      WEBUI_AUTH: "true"
-    depends_on:
-      litellm:
-        condition: service_started
-    expose:
-      - "8080"
-
-  caddy:
-    image: caddy:2
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy-data:/data
-      - caddy-config:/config
-    depends_on:
-      app:
-        condition: service_started
-      openwebui:
-        condition: service_started
+      - ./deploy/litellm/config.yaml:/app/config.yaml:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys, urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:4000/health/liveliness', timeout=4).status == 200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      start_period: 60s
+      retries: 10
 
   postgres:
     image: postgres:17
@@ -70,7 +130,7 @@ services:
     environment:
       POSTGRES_DB: brainstorm
       POSTGRES_USER: brainstorm
-      POSTGRES_PASSWORD: brainstorm # pragma: allowlist secret
+      POSTGRES_PASSWORD: ${BRAINSTORM_POSTGRES_PASSWORD:?BRAINSTORM_POSTGRES_PASSWORD is required}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U brainstorm -d brainstorm"]
       interval: 5s
@@ -83,6 +143,11 @@ services:
     image: redis:8
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     volumes:
       - redis-data:/data
 

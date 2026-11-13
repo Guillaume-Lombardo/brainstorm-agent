@@ -1,20 +1,105 @@
+# Development stack: backend, frontend, Postgres, Redis and LiteLLM.
+#
+#   docker compose up --build
+#
+# Frontend http://localhost:3000, backend http://localhost:8000, LiteLLM
+# http://localhost:4000 (host ports are bound to 127.0.0.1 and configurable).
+# Every value here is a development default; never reuse them in production
+# (see docker-compose.prod.yml and deploy/docker-box/).
+name: brainstorm-agent-dev
+
+x-backend-env: &backend-env
+  # The template binds 127.0.0.1 for host runs; containers listen on all interfaces.
+  HOST: 0.0.0.0
+  DATABASE_URL: postgresql+psycopg://brainstorm:brainstorm@postgres:5432/brainstorm # pragma: allowlist secret
+  REDIS_URL: redis://redis:6379/0
+  AUTO_CREATE_SCHEMA: "false"
+  RUN_DB_MIGRATIONS_ON_STARTUP: "false"
+  LOG_JSON: "false"
+  ENABLE_AUTH: "true"
+  AUTH_MODE: jwt
+  JWT_SECRET_KEY: ${BRAINSTORM_JWT_SECRET:-dev-only-jwt-secret-0123456789abcdef} # pragma: allowlist secret
+  JWT_ISSUER: brainstorm-frontend
+  JWT_AUDIENCE: brainstorm-backend
+  AUTH_BRIDGE_SECRET: ${BRAINSTORM_AUTH_BRIDGE_SECRET:-dev-only-bridge-secret-0123456789abcdef} # pragma: allowlist secret
+  # fake: deterministic offline LLM. openai: real models through the LiteLLM service.
+  LLM_MODE: ${LLM_MODE:-fake}
+  OPENAI_BASE_URL: http://litellm:4000/v1
+  OPENAI_API_KEY: ${LITELLM_MASTER_KEY:-sk-dev-brainstorm} # pragma: allowlist secret
+  MODEL_NAME: ${MODEL_NAME:-glm-5.3-flash}
+
 services:
-  app:
+  backend:
     build:
       context: .
       dockerfile: backend/Dockerfile
     env_file:
       - backend/.env.template
-    environment:
-      DATABASE_URL: postgresql+psycopg://brainstorm:brainstorm@postgres:5432/brainstorm # pragma: allowlist secret
-      REDIS_URL: redis://redis:6379/0
+    environment: *backend-env
     ports:
-      - "8000:8000"
+      - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
     depends_on:
+      init:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
+
+  # Migrations and idempotent bootstrap of the development administrator.
+  init:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    command: ["/app/docker/init.sh"]
+    env_file:
+      - backend/.env.template
+    environment:
+      <<: *backend-env
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-admin@example.com}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-brainstorm-admin} # pragma: allowlist secret
+    healthcheck:
+      disable: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    environment:
+      AUTH_URL: http://localhost:${FRONTEND_PORT:-3000}
+      AUTH_SECRET: ${AUTH_SECRET:-dev-only-auth-secret-0123456789abcdef} # pragma: allowlist secret
+      # http: real backend (complete from lot 7b). mock: in-memory demo data.
+      BACKEND_MODE: ${FRONTEND_BACKEND_MODE:-http}
+      BACKEND_URL: http://backend:8000
+      BACKEND_JWT_SECRET: ${BRAINSTORM_JWT_SECRET:-dev-only-jwt-secret-0123456789abcdef} # pragma: allowlist secret
+      BACKEND_JWT_ISSUER: brainstorm-frontend
+      BACKEND_JWT_AUDIENCE: brainstorm-backend
+      AUTH_BRIDGE_SECRET: ${BRAINSTORM_AUTH_BRIDGE_SECRET:-dev-only-bridge-secret-0123456789abcdef} # pragma: allowlist secret
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  litellm:
+    image: docker.litellm.ai/berriai/litellm:v1.106.1
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    environment:
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-dev-brainstorm} # pragma: allowlist secret
+      # Any OpenAI-compatible upstream (another LiteLLM, a provider API...).
+      LLM_UPSTREAM_BASE_URL: ${LLM_UPSTREAM_BASE_URL:-}
+      LLM_UPSTREAM_API_KEY: ${LLM_UPSTREAM_API_KEY:-}
+    volumes:
+      - ./deploy/litellm/config.yaml:/app/config.yaml:ro
+    ports:
+      - "127.0.0.1:${LITELLM_PORT:-4000}:4000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys, urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:4000/health/liveliness', timeout=4).status == 200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      start_period: 60s
+      retries: 10
 
   postgres:
     image: postgres:17
@@ -23,7 +108,7 @@ services:
       POSTGRES_USER: brainstorm
       POSTGRES_PASSWORD: brainstorm # pragma: allowlist secret
     ports:
-      - "5432:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U brainstorm -d brainstorm"]
       interval: 5s
@@ -35,7 +120,12 @@ services:
   redis:
     image: redis:8
     ports:
-      - "6379:6379"
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
 volumes:
   postgres-data:
