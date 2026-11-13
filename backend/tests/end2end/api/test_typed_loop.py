@@ -14,7 +14,7 @@ from brainstorm_agent.services.session_service import SessionService
 from brainstorm_agent.settings import Settings
 
 
-def test_every_stage_accumulates_multiple_free_form_turns(tmp_path):
+def test_every_stage_accumulates_multiple_free_form_turns(tmp_path):  # noqa: C901 - full workflow fixture
     settings = Settings(llm_mode=LLMMode.FAKE, database_url=f"sqlite+pysqlite:///{tmp_path / 'loop.db'}")
     engine = create_engine_from_settings(settings)
     create_all(engine)
@@ -62,6 +62,19 @@ def test_every_stage_accumulates_multiple_free_form_turns(tmp_path):
                     ]
                     for name in contract.required_fields
                 }
+            if stage is Stage.STAGE_7_DELIVERY_SLICING:
+                fields = {
+                    "slices": [
+                        {
+                            "id": "slice-0",
+                            "goal": "Walking skeleton and report export",
+                            "backlog_item_ids": ["mvp_user_stories", "risk_spikes", "cross_cutting_work"],
+                            "integration_scenarios": [
+                                {"ears": "WHEN export requested THE SYSTEM SHALL return reports"},
+                            ],
+                        },
+                    ],
+                }
             first_name = next(iter(fields))
             initial_fields = {first_name: fields.pop(first_name)}
             if stage is Stage.STAGE_5_RISK_STORMING:
@@ -98,7 +111,8 @@ def test_every_stage_accumulates_multiple_free_form_turns(tmp_path):
                 ),
             ])
             first = service.process_user_message(session_id=session_id, content="Voici mon contexte initial")
-            assert not first.stage_clear_enough
+            if stage is not Stage.STAGE_7_DELIVERY_SLICING:
+                assert not first.stage_clear_enough
             second = service.process_user_message(
                 session_id=session_id,
                 content="Voici les réponses aux questions",
@@ -111,8 +125,8 @@ def test_every_stage_accumulates_multiple_free_form_turns(tmp_path):
                 .stage_states[stage]
                 .extracted_fields.model_dump(exclude_none=True)
             )
-        assert len(service.list_documents(session_id)) == 14
-        assert len(service.list_messages(session_id)) == 29
+        assert len(service.list_documents(session_id)) == 16
+        assert len(service.list_messages(session_id)) == 33
 
 
 def test_vague_pitch_blocks_until_clarification_and_logs_answer(tmp_path):

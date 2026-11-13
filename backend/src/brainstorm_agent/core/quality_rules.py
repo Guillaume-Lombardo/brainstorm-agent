@@ -6,6 +6,7 @@ import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from brainstorm_agent.core.delivery import delivery_checks
 from brainstorm_agent.core.enums import Stage
 
 if TYPE_CHECKING:
@@ -163,3 +164,25 @@ STAGE_RULES: dict[Stage, tuple[Rule, ...]] = {
         ),
     ),
 }
+
+# Each predicate uses the same typed domain evaluator as exports.
+DELIVERY_RULE_MESSAGES = {
+    "walking_skeleton": "Include exactly one slice-0 walking skeleton with shared contracts.",
+    "mvp_assignment": "Assign every MVP backlog item to exactly one slice.",
+    "backlog_references": "Slice backlog references must exist in stage 6.",
+    "acyclic_dependencies": "Dependencies must reference existing slices and form an acyclic graph.",
+    "contract_ownership": "Every contract needs one owner; every consumed contract must exist.",
+    "integration_scenarios": "Every slice needs at least one complete GWT or EARS integration scenario.",
+    "cross_cutting_foundation": "Assign all cross-cutting backlog work exactly once to slice-0.",
+    "domain_ownership": "Own distinct stage 3 aggregates, or stage 2 capabilities only when stage 3 is not relevant.",
+}
+
+
+def _delivery_rule(rule_id: str) -> Rule:
+    def condition(fields: dict[str, Any], previous: dict[str, Any]) -> bool:
+        return delivery_checks(fields, previous)[rule_id]
+
+    return Rule(rule_id, condition, DELIVERY_RULE_MESSAGES[rule_id])
+
+
+STAGE_RULES[Stage.STAGE_7_DELIVERY_SLICING] = tuple(_delivery_rule(key) for key in DELIVERY_RULE_MESSAGES)

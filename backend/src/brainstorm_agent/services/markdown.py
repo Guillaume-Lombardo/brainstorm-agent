@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING
 from zoneinfo import ZoneInfo
 
 from brainstorm_agent.core.elicitation import selected_questions
+from brainstorm_agent.core.stage_contracts import DeliveryFields
+from brainstorm_agent.services.delivery import render_delivery
 
 if TYPE_CHECKING:
     from brainstorm_agent.core.enums import Stage
@@ -173,5 +175,7 @@ class MarkdownRenderer:
             f"- Stage clear enough: {'yes' if validation.stage_is_clear_enough else 'no'}",
             f"- Reason: {validation.transition_decision_reason}",
         ]
+        if isinstance(analysis.extracted_fields, DeliveryFields):
+            lines.extend(["", render_delivery(analysis.extracted_fields)])
         rendered = "\n".join(lines)
         return template.replace("{document}", rendered) if "{document}" in template else rendered

@@ -168,7 +168,9 @@ class FakeBrainstormLLM:
             extracted = self._extract_by_alias(normalized_lines, field_aliases)
             if extracted is None:
                 continue
-            if field_name == "event_storming_relevant":
+            if field_name == "slices":
+                extracted_fields[field_name] = json.loads(extracted)
+            elif field_name == "event_storming_relevant":
                 extracted_fields[field_name] = extracted.lower() in {"true", "yes", "1", "relevant"}
             elif field_name == "risks_by_category":
                 extracted_fields[field_name] = self._parse_risk_lines(extracted)

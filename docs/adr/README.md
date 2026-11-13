@@ -26,4 +26,5 @@
 - [0006-monorepo-layout](0006-monorepo-layout.md)
 - [0007-typed-stage-contracts-and-structured-outputs](0007-typed-stage-contracts-and-structured-outputs.md)
 
+- [0008-delivery-slicing-stage](0008-delivery-slicing-stage.md)
 - [0009-user-authentication](0009-user-authentication.md)

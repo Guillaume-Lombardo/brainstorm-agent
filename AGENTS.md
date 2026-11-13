@@ -33,6 +33,7 @@ The business workflow is fixed and ordered:
 5. `stage_4_impact_mapping`
 6. `stage_5_risk_storming`
 7. `stage_6_backlog_synthesis`
+8. `stage_7_delivery_slicing`
 
 Each turn must produce:
 

@@ -13,6 +13,7 @@ The service guides a user through a fixed workflow:
 5. Impact mapping
 6. Risk storming / pre-mortem
 7. Backlog synthesis
+8. Delivery slicing
 
 On every assistant turn it returns:
 
@@ -590,3 +591,16 @@ D5 defaults are proposals in assumptions (`default_field`, `to_confirm`), allowe
 no default populates stage fields or satisfies a required gate. Critical fields never default.
 Existing saved states load with empty new metadata; older incomplete backlog items need refinement
 before passing the stricter gate. No database migration or new environment setting is required.
+
+### Delivery slicing domain exports
+
+The final eighth stage produces `DeliveryFields.slices`: a `slice-0` walking skeleton and vertical
+slices with backlog ids, owned domain, provided/consumed contracts, dependencies, integration
+scenarios (Given/When/Then or EARS) and stubs. Slice lists replace completely on updates.
+Domain checks enforce MVP assignment, contract ownership, cross-cutting work in slice-0 and an
+acyclic graph. Waves derive from explicit dependencies, contract owners and the slice-0 foundation.
+`services.delivery.export_slice_specs(fields, previous_fields)` returns filename-to-Markdown contents;
+`export_backlog_json(fields, previous_fields)` returns JSON including backlog, dependencies and waves.
+Both reject invalid plans. `previous_fields` maps stage string identifiers to serialized fields.
+HTTP export endpoints are delivered separately in lot 6. Fake mode accepts `slices: <JSON array>`
+or scripted typed responses. No environment variables or SQL migration are introduced.

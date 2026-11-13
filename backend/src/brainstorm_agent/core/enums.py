@@ -16,12 +16,14 @@ class Stage(StrEnum):
     STAGE_5_RISK_STORMING = "stage_5_risk_storming"
     STAGE_6_BACKLOG_SYNTHESIS = "stage_6_backlog_synthesis"
 
+    STAGE_7_DELIVERY_SLICING = "stage_7_delivery_slicing"
+
     @classmethod
     def ordered(cls) -> tuple[Stage, ...]:
         """Return the full ordered workflow.
 
         Returns:
-            tuple[Stage, ...]: Ordered stages from pitch to backlog synthesis.
+            tuple[Stage, ...]: Ordered stages from pitch to delivery slicing.
         """
         return (
             cls.STAGE_0_PITCH,
@@ -31,6 +33,7 @@ class Stage(StrEnum):
             cls.STAGE_4_IMPACT_MAPPING,
             cls.STAGE_5_RISK_STORMING,
             cls.STAGE_6_BACKLOG_SYNTHESIS,
+            cls.STAGE_7_DELIVERY_SLICING,
         )
 
     def next_stage(self) -> Stage | None:
@@ -60,6 +63,7 @@ class Stage(StrEnum):
             Stage.STAGE_4_IMPACT_MAPPING: "Stage 4 - Impact Mapping",
             Stage.STAGE_5_RISK_STORMING: "Stage 5 - Risk Storming and Pre-mortem",
             Stage.STAGE_6_BACKLOG_SYNTHESIS: "Stage 6 - Backlog Synthesis",
+            Stage.STAGE_7_DELIVERY_SLICING: "Stage 7 - Delivery Slicing",
         }
         return labels[self]
 

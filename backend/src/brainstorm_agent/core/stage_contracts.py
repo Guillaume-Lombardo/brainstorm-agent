@@ -7,6 +7,7 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from brainstorm_agent.core.delivery import DeliverySlice  # noqa: TC001 - Pydantic runtime schema
 from brainstorm_agent.core.enums import Stage
 
 
@@ -269,6 +270,16 @@ class BacklogFields(StageFields):
     )
 
 
+class DeliveryFields(StageFields):
+    """Stage 7 contracts; waves are derived by the domain, never supplied by a model."""
+
+    slices: list[DeliverySlice] | None = Field(
+        default=None,
+        description="Vertical slices including slice-0 walking skeleton and shared contracts. Replace the complete slice list on update.",
+        json_schema_extra={"gate_required": True},
+    )
+
+
 STAGE_MODELS: dict[Stage, type[StageFields]] = {
     Stage.STAGE_0_PITCH: PitchFields,
     Stage.STAGE_1_PROBLEM_FRAMING: ProblemFields,
@@ -277,6 +288,7 @@ STAGE_MODELS: dict[Stage, type[StageFields]] = {
     Stage.STAGE_4_IMPACT_MAPPING: ImpactFields,
     Stage.STAGE_5_RISK_STORMING: RiskFields,
     Stage.STAGE_6_BACKLOG_SYNTHESIS: BacklogFields,
+    Stage.STAGE_7_DELIVERY_SLICING: DeliveryFields,
 }
 
 
@@ -302,6 +314,7 @@ STAGE_CONTRACTS = {
     for stage, model in STAGE_MODELS.items()
 }
 STAGE_FIELD_ALIASES: dict[Stage, dict[str, tuple[str, ...]]] = {
+    Stage.STAGE_7_DELIVERY_SLICING: {"slices": ("slices",)},
     Stage.STAGE_0_PITCH: {
         "pitch_summary": ("pitch", "summary"),
         "clear_points": ("clear", "clear_points"),
