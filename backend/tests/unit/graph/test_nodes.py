@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+from sqlalchemy import String
 
 from brainstorm_agent.core.enums import Stage
 from brainstorm_agent.core.models import (
@@ -11,7 +12,8 @@ from brainstorm_agent.core.models import (
     StageState,
 )
 from brainstorm_agent.core.stage_contracts import BacklogFields, BacklogItem, ProblemFields
-from brainstorm_agent.graph.nodes import decide_transition, merge_analysis
+from brainstorm_agent.graph.nodes import apply_stage_rules, decide_transition, merge_analysis
+from brainstorm_agent.persistence.models import OpenQuestionRecord
 
 
 def test_patch_preserves_fields_ids_and_resolves_questions():
@@ -66,6 +68,25 @@ def test_identified_backlog_patch_preserves_empty_lists_and_retracts_by_id():
     result = merge_analysis(previous=previous, patch=patch).extracted_fields.model_dump()["mvp_user_stories"]
     assert [item["id"] for item in result] == ["story-1"]
     assert result[0]["statement"] == "Revised"
+
+
+def test_gate_questions_fit_the_persisted_open_question_id():
+    analysis = AssistantAnalysis(stage=Stage.STAGE_1_PROBLEM_FRAMING, summary="", assistant_message="")
+    result = apply_stage_rules({
+        "session_id": "s",
+        "current_stage": Stage.STAGE_1_PROBLEM_FRAMING.value,
+        "user_message": "",
+        "session_state": {},
+        "analysis": analysis.model_dump(mode="json"),
+    })
+    gate_ids = [item.id for item in AssistantAnalysis.model_validate(result["analysis"]).open_questions]
+    id_type = OpenQuestionRecord.__table__.c.id.type
+    assert isinstance(id_type, String)
+    max_length = id_type.length
+    assert max_length is not None
+    assert gate_ids
+    assert all(item.startswith("gate:") and len(item) <= max_length for item in gate_ids)
+    assert len(set(gate_ids)) == len(gate_ids)
 
 
 def test_clarified_uncertainty_disappears_from_current_state():
