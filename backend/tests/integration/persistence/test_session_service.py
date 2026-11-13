@@ -282,7 +282,7 @@ def test_budget_keeps_all_questions_and_metadata_in_overview(tmp_path: Path) -> 
                     )
                     for i in range(5)
                 ],
-            )
+            ),
         ],
     )
     with create_session_factory(engine)() as db:
