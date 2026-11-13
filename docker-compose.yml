@@ -23,12 +23,25 @@ x-backend-env: &backend-env
   JWT_AUDIENCE: brainstorm-backend
   AUTH_BRIDGE_SECRET: ${BRAINSTORM_AUTH_BRIDGE_SECRET:-dev-only-bridge-secret-0123456789abcdef} # pragma: allowlist secret
   # fake: deterministic offline LLM. openai: real models through the LiteLLM service.
+  SEARCH_PROVIDER: ${SEARCH_PROVIDER:-none}
+  SEARXNG_BASE_URL: http://searxng:8080
   LLM_MODE: ${LLM_MODE:-fake}
   OPENAI_BASE_URL: http://litellm:4000/v1
   OPENAI_API_KEY: ${LITELLM_MASTER_KEY:-sk-dev-brainstorm} # pragma: allowlist secret
   MODEL_NAME: ${MODEL_NAME:-glm-5.3-flash}
 
 services:
+  searxng:
+    image: searxng/searxng:2026.11.13-8a53a6aa5
+    restart: unless-stopped
+    environment:
+      SEARXNG_SECRET: ${BRAINSTORM_SEARXNG_SECRET:-dev-only-searxng-secret} # pragma: allowlist secret
+    volumes:
+      - ./deploy/searxng/settings.yml:/etc/searxng/settings.yml:ro
+    security_opt:
+      - no-new-privileges:true
+    profiles: ["search"]
+
   backend:
     build:
       context: .

@@ -91,6 +91,40 @@ export class HttpBackend {
     this.fetchImpl = options.fetchImpl ?? fetch;
   }
 
+  /** Owner-scoped benchmark history. */
+  async researchHistory(caller: Caller, sessionId: string) {
+    return this.json({ caller }, "get", "/api/v1/sessions/{session_id}/research", {
+      path: { session_id: sessionId },
+    });
+  }
+
+  /** Stream the bounded asynchronous research operation. */
+  async research(caller: Caller, sessionId: string, signal?: AbortSignal) {
+    return this.call({ caller }, "post", "/api/v1/sessions/{session_id}/research", {
+      path: { session_id: sessionId },
+      accept: "text/event-stream",
+      signal,
+    });
+  }
+
+  /** Save explicit feature selection. */
+  async selectResearch(
+    caller: Caller,
+    sessionId: string,
+    benchmarkId: string,
+    selectedIds: string[],
+  ) {
+    return this.json(
+      { caller },
+      "patch",
+      "/api/v1/sessions/{session_id}/research/{benchmark_id}/selection",
+      {
+        path: { session_id: sessionId, benchmark_id: benchmarkId },
+        body: { selected_ids: selectedIds },
+      },
+    );
+  }
+
   /** Check a password; `null` when the backend rejects the credentials. */
   async verifyCredentials(email: string, password: string): Promise<UserResponse | null> {
     try {

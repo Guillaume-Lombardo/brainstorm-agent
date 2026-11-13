@@ -311,3 +311,17 @@ Reuse lot 2 validators and elicitation metadata; exports delegate to lot 4 deliv
 - [ ] Frontend (lot 7+): `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`, `pnpm e2e`
 - [ ] `pre-commit run --all-files`
 - [ ] Dead-code pass, docs and `.env.template` in sync, ADR written when required
+
+### Lot 10: Similar products research
+
+Validated scope: optional owner-triggered benchmark from stage 1, unchanged gates and stage order.
+Snippet-only search through a configurable provider port; bounded typed query generation and synthesis;
+strict evidence allowlist; versioned persistence and explicit feature selection; stage 2 context,
+Markdown/JSON exports, French workspace panel and internal SearXNG deployment.
+
+- [x] Implement and test all provider adapters and startup configuration validation.
+- [x] Persist benchmark versions, owner-scoped streaming API and explicit selection.
+- [x] Render Benchmark, export it, and supply selected candidates to stage 2.
+- [x] Deliver frontend panel and fake end-to-end coverage.
+- [x] Configure pinned internal SearXNG, document settings and run Docker smoke.
+- [x] Complete checks, review loop, rebase and ready PR (no merge).

@@ -345,6 +345,99 @@
         "title": "BacklogItem",
         "type": "object"
       },
+      "Benchmark": {
+        "description": "Immutable execution result with separately editable owner selection.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "queries": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Queries",
+            "type": "array"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/SearchResult"
+            },
+            "title": "Results",
+            "type": "array"
+          },
+          "selected_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Selected Ids",
+            "type": "array"
+          },
+          "synthesis": {
+            "$ref": "#/components/schemas/ResearchSynthesis"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "queries",
+          "results",
+          "synthesis"
+        ],
+        "title": "Benchmark",
+        "type": "object"
+      },
+      "CandidateFeature": {
+        "additionalProperties": false,
+        "description": "An inferred recommendation requiring explicit owner selection.",
+        "properties": {
+          "evidence_urls": {
+            "items": {
+              "format": "uri",
+              "maxLength": 2083,
+              "minLength": 1,
+              "type": "string"
+            },
+            "title": "Evidence Urls",
+            "type": "array"
+          },
+          "feature": {
+            "title": "Feature",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "justification": {
+            "title": "Justification",
+            "type": "string"
+          },
+          "products": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Products",
+            "type": "array"
+          },
+          "recommendation": {
+            "$ref": "#/components/schemas/Recommendation"
+          }
+        },
+        "required": [
+          "feature",
+          "products",
+          "recommendation",
+          "justification",
+          "evidence_urls"
+        ],
+        "title": "CandidateFeature",
+        "type": "object"
+      },
       "Clarification": {
         "description": "Explicit answer to an identified question.",
         "properties": {
@@ -1047,6 +1140,24 @@
           "statement"
         ],
         "title": "FactItem",
+        "type": "object"
+      },
+      "FeatureSelection": {
+        "description": "Replacement selection for a specific benchmark version.",
+        "properties": {
+          "selected_ids": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 40,
+            "title": "Selected Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "selected_ids"
+        ],
+        "title": "FeatureSelection",
         "type": "object"
       },
       "FieldPatch": {
@@ -2371,6 +2482,65 @@
         "title": "ProblemFields",
         "type": "object"
       },
+      "Product": {
+        "additionalProperties": false,
+        "description": "Sourced observations of an existing product.",
+        "properties": {
+          "evidence_urls": {
+            "items": {
+              "format": "uri",
+              "maxLength": 2083,
+              "minLength": 1,
+              "type": "string"
+            },
+            "title": "Evidence Urls",
+            "type": "array"
+          },
+          "key_features": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Key Features",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "pricing": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pricing"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "url": {
+            "format": "uri",
+            "maxLength": 2083,
+            "minLength": 1,
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "url",
+          "summary",
+          "key_features",
+          "pricing",
+          "evidence_urls"
+        ],
+        "title": "Product",
+        "type": "object"
+      },
       "QuestionPriority": {
         "description": "Ordered elicitation topics.",
         "enum": [
@@ -2404,6 +2574,60 @@
           "message"
         ],
         "title": "ReadinessItem",
+        "type": "object"
+      },
+      "Recommendation": {
+        "description": "Owner-facing recommendation, never an automatic decision.",
+        "enum": [
+          "adopt",
+          "adapt",
+          "skip"
+        ],
+        "title": "Recommendation",
+        "type": "string"
+      },
+      "ResearchSynthesis": {
+        "additionalProperties": false,
+        "description": "Untrusted model synthesis, checked against actual search evidence.",
+        "properties": {
+          "assumptions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Assumptions",
+            "type": "array"
+          },
+          "features": {
+            "items": {
+              "$ref": "#/components/schemas/CandidateFeature"
+            },
+            "maxItems": 40,
+            "title": "Features",
+            "type": "array"
+          },
+          "open_questions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Open Questions",
+            "type": "array"
+          },
+          "products": {
+            "items": {
+              "$ref": "#/components/schemas/Product"
+            },
+            "maxItems": 20,
+            "title": "Products",
+            "type": "array"
+          }
+        },
+        "required": [
+          "products",
+          "features",
+          "assumptions",
+          "open_questions"
+        ],
+        "title": "ResearchSynthesis",
         "type": "object"
       },
       "ReviewAction": {
@@ -2575,6 +2799,38 @@
           "action"
         ],
         "title": "RiskItem",
+        "type": "object"
+      },
+      "SearchResult": {
+        "description": "Normalized snippet; pages are never fetched.",
+        "properties": {
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "snippet": {
+            "title": "Snippet",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "url": {
+            "format": "uri",
+            "maxLength": 2083,
+            "minLength": 1,
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "url",
+          "snippet",
+          "provider"
+        ],
+        "title": "SearchResult",
         "type": "object"
       },
       "SectionComment": {
@@ -4737,6 +4993,248 @@
         "summary": "Post Message Stream",
         "tags": [
           "sessions"
+        ]
+      }
+    },
+    "/api/v1/sessions/{session_id}/research": {
+      "get": {
+        "description": "Read owned benchmark history and configured availability.\n\nArgs:\n    session_id (str): Owned session.\n    service (Service): Application service.\n\nReturns:\n    dict: Availability and versioned results.",
+        "operationId": "research_history_api_v1_sessions__session_id__research_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Research History Api V1 Sessions  Session Id  Research Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Research History",
+        "tags": [
+          "application"
+        ]
+      },
+      "post": {
+        "description": "Stream research completion while its async network calls execute.\n\nArgs:\n    session_id (str): Owned session.\n    service (Service): Application service.\n\nReturns:\n    StreamingResponse: Start and terminal SSE events.",
+        "operationId": "research_products_api_v1_sessions__session_id__research_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Research Products",
+        "tags": [
+          "application"
+        ]
+      }
+    },
+    "/api/v1/sessions/{session_id}/research/{benchmark_id}/selection": {
+      "patch": {
+        "description": "Persist explicit owner selection.\n\nArgs:\n    session_id (str): Owned session.\n    benchmark_id (str): Execution id.\n    payload (FeatureSelection): Selected candidate ids.\n    service (Service): Application service.\n\nReturns:\n    Benchmark: Updated execution.",
+        "operationId": "select_research_features_api_v1_sessions__session_id__research__benchmark_id__selection_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "benchmark_id",
+            "required": true,
+            "schema": {
+              "title": "Benchmark Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeatureSelection"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Benchmark"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Select Research Features",
+        "tags": [
+          "application"
         ]
       }
     },

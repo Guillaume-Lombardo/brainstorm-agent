@@ -40,6 +40,7 @@ from brainstorm_agent.core.models import (
     AssistantTurnOutput,
     BrainstormSessionState,
     ConversationTurn,
+    DecisionItem,
     HumanReviewRecord,
     PendingHumanReview,
     SectionComment,
@@ -48,12 +49,13 @@ from brainstorm_agent.core.models import (
     StageValidationResult,
     StepDocument,
 )
+from brainstorm_agent.core.research import Benchmark, FeatureSelection, escape_markdown, render_benchmark
 from brainstorm_agent.core.stage_contracts import DeliveryFields
 from brainstorm_agent.exceptions import ConflictError, LLMResponseError, NotFoundError
 from brainstorm_agent.graph.builder import build_turn_graph
 from brainstorm_agent.graph.nodes import apply_stage_rules
 from brainstorm_agent.logging import get_logger
-from brainstorm_agent.persistence.models import BOOTSTRAP_USER_ID, SessionRecord
+from brainstorm_agent.persistence.models import BOOTSTRAP_USER_ID, BenchmarkRecord, SessionRecord
 from brainstorm_agent.persistence.repositories import (
     DocumentRepository,
     HumanReviewRepository,
@@ -67,6 +69,8 @@ from brainstorm_agent.services.llm_client import BrainstormLLM, OpenAICompatible
 from brainstorm_agent.services.locks import NoopSessionLockManager, SessionLockManager
 from brainstorm_agent.services.markdown import MarkdownRenderer
 from brainstorm_agent.services.prompt_loader import PromptLoader
+from brainstorm_agent.services.research import execute_research
+from brainstorm_agent.services.search import SearchProviderName
 from brainstorm_agent.services.users import UserService
 
 if TYPE_CHECKING:
@@ -225,6 +229,11 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
                 self.graph = build_turn_graph(llm=self.llm, renderer=self.renderer)
             comments = [item for item in state.comments if not item.consumed]
             context = content
+            if current_stage is Stage.STAGE_2_USER_STORY_MAPPING:
+                context += (
+                    "\nOwner-selected benchmark candidates (not validated stories):\n"
+                    + self.benchmark_context(session_id)
+                )
             if comments:
                 context += "\n\nOwner section comments:\n" + "\n".join(
                     f"[{item.stage.value}/{item.section}] {item.body}" for item in comments
@@ -261,6 +270,12 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
                 stage_is_clear_enough=output.stage_clear_enough,
                 transition_decision_reason=output.transition_decision_reason,
             )
+            if output.processed_stage is Stage.STAGE_1_PROBLEM_FRAMING:
+                self._render_benchmark_stage(processed_stage_state, self.list_benchmarks(session_id))
+                output.decisions, output.step_markdown = (
+                    processed_stage_state.decisions,
+                    processed_stage_state.latest_markdown,
+                )
             state.stage_states[output.processed_stage.value] = processed_stage_state
             proposed_next_stage = output.next_stage
             if (
@@ -520,6 +535,7 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
         """
         overview = self.get_session(session_id)
         return {
+            "benchmarks": [item.model_dump(mode="json") for item in self.list_benchmarks(session_id)],
             "session": overview.model_dump(mode="json"),
             "messages": [item.model_dump(mode="json") for item in self.list_messages(session_id)],
             "documents": [item.model_dump(mode="json") for item in self.list_documents(session_id)],
@@ -765,6 +781,8 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
                 analysis=analysis,
                 validation=validation,
             )
+            if stage is Stage.STAGE_1_PROBLEM_FRAMING:
+                self._render_benchmark_stage(current, self.list_benchmarks(session_id))
             state.stage_states[stage.value] = current
             state.pending_human_review = (
                 PendingHumanReview(
@@ -1033,3 +1051,203 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
                 task.cancel()
                 with suppress(asyncio.CancelledError):
                     await task
+
+    def list_benchmarks(self, session_id: str) -> list[Benchmark]:
+        """Read owner-scoped execution history.
+
+        Args:
+            session_id (str): Owned session.
+
+        Returns:
+            list[Benchmark]: Ordered versions.
+        """
+        self._require_owned(session_id)
+        rows = self.db_session.scalars(
+            select(BenchmarkRecord)
+            .where(BenchmarkRecord.session_id == session_id)
+            .order_by(BenchmarkRecord.version),
+        ).all()
+        return [Benchmark.model_validate(row.payload) for row in rows]
+
+    def benchmark_context(self, session_id: str) -> str:
+        """Return only explicitly selected candidate descriptions.
+
+        Args:
+            session_id (str): Owned session.
+
+        Returns:
+            str: Candidate context for stage 2.
+        """
+        history = self.list_benchmarks(session_id)
+        if not history:
+            return ""
+        latest = history[-1]
+        return "\n".join(item.feature for item in latest.synthesis.features if item.id in latest.selected_ids)
+
+    def prepare_research(self, session_id: str) -> None:
+        """Require an active owned framing session and configured search.
+
+        Args:
+            session_id (str): Owned session.
+
+        Raises:
+            ConflictError: Search is unavailable or framing has not begun.
+        """
+        state = self.sessions.to_state(self._require_owned(session_id))
+        if (
+            state.archived
+            or state.current_stage is Stage.STAGE_0_PITCH
+            or self.settings.search_provider is SearchProviderName.NONE
+        ):
+            raise ConflictError(  # noqa: TRY003 - Actionable application error
+                "Research requires an active session at stage 1 or later and a search provider.",
+            )
+
+    async def research(self, session_id: str) -> Benchmark:
+        """Run a bounded execution under the existing session lock.
+
+        Args:
+            session_id (str): Owned session.
+
+        Returns:
+            Benchmark: Committed evidence and synthesis.
+
+        Raises:
+            ConflictError: Stage 1 has no framing yet.
+        """
+        self.prepare_research(session_id)
+        with self.lock_manager.lock(session_id):
+            self.prepare_research(session_id)
+            state = self.sessions.to_state(self._require_owned(session_id))
+            stage = state.stage_states.get(Stage.STAGE_1_PROBLEM_FRAMING.value)
+            if stage is None:
+                raise ConflictError("Provide stage 1 framing before researching products.")  # noqa: TRY003 - Sanitized actionable application error
+            history = self.list_benchmarks(session_id)
+            # Reserve time for persistence and release before the Redis lease can expire.
+            async with asyncio.timeout(self.settings.redis_lock_timeout_seconds * 0.8):
+                benchmark = await execute_research(self, stage, len(history) + 1)
+            self.db_session.add(
+                BenchmarkRecord(
+                    id=benchmark.id,
+                    session_id=session_id,
+                    version=benchmark.version,
+                    payload=benchmark.model_dump(mode="json"),
+                ),
+            )
+            self._benchmark_document(session_id, state, [*history, benchmark])
+            self.db_session.commit()
+            return benchmark
+
+    def select_features(self, session_id: str, benchmark_id: str, selection: FeatureSelection) -> Benchmark:
+        """Replace the latest execution's owner selection atomically.
+
+        Args:
+            session_id (str): Owned session.
+            benchmark_id (str): Latest execution identifier.
+            selection (FeatureSelection): Explicit candidate ids.
+
+        Returns:
+            Benchmark: Persisted selection.
+
+        Raises:
+            NotFoundError: Execution is absent or belongs to another session.
+            ConflictError: Stale version or unknown candidate ids.
+        """
+        self.prepare_research(session_id)
+        with self.lock_manager.lock(session_id):
+            history = self.list_benchmarks(session_id)
+            if not any(item.id == benchmark_id for item in history):
+                raise NotFoundError("Benchmark not found.")  # noqa: TRY003 - Sanitized actionable application error
+            latest = history[-1]
+            if latest.id != benchmark_id or not set(selection.selected_ids) <= {
+                item.id for item in latest.synthesis.features
+            }:
+                raise ConflictError("Select known features from the latest benchmark version.")  # noqa: TRY003 - Sanitized actionable application error
+            latest.selected_ids = list(dict.fromkeys(selection.selected_ids))
+            row = self.db_session.get(BenchmarkRecord, benchmark_id)
+            if row is None:
+                message = "Benchmark not found."
+                raise NotFoundError(message)
+            row.payload = latest.model_dump(mode="json")
+            state = self.sessions.to_state(self._require_owned(session_id))
+            self._benchmark_document(session_id, state, history)
+            self.db_session.commit()
+            return latest
+
+    def _benchmark_document(
+        self,
+        session_id: str,
+        state: BrainstormSessionState,
+        history: list[Benchmark],
+    ) -> None:
+        """Create an immutable framing document version without changing its gate.
+
+        Args:
+            session_id (str): Owned session.
+            state (BrainstormSessionState): Current state.
+            history (list[Benchmark]): Execution history including new selection.
+        """
+        stage = Stage.STAGE_1_PROBLEM_FRAMING
+        current = state.stage_states[stage.value]
+        self._render_benchmark_stage(current, history)
+        for downstream in state.stage_states.values():
+            if Stage.ordered().index(downstream.stage) > Stage.ordered().index(stage):
+                downstream.stale = True
+        versions = [item.version for item in self.documents.list_all(session_id) if item.stage is stage]
+        self.documents.create_version(
+            StepDocument(
+                session_id=session_id,
+                stage=stage,
+                version=max(versions, default=0) + 1,
+                markdown=current.latest_markdown,
+                summary=current.summary,
+                facts=current.facts,
+                assumptions=current.assumptions,
+                decisions=current.decisions,
+                uncertainties=current.uncertainties,
+                open_questions=current.open_questions,
+                risks=current.risks,
+            ),
+        )
+        self.sessions.save_state(session_id, state)
+
+    def _render_benchmark_stage(self, current: StageState, history: list[Benchmark]) -> None:
+        """Reconcile explicit selections and regenerate the complete framing document.
+
+        Args:
+            current (StageState): Mutable framing state.
+            history (list[Benchmark]): Ordered benchmark versions.
+        """
+        if not history:
+            return
+        marker = "Owner-selected benchmark candidate"
+        latest = history[-1]
+        current.decisions = [item for item in current.decisions if item.rationale != marker]
+        current.decisions.extend(
+            DecisionItem(id=item.id, statement=item.feature, rationale=marker)
+            for item in latest.synthesis.features
+            if item.id in latest.selected_ids
+        )
+        analysis = AssistantAnalysis.model_validate({
+            key: value
+            for key, value in current.model_dump().items()
+            if key in AssistantAnalysis.model_fields and key != "partial_fields"
+        })
+        analysis.decisions = [
+            item.model_copy(update={"statement": escape_markdown(item.statement)})
+            if item.rationale == marker
+            else item
+            for item in analysis.decisions
+        ]
+        validation = StageValidationResult(
+            stage=current.stage,
+            coverage=current.coverage,
+            readiness=current.readiness,
+            stage_is_clear_enough=current.stage_is_clear_enough,
+            transition_decision_reason=current.transition_decision_reason,
+        )
+        current.latest_markdown = self.renderer.render(
+            stage=current.stage,
+            analysis=analysis,
+            validation=validation,
+        ) + render_benchmark(history)

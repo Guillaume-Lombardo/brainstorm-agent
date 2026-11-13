@@ -28,6 +28,7 @@ const env = {
   REDIS_URL: "redis://127.0.0.1:1/0",
   RATE_LIMIT_ENABLED: "false",
   LLM_MODE: "fake",
+  SEARCH_PROVIDER: "fake",
   ENABLE_AUTH: "true",
   AUTH_MODE: "jwt",
   JWT_SECRET_KEY: E2E_SECRETS.jwtSecret,

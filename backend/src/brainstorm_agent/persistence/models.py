@@ -179,3 +179,15 @@ class HumanReviewDecisionRecord(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
 
     session: Mapped[SessionRecord] = relationship(back_populates="human_reviews")
+
+
+class BenchmarkRecord(Base):
+    """Versioned normalized search evidence and owner selection."""
+
+    __tablename__ = "benchmarks"
+    __table_args__ = (UniqueConstraint("session_id", "version"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    session_id: Mapped[str] = mapped_column(ForeignKey("sessions.id", ondelete="CASCADE"), index=True)
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    payload: Mapped[dict] = mapped_column(JSON, nullable=False)
