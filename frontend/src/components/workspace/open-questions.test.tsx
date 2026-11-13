@@ -26,6 +26,23 @@ describe("OpenQuestions", () => {
     expect(screen.getByRole("button", { name: "No" })).toBeDisabled();
   });
 
+  it("wraps a long option inside the panel instead of overflowing it", () => {
+    const option = "Immediate booking for members, approval only for outside associations";
+    render(
+      <OpenQuestions
+        questions={[questionFixture({ options: [option], recommended_option: option })]}
+        disabled={false}
+        onAnswer={vi.fn()}
+      />,
+    );
+    // Buttons default to one fixed-height line: the panel would clip a long option.
+    expect(screen.getByRole("button", { name: /^Immediate booking/ })).toHaveClass(
+      "h-auto",
+      "max-w-full",
+      "whitespace-normal",
+    );
+  });
+
   it("shows an empty state", () => {
     render(<OpenQuestions questions={[]} disabled={false} onAnswer={vi.fn()} />);
     expect(screen.getByText("No open question for now.")).toBeInTheDocument();
