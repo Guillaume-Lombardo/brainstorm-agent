@@ -4,6 +4,7 @@ import pytest
 
 from brainstorm_agent.core.enums import Stage
 from brainstorm_agent.core.quality_rules import STAGE_RULES, reference_catalog
+from tests.unit.core.test_delivery import DELIVERY_CASES
 
 S = Stage
 PREVIOUS = {
@@ -91,7 +92,7 @@ def test_each_rule_accepts_and_rejects(stage, rule_id, valid, invalid):
 def test_all_registered_rules_are_tested():
     assert {(stage, rule.id) for stage, rules in STAGE_RULES.items() for rule in rules} == {
         (stage, name) for stage, name, _, _ in CASES
-    }
+    } | {(S.STAGE_7_DELIVERY_SLICING, name) for _, name in DELIVERY_CASES}
 
 
 @pytest.mark.parametrize("key", ["objective", "definition_of_done", "link"])

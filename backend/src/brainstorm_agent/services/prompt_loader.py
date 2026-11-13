@@ -87,6 +87,7 @@ class PromptLoader:
             Stage.STAGE_4_IMPACT_MAPPING: "stages/stage-4-impact-mapping.md",
             Stage.STAGE_5_RISK_STORMING: "stages/stage-5-risk-storming.md",
             Stage.STAGE_6_BACKLOG_SYNTHESIS: "stages/stage-6-backlog-synthesis.md",
+            Stage.STAGE_7_DELIVERY_SLICING: "stages/stage-7-delivery-slicing.md",
         }
         return self._read(stage_map[stage])
 

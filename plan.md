@@ -151,30 +151,30 @@
 
 #### Steps
 
-- [ ] Add `stage_7_delivery_slicing` to the `Stage` enum and ordering (stages are stored as strings:
+- [x] Add `stage_7_delivery_slicing` to the `Stage` enum and ordering (stages are stored as strings:
       no schema migration).
-- [ ] Update the canonical workflow in `AGENTS.md`, `README.md`, `skills/brainstorm-workflow` and the
+- [x] Update the canonical workflow in `AGENTS.md`, `README.md`, `skills/brainstorm-workflow` and the
       ADR index.
-- [ ] Typed stage model:
-  - [ ] slice 0 "walking skeleton": cross-cutting foundation and shared contracts (API schemas,
+- [x] Typed stage model:
+  - [x] slice 0 "walking skeleton": cross-cutting foundation and shared contracts (API schemas,
         events, shared data model);
-  - [ ] per slice: goal, backlog item ids, owned domain (from stage 3 aggregates/sub-systems, or
+  - [x] per slice: goal, backlog item ids, owned domain (from stage 3 aggregates/sub-systems, or
         from stage 2 capabilities when stage 3 was declared not relevant),
         provided and consumed contracts, dependencies, integration scenarios (Given/When/Then or
         EARS), stubs needed to work without the other slices;
-  - [ ] delivery waves derived from the dependency graph.
-- [ ] Stage prompt (`v2/stages/stage-7-delivery-slicing.md`) built from the story map backbone
+  - [x] delivery waves derived from the dependency graph.
+- [x] Stage prompt (`v2/stages/stage-7-delivery-slicing.md`) built from the story map backbone
       (stage 2), event storming (stage 3) and impact map (stage 4).
-- [ ] Deterministic rules:
-  - [ ] every MVP backlog item belongs to exactly one slice;
-  - [ ] the dependency graph is acyclic;
-  - [ ] every contract has exactly one owning slice and every consumed contract exists;
-  - [ ] every slice has at least one integration scenario;
-  - [ ] cross-cutting work is assigned to slice 0.
-- [ ] Rendering: slice table, waves, contract matrix, one spec section per slice.
-- [ ] Export: one Markdown spec per slice and a backlog JSON with dependencies and waves (usable as
+- [x] Deterministic rules:
+  - [x] every MVP backlog item belongs to exactly one slice;
+  - [x] the dependency graph is acyclic;
+  - [x] every contract has exactly one owning slice and every consumed contract exists;
+  - [x] every slice has at least one integration scenario;
+  - [x] cross-cutting work is assigned to slice 0.
+- [x] Rendering: slice table, waves, contract matrix, one spec section per slice.
+- [x] Export: one Markdown spec per slice and a backlog JSON with dependencies and waves (usable as
       parallel work lots).
-- [ ] Evaluation scenarios extended to stage 7.
+- [ ] Evaluation scenarios extended to stage 7 (deferred to lot 3: evaluation harness not yet created).
 
 ### Lot 5: Users, authentication and ownership
 

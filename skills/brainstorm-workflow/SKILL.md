@@ -54,3 +54,21 @@ Every assistant turn must produce:
 - Updated prompt assets
 - Updated validation logic plan
 - ADR reference when stage architecture changes materially
+
+## Canonical stage order
+
+1. `stage_0_pitch`
+2. `stage_1_problem_framing`
+3. `stage_2_user_story_mapping`
+4. `stage_3_event_storming`
+5. `stage_4_impact_mapping`
+6. `stage_5_risk_storming`
+7. `stage_6_backlog_synthesis`
+8. `stage_7_delivery_slicing`
+
+Stage 7 requires a slice-0 walking skeleton, uniquely assigned MVP backlog items, owned domains,
+contracts with unique owners, acyclic dependencies and integration scenarios for every slice.
+Cross-cutting work belongs to slice-0. Domain ownership references stage 3 aggregates, or stage 2
+capabilities only when event storming was declared not relevant. The server derives waves from
+explicit dependencies and consumed-contract owners, with slice-0 preceding other slices.
+See ADR 0008. Export functions live in `services/delivery.py`; HTTP exposure belongs to lot 6.
