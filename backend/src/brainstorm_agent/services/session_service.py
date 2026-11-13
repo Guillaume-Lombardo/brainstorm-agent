@@ -69,7 +69,7 @@ from brainstorm_agent.services.llm_client import BrainstormLLM, OpenAICompatible
 from brainstorm_agent.services.locks import NoopSessionLockManager, SessionLockManager
 from brainstorm_agent.services.markdown import MarkdownRenderer
 from brainstorm_agent.services.prompt_loader import PromptLoader
-from brainstorm_agent.services.research import execute_research
+from brainstorm_agent.services.research import execute_research, framing_context
 from brainstorm_agent.services.search import SearchProviderName
 from brainstorm_agent.services.users import UserService
 
@@ -1119,13 +1119,18 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
         with self.lock_manager.lock(session_id):
             self.prepare_research(session_id)
             state = self.sessions.to_state(self._require_owned(session_id))
-            stage = state.stage_states.get(Stage.STAGE_1_PROBLEM_FRAMING.value)
-            if stage is None:
-                raise ConflictError("Provide stage 1 framing before researching products.")  # noqa: TRY003 - Sanitized actionable application error
+            # Stage 1 has no snapshot until its first turn: the pitch alone is enough to search.
+            stages = [
+                snapshot
+                for name in (Stage.STAGE_0_PITCH, Stage.STAGE_1_PROBLEM_FRAMING)
+                if (snapshot := state.stage_states.get(name.value)) is not None
+            ]
+            if not framing_context(stages):
+                raise ConflictError("Provide a pitch or stage 1 framing before researching products.")  # noqa: TRY003 - Sanitized actionable application error
             history = self.list_benchmarks(session_id)
             # Reserve time for persistence and release before the Redis lease can expire.
             async with asyncio.timeout(self.settings.redis_lock_timeout_seconds * 0.8):
-                benchmark = await execute_research(self, stage, len(history) + 1)
+                benchmark = await execute_research(self, stages, len(history) + 1)
             self.db_session.add(
                 BenchmarkRecord(
                     id=benchmark.id,
@@ -1188,7 +1193,8 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
             history (list[Benchmark]): Execution history including new selection.
         """
         stage = Stage.STAGE_1_PROBLEM_FRAMING
-        current = state.stage_states[stage.value]
+        # Research may run before the first stage 1 turn: start that stage's snapshot.
+        current = state.stage_states.setdefault(stage.value, StageState(stage=stage))
         self._render_benchmark_stage(current, history)
         for downstream in state.stage_states.values():
             if Stage.ordered().index(downstream.stage) > Stage.ordered().index(stage):

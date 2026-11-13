@@ -2,7 +2,7 @@
 
 import asyncio
 import json
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 from brainstorm_agent.core.enums import LLMMode, Stage
@@ -23,9 +23,25 @@ if TYPE_CHECKING:
     from brainstorm_agent.services.session_service import SessionService
 
 
+def framing_context(stages: list[StageState]) -> dict[str, dict[str, Any]]:
+    """Collect the accumulated fields that describe the project for research.
+
+    Args:
+        stages (list[StageState]): Available pitch and problem framing snapshots.
+
+    Returns:
+        dict[str, dict[str, Any]]: Non-empty fields keyed by stage value.
+    """
+    return {
+        stage.stage.value: fields
+        for stage in stages
+        if (fields := stage.extracted_fields.model_dump(exclude_none=True))
+    }
+
+
 async def execute_research(
     service: SessionService,
-    stage: StageState,
+    stages: list[StageState],
     version: int,
     provider: SearchProvider | None = None,
 ) -> Benchmark:
@@ -33,7 +49,7 @@ async def execute_research(
 
     Args:
         service (SessionService): Application dependencies.
-        stage (StageState): Stage 1 snapshot.
+        stages (list[StageState]): Pitch and, once started, problem framing snapshots.
         version (int): Next execution version.
         provider (SearchProvider | None): Test override.
 
@@ -41,13 +57,13 @@ async def execute_research(
         Benchmark: Validated execution, never applied to framing automatically.
     """
     provider = provider or build_search_provider(service.settings)
-    fields = stage.extracted_fields.model_dump(exclude_none=True)
+    fields = framing_context(stages)
     llm = service.llm
     try:
         if service.settings.llm_mode is LLMMode.FAKE:
             queries = ResearchQueries(
                 queries=[
-                    f"{fields.get('problem_statement', 'project framing')} {term}"[:500]
+                    f"{fake_subject(fields)} {term}"[:500]
                     for term in ["software", "alternatives", "features"]
                 ],
             )
@@ -122,3 +138,17 @@ async def execute_research(
     finally:
         if isinstance(llm, OpenAICompatibleBrainstormLLM):
             await llm.client.close()
+
+
+def fake_subject(fields: dict[str, dict[str, Any]]) -> str:
+    """Pick the deterministic query subject of the fake model.
+
+    Args:
+        fields (dict[str, dict[str, Any]]): Framing context keyed by stage value.
+
+    Returns:
+        str: Problem statement, else pitch summary, else a generic subject.
+    """
+    problem = fields.get(Stage.STAGE_1_PROBLEM_FRAMING.value, {}).get("problem_statement")
+    pitch = fields.get(Stage.STAGE_0_PITCH.value, {}).get("pitch_summary")
+    return str(problem or pitch or "project framing")

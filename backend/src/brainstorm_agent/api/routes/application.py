@@ -24,6 +24,7 @@ from brainstorm_agent.core.application import (
 from brainstorm_agent.core.enums import Stage  # noqa: TC001
 from brainstorm_agent.core.models import SessionOverview, StepDocument  # noqa: TC001
 from brainstorm_agent.core.research import Benchmark, FeatureSelection  # noqa: TC001
+from brainstorm_agent.logging import get_logger
 from brainstorm_agent.services.search import SearchProviderName
 from brainstorm_agent.services.session_service import SessionService
 from brainstorm_agent.services.streaming import Keepalive, stream_in_worker, stream_research_in_worker
@@ -309,6 +310,8 @@ async def research_products(session_id: str, service: Service) -> StreamingRespo
                     else:
                         yield f"event: research.completed\ndata: {result.model_dump_json()}\n\n"
         except Exception:
+            # The client only gets a generic error: keep the cause in the server logs.
+            get_logger(__name__).exception("research_failed", session_id=session_id)
             await run_in_threadpool(service.db_session.rollback)
             yield 'event: error\ndata: {"message":"La recherche a échoué. Vérifiez le fournisseur ou réessayez."}\n\n'
 
