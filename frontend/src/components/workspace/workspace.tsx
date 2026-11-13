@@ -186,7 +186,7 @@ function WorkspaceView({ initialSnapshot }: { initialSnapshot: SessionSnapshot }
           <ErrorState error={actionError} />
         </div>
       ) : null}
-      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)_440px]">
+      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)_440px] lg:grid-rows-[minmax(0,1fr)]">
         <aside className="flex flex-col gap-4 overflow-y-auto border-r p-3">
           <StageStepper
             session={session}
@@ -200,7 +200,7 @@ function WorkspaceView({ initialSnapshot }: { initialSnapshot: SessionSnapshot }
             onEditField={(field, value) => act(() => api.editField(sessionId, stage, field, value))}
           />
         </aside>
-        <section className="flex min-h-[60vh] flex-col" aria-label="Conversation">
+        <section className="flex min-h-[60vh] flex-col lg:min-h-0" aria-label="Conversation">
           <ChatPanel
             messages={state.messages}
             streaming={state.streaming}

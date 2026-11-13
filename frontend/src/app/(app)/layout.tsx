@@ -17,7 +17,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
   }
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-screen flex-col lg:h-screen">
       <header className="flex h-12 shrink-0 items-center justify-between border-b px-4">
         <Link href="/sessions" className="font-semibold">
           Brainstorm Agent
@@ -32,7 +32,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
           </form>
         </div>
       </header>
-      <div className="flex flex-1 flex-col">{children}</div>
+      <div className="flex flex-1 flex-col lg:min-h-0 lg:overflow-y-auto">{children}</div>
     </div>
   );
 }
