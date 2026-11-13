@@ -25,27 +25,27 @@ def test_valid_plan_and_capability_fallback(delivery_plan):
     assert not delivery_checks(fields, previous)["domain_ownership"]
 
 
-@pytest.mark.parametrize(
-    ("mutation", "rule"),
-    [
-        (lambda s: s[0].update(dependencies=["reports"]), "acyclic_dependencies"),
-        (lambda s: s[1].update(dependencies=["missing"]), "acyclic_dependencies"),
-        (lambda s: s[1].update(consumed_contracts=["orphan"]), "contract_ownership"),
-        (lambda s: s[1].update(provided_contracts=s[0]["provided_contracts"]), "contract_ownership"),
-        (lambda s: s[1].update(backlog_item_ids=[]), "mvp_assignment"),
-        (lambda s: s[0]["backlog_item_ids"].append("story"), "mvp_assignment"),
-        (lambda s: s[1]["backlog_item_ids"].append("story"), "mvp_assignment"),
-        (lambda s: s[1].update(integration_scenarios=[]), "integration_scenarios"),
-        (lambda s: s[1].update(integration_scenarios=[{"given": "Only context"}]), "integration_scenarios"),
-        (lambda s: s[1].update(integration_scenarios=[{"ears": "Export it"}]), "integration_scenarios"),
-        (lambda s: s[1]["backlog_item_ids"].append("foundation"), "cross_cutting_foundation"),
-        (lambda s: s[0].update(backlog_item_ids=[]), "cross_cutting_foundation"),
-        (lambda s: s[1]["backlog_item_ids"].append("unknown"), "backlog_references"),
-        (lambda s: s[1].update(owned_domain=["unknown"]), "domain_ownership"),
-        (lambda s: s.pop(0), "walking_skeleton"),
-        (lambda s: s.append(deepcopy(s[0])), "acyclic_dependencies"),
-    ],
-)
+DELIVERY_CASES = [
+    (lambda s: s[0].update(dependencies=["reports"]), "acyclic_dependencies"),
+    (lambda s: s[1].update(dependencies=["missing"]), "acyclic_dependencies"),
+    (lambda s: s[1].update(consumed_contracts=["orphan"]), "contract_ownership"),
+    (lambda s: s[1].update(provided_contracts=s[0]["provided_contracts"]), "contract_ownership"),
+    (lambda s: s[1].update(backlog_item_ids=[]), "mvp_assignment"),
+    (lambda s: s[0]["backlog_item_ids"].append("story"), "mvp_assignment"),
+    (lambda s: s[1]["backlog_item_ids"].append("story"), "mvp_assignment"),
+    (lambda s: s[1].update(integration_scenarios=[]), "integration_scenarios"),
+    (lambda s: s[1].update(integration_scenarios=[{"given": "Only context"}]), "integration_scenarios"),
+    (lambda s: s[1].update(integration_scenarios=[{"ears": "Export it"}]), "integration_scenarios"),
+    (lambda s: s[1]["backlog_item_ids"].append("foundation"), "cross_cutting_foundation"),
+    (lambda s: s[0].update(backlog_item_ids=[]), "cross_cutting_foundation"),
+    (lambda s: s[1]["backlog_item_ids"].append("unknown"), "backlog_references"),
+    (lambda s: s[1].update(owned_domain=["unknown"]), "domain_ownership"),
+    (lambda s: s.pop(0), "walking_skeleton"),
+    (lambda s: s.append(deepcopy(s[0])), "acyclic_dependencies"),
+]
+
+
+@pytest.mark.parametrize(("mutation", "rule"), DELIVERY_CASES)
 def test_rejects_invalid_delivery_rule(delivery_plan, mutation, rule):
     fields, previous = delivery_plan
     mutation(fields["slices"])
