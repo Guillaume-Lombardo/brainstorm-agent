@@ -183,20 +183,20 @@
 
 #### Steps
 
-- [ ] `users` table (email, display name, Argon2id password hash, OIDC issuer + subject, active
+- [x] `users` table (email, display name, Argon2id password hash, OIDC issuer + subject, active
       flag, timestamps) with an Alembic migration.
-- [ ] `owner_id` on sessions with a migration assigning existing sessions to a bootstrap user.
-- [ ] Authorization enforced in the shared session service (owner only), so every route and the
+- [x] `owner_id` on sessions with a migration assigning existing sessions to a bootstrap user.
+- [x] Authorization enforced in the shared session service (owner only), so every route and the
       OpenAI-compatible facade are covered.
-- [ ] Existing API-key auth kept for service clients, with each key mapped to an owning user
+- [x] Existing API-key auth kept for service clients, with each key mapped to an owning user
       (facade sessions are owned by that user).
-- [ ] Recommended flow (to confirm in the ADR): Auth.js in Next.js with a Credentials provider
+- [x] Recommended flow (accepted in ADR 0009): Auth.js in Next.js with a Credentials provider
       (verified against the backend) and an OIDC provider enabled only when configured; the Next.js
       server calls the backend with a short-lived signed JWT (`sub` = user id) using the existing JWT
       mode; OIDC users are linked or provisioned by issuer + subject.
-- [ ] Login throttling with the existing rate limiter.
-- [ ] CLI: `user create`, `user set-password`, `user disable`.
-- [ ] Tests: password hashing, login success/failure, OIDC linking, ownership isolation between two
+- [x] Login throttling with the existing rate limiter.
+- [x] CLI: `user create`, `user set-password`, `user disable`.
+- [x] Tests: password hashing, login success/failure, OIDC linking, ownership isolation between two
       users.
 
 ### Lot 6: Application API and event stream

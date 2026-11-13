@@ -84,3 +84,16 @@ def test_auth_service_accepts_jwt_bearer() -> None:
     assert principal.auth_mode is AuthMode.JWT
     assert principal.subject == "user-123"
     assert "brainstorm:write" in principal.scopes
+
+
+def test_jwt_without_expiry_is_rejected() -> None:
+    settings = Settings(
+        enable_auth=True,
+        auth_mode=AuthMode.JWT,
+        jwt_secret_key="test-signing-key-with-sufficient-length",  # noqa: S106  # pragma: allowlist secret
+    )
+    assert settings.jwt_secret_key is not None
+    token = jwt.encode({"sub": "user"}, settings.jwt_secret_key, algorithm="HS256")
+    assert (
+        AuthenticationService(settings).authenticate(x_api_key=None, authorization=f"Bearer {token}") is None
+    )

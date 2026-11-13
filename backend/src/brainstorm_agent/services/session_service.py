@@ -19,6 +19,7 @@ from brainstorm_agent.core.models import (
 )
 from brainstorm_agent.exceptions import ConflictError, NotFoundError
 from brainstorm_agent.graph.builder import build_turn_graph
+from brainstorm_agent.persistence.models import BOOTSTRAP_USER_ID, SessionRecord
 from brainstorm_agent.persistence.repositories import (
     DocumentRepository,
     HumanReviewRepository,
@@ -31,6 +32,7 @@ from brainstorm_agent.services.llm_client import BrainstormLLM, OpenAICompatible
 from brainstorm_agent.services.locks import NoopSessionLockManager, SessionLockManager
 from brainstorm_agent.services.markdown import MarkdownRenderer
 from brainstorm_agent.services.prompt_loader import PromptLoader
+from brainstorm_agent.services.users import UserService
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
@@ -53,11 +55,12 @@ class SessionService:
         """
         return PromptLoader.from_settings(settings)
 
-    def __init__(
+    def __init__(  # noqa: PLR0913 - Explicit application dependencies
         self,
         *,
         db_session: Session,
         settings: Settings,
+        owner_id: str | None = None,
         llm: BrainstormLLM | None = None,
         prompt_loader: PromptLoader | None = None,
         lock_manager: SessionLockManager | None = None,
@@ -67,12 +70,22 @@ class SessionService:
         Args:
             db_session: Database session.
             settings: Application settings.
+            owner_id: Authenticated owner; required when authentication is enabled.
             llm: Optional structured LLM adapter override.
             prompt_loader: Optional prompt loader override.
             lock_manager: Optional session lock manager override.
+
+        Raises:
+            ValueError: Authentication is enabled but no owner was supplied.
         """
         self.db_session = db_session
         self.settings = settings
+        if owner_id is None and settings.enable_auth:
+            message = "An authenticated owner is required."
+            raise ValueError(message)
+        self.owner_id = owner_id or BOOTSTRAP_USER_ID
+        if not settings.enable_auth and owner_id is None:
+            UserService(db_session).ensure_bootstrap()
         self.prompt_loader = prompt_loader or self._default_prompt_loader(settings)
         self._owns_llm = llm is None
         self.llm = llm or build_llm(settings=settings, prompt_loader=self.prompt_loader)
@@ -86,15 +99,39 @@ class SessionService:
         self.human_reviews = HumanReviewRepository(db_session)
         self.graph = build_turn_graph(llm=self.llm, renderer=self.renderer)
 
+    def _require_owned(self, session_id: str) -> SessionRecord:
+        """Require an active owner and hide sessions belonging to other users.
+
+        Args:
+            session_id: str: Requested session identifier.
+
+        Returns:
+            SessionRecord: Authorized row.
+
+        Raises:
+            missing_session: The session is absent or belongs to another user.
+        """
+        record = self.sessions.get(session_id)
+        user = UserService(self.db_session).get_active(self.owner_id)
+        if record is None or record.owner_id != self.owner_id or user is None:
+            raise NotFoundError.missing_session(session_id)
+        return record
+
     def create_session(self) -> SessionOverview:
         """Create a new brainstorming session.
 
         Returns:
             SessionOverview: Created session overview.
+
+        Raises:
+            ValueError: The owner is missing or inactive.
         """
+        if UserService(self.db_session).get_active(self.owner_id) is None:
+            message = "An active owner is required."
+            raise ValueError(message)
         session_id = str(uuid4())
         state = BrainstormSessionState(session_id=session_id)
-        self.sessions.create(state)
+        self.sessions.create(state, owner_id=self.owner_id)
         welcome_turn = ConversationTurn(
             session_id=session_id,
             role=MessageRole.ASSISTANT,
@@ -104,7 +141,7 @@ class SessionService:
         )
         self.messages.add(welcome_turn)
         self.db_session.commit()
-        record = self.sessions.require(session_id)
+        record = self._require_owned(session_id)
         return self.sessions.overview(record, [])
 
     async def aprocess_user_message(
@@ -125,13 +162,11 @@ class SessionService:
             AssistantTurnOutput: Structured assistant response.
 
         Raises:
-            missing_session: If the session does not exist.
             pending_human_review_in_progress: If a human validation decision is still pending.
         """
+        self._require_owned(session_id)
         with self.lock_manager.lock(session_id):
-            record = self.sessions.get(session_id)
-            if record is None:
-                raise NotFoundError.missing_session(session_id)
+            record = self._require_owned(session_id)
             state = self.sessions.to_state(record)
             if state.pending_human_review is not None:
                 raise ConflictError.pending_human_review_in_progress()
@@ -311,12 +346,8 @@ class SessionService:
         Returns:
             SessionOverview: Current session overview.
 
-        Raises:
-            missing_session: If the session does not exist.
         """
-        record = self.sessions.get(session_id)
-        if record is None:
-            raise NotFoundError.missing_session(session_id)
+        record = self._require_owned(session_id)
         return self.sessions.overview(record, self.open_questions.list_open(session_id))
 
     def list_messages(self, session_id: str) -> list[ConversationTurn]:
@@ -328,8 +359,7 @@ class SessionService:
         Returns:
             list[ConversationTurn]: Session message history.
         """
-        self.sessions.require(session_id)
-        usage = self.sessions.to_state(self.sessions.require(session_id)).turn_usage
+        usage = self.sessions.to_state(self._require_owned(session_id)).turn_usage
         turns = self.messages.list_for_session(session_id)
         for turn in turns:
             counts = usage.get(turn.id, {})
@@ -349,7 +379,7 @@ class SessionService:
         Raises:
             missing_document: If no document exists yet.
         """
-        self.sessions.require(session_id)
+        self._require_owned(session_id)
         document = self.documents.get_current(session_id)
         if document is None:
             raise NotFoundError.missing_document(session_id)
@@ -364,7 +394,7 @@ class SessionService:
         Returns:
             list[StepDocument]: Versioned documents.
         """
-        self.sessions.require(session_id)
+        self._require_owned(session_id)
         return self.documents.list_all(session_id)
 
     def export_markdown(self, session_id: str) -> str:
@@ -443,8 +473,9 @@ class SessionService:
         Raises:
             no_pending_human_review: If the session has no pending human review.
         """
+        self._require_owned(session_id)
         with self.lock_manager.lock(session_id):
-            record = self.sessions.require(session_id)
+            record = self._require_owned(session_id)
             state = self.sessions.to_state(record)
             pending = state.pending_human_review
             if pending is None:
@@ -473,5 +504,5 @@ class SessionService:
         Returns:
             list[HumanReviewRecord]: Ordered review decisions.
         """
-        self.sessions.require(session_id)
+        self._require_owned(session_id)
         return self.human_reviews.list_for_session(session_id)

@@ -9,7 +9,9 @@ from fastapi.testclient import TestClient
 from brainstorm_agent.api.main import create_app
 from brainstorm_agent.core.enums import AuthMode, LLMMode
 from brainstorm_agent.exceptions import LLMResponseError
+from brainstorm_agent.persistence.models import BOOTSTRAP_USER_ID
 from brainstorm_agent.services.auth import hash_api_key
+from brainstorm_agent.services.users import UserService
 from brainstorm_agent.settings import Settings
 
 if TYPE_CHECKING:
@@ -92,7 +94,12 @@ def test_auth_blocks_requests_when_enabled(tmp_path: Path) -> None:
     settings.enable_auth = True
     settings.auth_mode = AuthMode.API_KEY
     settings.auth_api_key_hashes = [hash_api_key("secret-token")]
-    client = TestClient(create_app(settings=settings))
+    settings.auth_api_key_owners = {hash_api_key("secret-token"): BOOTSTRAP_USER_ID}
+    app = create_app(settings=settings)
+    with app.state.session_factory() as db:
+        UserService(db).ensure_bootstrap()
+        db.commit()
+    client = TestClient(app)
 
     blocked = client.post("/api/v1/sessions")
     assert blocked.status_code == 401
@@ -124,10 +131,14 @@ def test_jwt_auth_allows_requests_when_enabled(tmp_path: Path) -> None:
     settings.jwt_secret_key = jwt_secret
     settings.jwt_audience = "brainstorm-users"
     settings.jwt_issuer = "brainstorm-agent"
-    client = TestClient(create_app(settings=settings))
+    app = create_app(settings=settings)
+    with app.state.session_factory() as db:
+        UserService(db).ensure_bootstrap()
+        db.commit()
+    client = TestClient(app)
     token = jwt.encode(
         {
-            "sub": "user-123",
+            "sub": BOOTSTRAP_USER_ID,
             "exp": datetime.now(tz=UTC) + timedelta(minutes=5),
             "aud": "brainstorm-users",
             "iss": "brainstorm-agent",

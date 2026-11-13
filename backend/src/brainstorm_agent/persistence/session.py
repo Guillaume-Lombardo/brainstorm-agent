@@ -34,7 +34,7 @@ def create_engine_from_settings(settings: Settings) -> Engine:
     connect_args: dict[str, object] = {}
     if settings.is_sqlite:
         connect_args["check_same_thread"] = False
-    return create_engine(settings.database_url, future=True, connect_args=connect_args)
+    return create_engine(settings.database_url, future=True, connect_args=connect_args, hide_parameters=True)
 
 
 def create_session_factory(engine: Engine) -> sessionmaker[Session]:

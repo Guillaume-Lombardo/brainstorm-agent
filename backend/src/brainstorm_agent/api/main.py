@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse, PlainTextResponse
 from sqlalchemy import text
 
 from brainstorm_agent.api.dependencies import configure_application_state, enforce_api_security
+from brainstorm_agent.api.routes.auth import router as auth_router
 from brainstorm_agent.api.routes.openai import router as openai_router
 from brainstorm_agent.api.routes.sessions import router as session_router
 from brainstorm_agent.exceptions import ConflictError, LLMResponseError, LockAcquisitionError, NotFoundError
@@ -115,6 +116,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     logger = get_logger("brainstorm_agent.api")
     configure_application_state(app, app_settings)
+    app.include_router(auth_router, prefix=app_settings.api_v1_prefix)
     app.include_router(openai_router, dependencies=[Depends(enforce_api_security)])
     app.include_router(
         session_router,

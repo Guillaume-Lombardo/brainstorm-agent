@@ -30,6 +30,7 @@ from brainstorm_agent.services.rate_limit import (
     is_rate_limit_enabled,
 )
 from brainstorm_agent.services.session_service import SessionService
+from brainstorm_agent.services.users import UserService
 from brainstorm_agent.settings import Settings  # noqa: TC001
 
 if TYPE_CHECKING:
@@ -139,6 +140,10 @@ def enforce_api_security(
         x_api_key=x_api_key,
         authorization=authorization,
     )
+    if principal is not None:
+        with request.app.state.session_factory() as db:
+            if UserService(db).get_active(principal.subject) is None:
+                principal = None
     request.state.principal = principal
     mode = settings.effective_auth_mode
     if mode is not AuthMode.NONE and principal is None:
@@ -167,6 +172,8 @@ def enforce_api_security(
 
 
 def get_session_service(
+    *,
+    request: Request,
     db_session: Annotated[Session, Depends(get_db_session)],
     settings: Annotated[Settings, Depends(get_app_settings)],
     prompt_loader: Annotated[PromptLoader, Depends(get_prompt_loader)],
@@ -175,6 +182,7 @@ def get_session_service(
     """Build the session service dependency.
 
     Args:
+        request: FastAPI request.
         db_session: Database session.
         settings: Application settings.
         prompt_loader: Prompt loader.
@@ -188,6 +196,7 @@ def get_session_service(
         settings=settings,
         prompt_loader=prompt_loader,
         lock_manager=lock_manager,
+        owner_id=request.state.principal.subject if request.state.principal else None,
     )
 
 
