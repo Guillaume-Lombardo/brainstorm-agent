@@ -29,6 +29,9 @@ SearXNG requires `SEARXNG_BASE_URL`; Tavily/Brave require their `*_API_KEY`, wit
 The deployment uses internal SearXNG with no published port and versioned JSON-enabled settings in
 `deploy/searxng/settings.yml`. Provision `BRAINSTORM_SEARXNG_SECRET` in 1Password and Dockhand before
 merging; Compose requires it. The image consumes `SEARXNG_SECRET`. Never commit its value.
+The settings enable only Yahoo: from the homelab egress IP, DuckDuckGo, Brave, Google and Qwant
+are blocked and Bing returns off-topic pages. SearXNG reads them at startup, so restart the
+`searxng` container after changing them (a Dockhand redeploy does not recreate it).
 For dev, set the secret, `SEARCH_PROVIDER=searxng`, and use `docker compose --profile search`.
 
 Owner-scoped API: `GET /api/v1/sessions/{id}/research` returns availability/history; `POST` streams

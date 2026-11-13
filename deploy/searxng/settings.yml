@@ -1,9 +1,13 @@
+# Engines checked from the homelab egress IP on 2026-11-13 (searxng 2026.11.13-8a53a6aa5):
+# - yahoo: relevant results; disabled by default upstream, so it is enabled explicitly below.
+# - duckduckgo (CAPTCHA), brave (rate limited), google and qwant (blocked): no results.
+# - bing: answers, but with off-topic pages (dictionaries, unrelated forums) that would crowd out
+#   the five snippets kept by the backend; disabled by default upstream and left out.
+# - startpage and mojeek: inactive upstream (proof-of-work CAPTCHA).
 use_default_settings:
   engines:
     keep_only:
-      - duckduckgo
-      - bing
-      - brave
+      - yahoo
 server:
   bind_address: "0.0.0.0"
   port: 8080
@@ -13,6 +17,11 @@ search:
   formats:
     - html
     - json
+engines:
+  - name: yahoo
+    engine: yahoo
+    shortcut: yh
+    disabled: false
 outgoing:
   request_timeout: 8.0
   max_request_timeout: 12.0
