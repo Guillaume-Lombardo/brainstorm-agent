@@ -1,11 +1,16 @@
-import NextAuth, { type NextAuthConfig } from "next-auth";
+import NextAuth, { CredentialsSignin, type NextAuthConfig } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 
 import { authConfig } from "@/auth.config";
-import { getBackend } from "@/lib/backend";
-import { OIDC_PROVIDER_ID, readOidcSettings } from "@/lib/auth/oidc";
+import { BackendError, getBackend } from "@/lib/backend";
+import { OIDC_PROVIDER_ID, oidcIdentity, readOidcSettings } from "@/lib/auth/oidc";
 
 type Providers = NextAuthConfig["providers"];
+
+/** The backend refused the attempt: too many failures for this identity (HTTP 429). */
+class LoginRateLimited extends CredentialsSignin {
+  code = "rate_limited";
+}
 
 /** Credentials provider always; the OIDC provider only when configured. */
 function buildProviders(env: Record<string, string | undefined>): Providers {
@@ -18,8 +23,16 @@ function buildProviders(env: Record<string, string | undefined>): Providers {
         if (!email || !password) {
           return null;
         }
-        const user = await getBackend().verifyCredentials(email, password);
-        return user ? { id: user.id, email: user.email, name: user.displayName } : null;
+        try {
+          // Server-to-server login bridge; the backend limits attempts per identity.
+          const user = await getBackend().verifyCredentials(email, password);
+          return user ? { id: user.id, email: user.email, name: user.display_name } : null;
+        } catch (error) {
+          if (error instanceof BackendError && error.code === "rate_limited") {
+            throw new LoginRateLimited();
+          }
+          throw error;
+        }
       },
     }),
   ];
@@ -42,17 +55,23 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: buildProviders(process.env),
   callbacks: {
     ...authConfig.callbacks,
+    signIn({ account, profile }) {
+      // Only verified e-mail addresses may sign in or be linked through SSO.
+      if (account?.provider === OIDC_PROVIDER_ID) {
+        return oidcIdentity(readOidcSettings(process.env)?.issuer ?? "", profile) !== null;
+      }
+      return true;
+    },
     async jwt({ token, user, account, profile }) {
-      if (account?.provider === OIDC_PROVIDER_ID && profile?.sub) {
+      if (account?.provider === OIDC_PROVIDER_ID) {
+        const identity = oidcIdentity(readOidcSettings(process.env)?.issuer ?? "", profile);
+        if (!identity) {
+          throw new Error("OIDC profile without a verified e-mail address.");
+        }
         // OIDC identities are linked or provisioned by issuer + subject.
-        const backendUser = await getBackend().resolveOidcUser({
-          issuer: readOidcSettings(process.env)?.issuer ?? "",
-          subject: profile.sub,
-          email: typeof profile.email === "string" ? profile.email : null,
-          name: typeof profile.name === "string" ? profile.name : null,
-        });
+        const backendUser = await getBackend().resolveOidcUser(identity);
         token.uid = backendUser.id;
-        token.name = backendUser.displayName;
+        token.name = backendUser.display_name;
         token.email = backendUser.email;
       } else if (user?.id) {
         token.uid = user.id;

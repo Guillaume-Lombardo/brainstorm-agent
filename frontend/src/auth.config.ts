@@ -5,7 +5,8 @@ import type { NextAuthConfig } from "next-auth";
  * It must not import the backend client.
  */
 export const authConfig = {
-  pages: { signIn: "/login" },
+  // Auth.js errors (SSO refused, provider failure) come back to the login page as `?error=`.
+  pages: { signIn: "/login", error: "/login" },
   session: { strategy: "jwt", maxAge: 8 * 60 * 60 },
   trustHost: true,
   providers: [],
