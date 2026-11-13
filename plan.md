@@ -211,19 +211,19 @@ Reuse lot 2 validators and elicitation metadata; delivery slicing exports stay e
 
 #### Steps
 
-- [ ] Typed SSE event stream per turn: `turn.started`, `analysis.status`, `message.delta`,
+- [x] Typed SSE event stream per turn: `turn.started`, `analysis.status`, `message.delta`,
       `document.updated`, `coverage.updated`, `stage.changed`, `review.required`, `turn.completed`,
       `error`; documented in OpenAPI.
-- [ ] `GET /sessions` (paginated, owner-scoped), `PATCH /sessions/{id}` (title, archive), soft
+- [x] `GET /sessions` (paginated, owner-scoped), `PATCH /sessions/{id}` (title, archive), soft
       delete.
-- [ ] Reopen an earlier stage with `stale` propagation to downstream stages (D4).
-- [ ] Direct edits: `PATCH` stage field values or items from the UI, then re-validate; comments on a
+- [x] Reopen an earlier stage with `stale` propagation to downstream stages (D4).
+- [x] Direct edits: `PATCH` stage field values or items from the UI, then re-validate; comments on a
       document section feed the next turn.
-- [ ] Review endpoint: approve, reject, request changes with a note.
-- [ ] Document version diff endpoint.
-- [ ] Final consolidated framing document export, slice specs and backlog JSON export.
-- [ ] CORS settings; OpenAPI-to-TypeScript generation script for the frontend.
-- [ ] Integration tests for reopen/stale, edits, event order; end-to-end SSE test.
+- [x] Review endpoint: approve, reject, request changes with a note.
+- [x] Document version diff endpoint.
+- [x] Final consolidated framing document export, slice specs and backlog JSON export.
+- [x] CORS settings; OpenAPI-to-TypeScript generation script for the frontend.
+- [x] Integration tests for reopen/stale, edits, event order; end-to-end SSE test.
 
 ### Lot 7: Next.js frontend
 

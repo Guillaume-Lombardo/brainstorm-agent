@@ -109,6 +109,7 @@ class HumanReviewDecision(StrEnum):
 
     APPROVED = "approved"
     REJECTED = "rejected"
+    REQUEST_CHANGES = "request_changes"
 
 
 class StructuredOutputMode(StrEnum):

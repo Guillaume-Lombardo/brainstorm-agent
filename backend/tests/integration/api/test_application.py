@@ -120,7 +120,7 @@ def test_new_endpoints_hide_other_owners(tmp_path: Path, method: str, path: str,
         user = UserService(db).create(
             email="other@example.com",
             display_name="Other",
-            password="strong-password",  # noqa: S106
+            password="strong-password",  # noqa: S106  # pragma: allowlist secret
         )
         db.commit()
         other_id = user.id
@@ -132,3 +132,53 @@ def test_new_endpoints_hide_other_owners(tmp_path: Path, method: str, path: str,
     app.dependency_overrides[get_session_service] = other_service
     assert client.request(method, f"/api/v1/sessions/{sid}{path}", json=body).status_code == 404
     assert client.get("/api/v1/sessions").json()["items"] == []
+
+
+@pytest.mark.parametrize("action", ["approve", "reject", "request_changes"])
+def test_explicit_reviews_persist_action_and_note(tmp_path: Path, action: str) -> None:
+    client = client_for(tmp_path)
+    assert isinstance(client.app, FastAPI)
+    client.app.state.settings.require_human_validation_for_transitions = True
+    sid = client.post("/api/v1/sessions").json()["session_id"]
+    base = f"/api/v1/sessions/{sid}"
+    assert client.post(base + "/messages", json={"content": PITCH}).json()["requires_human_review"]
+    assert client.post(base + "/turns", json={"content": "continue"}).status_code == 409
+    assert (
+        client.post(base + "/review", json={"stage": "stage_1_problem_framing", "action": action}).status_code
+        == 409
+    )
+    result = client.post(base + "/review", json={"stage": STAGE, "action": action, "note": "Review feedback"})
+    assert result.status_code == 200
+    assert result.json()["pending_human_review"] is None
+    assert result.json()["comments"][-1]["body"] == "Review feedback"
+    assert (result.json()["current_stage"] != STAGE) == (action == "approve")
+    stored = client.get(base + "/reviews").json()["items"][-1]
+    assert (
+        stored["decision"]
+        == {"approve": "approved", "reject": "rejected", "request_changes": "request_changes"}[action]
+    )
+
+
+def test_direct_edit_rechecks_gate_questions(tmp_path: Path) -> None:
+    client = client_for(tmp_path)
+    sid = client.post("/api/v1/sessions").json()["session_id"]
+    base = f"/api/v1/sessions/{sid}"
+    client.post(base + "/messages", json={"content": "pitch: A project framing service for teams."})
+    before = client.get(base).json()["stage_states"][STAGE]
+    assert not before["stage_is_clear_enough"]
+    result = client.patch(
+        base + f"/stages/{STAGE}",
+        json={
+            "items": {"open_questions": []},
+            "fields": {
+                "clear_points": ["Guided framing"],
+                "ambiguities": ["Audience"],
+                "missing_information": ["Adoption target"],
+            },
+        },
+    )
+    assert result.status_code == 200
+    edited = result.json()["stage_states"][STAGE]
+    assert edited["stage_is_clear_enough"], edited["readiness"]
+    assert all(check["passed"] for check in edited["readiness"])
+    assert not any(question["id"].startswith("gate:") for question in edited["open_questions"])

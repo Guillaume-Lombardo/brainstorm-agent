@@ -1,6 +1,7 @@
 /** Regenerate the versioned backend schema and TypeScript without a running server. */
 import { spawnSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
+import { format, resolveConfig } from "prettier";
 import openapiTS, { astToString } from "openapi-typescript";
 
 const result = spawnSync(
@@ -24,4 +25,10 @@ const result = spawnSync(
 if (result.status !== 0) throw new Error(result.stderr);
 const schema = JSON.parse(result.stdout);
 writeFileSync("src/lib/backend/generated/openapi.json", JSON.stringify(schema, null, 2) + "\n");
-writeFileSync("src/lib/backend/generated/api.ts", astToString(await openapiTS(schema)));
+writeFileSync(
+  "src/lib/backend/generated/api.ts",
+  await format(astToString(await openapiTS(schema)), {
+    ...(await resolveConfig("src/lib/backend/generated/api.ts")),
+    parser: "typescript",
+  }),
+);

@@ -45,11 +45,12 @@ from brainstorm_agent.core.models import (
     SectionComment,
     SessionOverview,
     StageState,
+    StageValidationResult,
     StepDocument,
 )
-from brainstorm_agent.core.validation import validate_stage
 from brainstorm_agent.exceptions import ConflictError, NotFoundError
 from brainstorm_agent.graph.builder import build_turn_graph
+from brainstorm_agent.graph.nodes import apply_stage_rules
 from brainstorm_agent.persistence.models import BOOTSTRAP_USER_ID, SessionRecord
 from brainstorm_agent.persistence.repositories import (
     DocumentRepository,
@@ -525,6 +526,8 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
         session_id: str,
         approved: bool,
         note: str | None = None,
+        expected_stage: Stage | None = None,
+        request_changes: bool = False,
     ) -> SessionOverview:
         """Approve or reject the pending human-reviewed transition.
 
@@ -532,12 +535,15 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
             session_id: Session identifier.
             approved: Whether to approve the pending transition.
             note: Optional reviewer note.
+            expected_stage: Stage expected by the application caller.
+            request_changes: Record an explicit request for changes.
 
         Returns:
             SessionOverview: Updated session overview.
 
         Raises:
             no_pending_human_review: If the session has no pending human review.
+            ConflictError: Review stage no longer matches.
         """
         self._require_owned(session_id)
         with self.lock_manager.lock(session_id):
@@ -546,11 +552,22 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
             pending = state.pending_human_review
             if pending is None:
                 raise ConflictError.no_pending_human_review()
+            if expected_stage is not None and pending.from_stage != expected_stage:
+                message = "Review does not match the pending stage."
+                raise ConflictError(message)
+            if note:
+                state.comments.append(SectionComment(stage=pending.from_stage, section="Review", body=note))
             review = HumanReviewRecord(
                 session_id=session_id,
                 from_stage=pending.from_stage,
                 proposed_next_stage=pending.to_stage,
-                decision=(HumanReviewDecision.APPROVED if approved else HumanReviewDecision.REJECTED),
+                decision=(
+                    HumanReviewDecision.APPROVED
+                    if approved
+                    else HumanReviewDecision.REQUEST_CHANGES
+                    if request_changes
+                    else HumanReviewDecision.REJECTED
+                ),
                 note=note,
             )
             self.human_reviews.add(review)
@@ -703,28 +720,32 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
             except ValidationError as exc:
                 message = "Edit does not match the stage contract."
                 raise ConflictError(message) from exc
-            validation = validate_stage(
-                stage=stage,
-                extracted_fields=current.extracted_fields.model_dump(exclude_none=True),
-                open_questions=current.open_questions,
-                partial_fields=current.partial_fields,
-                contradictions=current.contradictions,
-                previous_fields={
-                    key: value.extracted_fields.model_dump(exclude_none=True)
-                    for key, value in state.stage_states.items()
-                    if key != stage.value
-                },
-            )
+            current.partial_fields = {
+                key: value for key, value in current.partial_fields.items() if key not in patch.fields
+            }
+            analysis_data = {
+                key: value
+                for key, value in current.model_dump().items()
+                if key in AssistantAnalysis.model_fields and key != "partial_fields"
+            }
+            analysis_data["partial_fields"] = [
+                {"field": key, "reason": value} for key, value in current.partial_fields.items()
+            ]
+            validated = apply_stage_rules({
+                "session_id": session_id,
+                "current_stage": stage.value,
+                "session_state": state.model_dump(mode="json"),
+                "user_message": "",
+                "analysis": analysis_data,
+            })
+            analysis = AssistantAnalysis.model_validate(validated["analysis"])
+            validation = StageValidationResult.model_validate(validated["validation"])
+            current.open_questions = analysis.open_questions
             current.coverage = validation.coverage
             current.readiness = validation.readiness
             current.stage_is_clear_enough = validation.stage_is_clear_enough
             current.transition_decision_reason = validation.transition_decision_reason
             current.stale = False
-            analysis = AssistantAnalysis.model_validate({
-                key: value
-                for key, value in current.model_dump().items()
-                if key in AssistantAnalysis.model_fields and key != "partial_fields"
-            })
             current.latest_markdown = self.renderer.render(
                 stage=stage,
                 analysis=analysis,
@@ -796,6 +817,8 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
             session_id=session_id,
             approved=review.action == ReviewAction.APPROVE,
             note=review.note,
+            expected_stage=review.stage,
+            request_changes=review.action == ReviewAction.REQUEST_CHANGES,
         )
 
     def document_diff(

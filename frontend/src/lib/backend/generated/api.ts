@@ -1137,7 +1137,7 @@ export interface components {
      * @description Decision taken during optional human review.
      * @enum {string}
      */
-    HumanReviewDecision: "approved" | "rejected";
+    HumanReviewDecision: "approved" | "rejected" | "request_changes";
     /**
      * HumanReviewRecord
      * @description Persisted human review decision.

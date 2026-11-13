@@ -4,6 +4,7 @@ import json
 from pathlib import Path  # noqa: TC003
 
 from fastapi.testclient import TestClient
+from pytest_mock import MockerFixture  # noqa: TC002
 
 from brainstorm_agent.api.main import create_app
 from brainstorm_agent.core.enums import LLMMode
@@ -43,3 +44,28 @@ def test_typed_stream_orders_deltas_and_committed_events(tmp_path: Path) -> None
     assert events[-1]["turn_id"] == events[0]["turn_id"]
     schema = client.get("/openapi.json").json()
     assert schema["components"]["schemas"]["TurnEvent"]["discriminator"]["propertyName"] == "type"
+
+
+def test_stream_error_is_terminal_sanitized_and_rolls_back(tmp_path: Path, mocker: MockerFixture) -> None:
+    client = TestClient(
+        create_app(
+            Settings(
+                database_url=f"sqlite+pysqlite:///{tmp_path / 'failure.db'}",
+                llm_mode=LLMMode.FAKE,
+                redis_url="redis://localhost:6399/0",
+            ),
+        ),
+    )
+    sid = client.post("/api/v1/sessions").json()["session_id"]
+    base = f"/api/v1/sessions/{sid}"
+    mocker.patch(
+        "brainstorm_agent.services.llm_client.FakeBrainstormLLM.analyze",
+        side_effect=RuntimeError("private provider detail"),
+    )
+    response = client.post(base + "/turns", json={"content": "hello"})
+    assert response.status_code == 200
+    events = [json.loads(line[6:]) for line in response.text.splitlines() if line.startswith("data: ")]
+    assert [item["type"] for item in events] == ["turn.started", "analysis.status", "error"]
+    assert "private provider detail" not in response.text
+    assert len(client.get(base + "/messages").json()["items"]) == 1
+    assert client.get(base + "/documents").json()["items"] == []

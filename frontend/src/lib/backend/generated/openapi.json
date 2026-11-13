@@ -636,7 +636,8 @@
         "description": "Decision taken during optional human review.",
         "enum": [
           "approved",
-          "rejected"
+          "rejected",
+          "request_changes"
         ],
         "title": "HumanReviewDecision",
         "type": "string"
