@@ -67,6 +67,7 @@ async def run_scenario(  # noqa: C901, PLR0912, PLR0915 - bounded sequential con
             observation = Observation(stage=turn.stage, expected=turn.should_advance)
             observations.append(observation)
             if completed or state.current_stage != turn.stage:
+                observation.target_attempted = False
                 observation.error = "Workflow diverged from oracle checkpoint."
                 failures.append(f"turn {index + 1}: {observation.error}")
                 continue

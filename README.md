@@ -684,8 +684,8 @@ contradiction, all eight stages, and justified event-storming irrelevance.
 Reports include micro-averaged transition precision/recall (null if undefined),
 turns per oracle stage, exhausted schema failures, total wall latency, target token
 usage and separate simulator/judge usage. Stage 7 acceptance is a positive gate
-decision. Failed attempts count as non-advancement; divergent checkpoints count as
-missed expectations. Latency includes simulator and judge work. Token cost means
+decision. Failed attempts count as non-advancement; divergent checkpoints fail scenario
+expectations and are excluded from per-attempt transition metrics. Latency includes simulator and judge work. Token cost means
 token counts, not currency; provider retries that fail before producing analysis
 may not expose usage. Replay labels results `recorded-fixtures`, never a measured
 model score. Live document judging scores specificity, traceability and absence

@@ -52,3 +52,7 @@ def test_simulator_failure_is_not_target_schema_failure():
     assert not result["passed"]
     assert result["metrics"]["schema_failures"] == 0
     assert result["observations"][0]["target_attempted"] is False
+
+    assert result["metrics"]["false_negative"] == 0
+    assert result["metrics"]["transition_recall"] is None
+    assert all(not item["target_attempted"] for item in result["observations"])
