@@ -47,6 +47,7 @@
   "scripts": {
     "build": "next build",
     "dev": "next dev",
+    "dev:backend": "node scripts/e2e-backend.mjs",
     "e2e": "playwright test",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
