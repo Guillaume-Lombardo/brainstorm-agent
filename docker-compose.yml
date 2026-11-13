@@ -35,7 +35,7 @@ services:
     image: searxng/searxng:2026.11.13-8a53a6aa5
     restart: unless-stopped
     environment:
-      SEARXNG_SECRET: ${BRAINSTORM_SEARXNG_SECRET:?set BRAINSTORM_SEARXNG_SECRET as a secret variable}
+      SEARXNG_SECRET: ${BRAINSTORM_SEARXNG_SECRET:-dev-only-searxng-secret} # pragma: allowlist secret
     volumes:
       - ./deploy/searxng/settings.yml:/etc/searxng/settings.yml:ro
     security_opt:

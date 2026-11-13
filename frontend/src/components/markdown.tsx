@@ -19,7 +19,9 @@ export const Markdown = memo(function Markdown({
 }) {
   return (
     <div className={cn("prose-document", className)}>
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>{children}</ReactMarkdown>
+      <ReactMarkdown disallowedElements={["img"]} remarkPlugins={[remarkGfm]}>
+        {children}
+      </ReactMarkdown>
     </div>
   );
 });

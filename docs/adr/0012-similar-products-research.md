@@ -24,6 +24,8 @@ remain hypotheses. Search results are untrusted prompt data, never executable in
 
 Benchmark executions are versioned in their own table, with 36-character UUID ids and a per-session
 version constraint. Owner-only application service methods reuse session authorization and locking.
+A dedicated worker keeps synchronous SQL and Redis acquisition off the HTTP event loop.
+A global research deadline uses 80% of the configured lock lease, reserving time for persistence.
 SSE communicates execution and terminal outcomes; disconnects do not automatically apply choices.
 Selection targets the latest execution; stale or unknown feature ids are rejected. Each execution
 and selection creates a stage 1 document version. Benchmark selections are explicit decisions and
@@ -48,3 +50,7 @@ Perplexity-compatible contract; the tagged source fixes the contract to the depl
 Search can disclose framing terms to the selected provider; it always requires an explicit action.
 A rerun starts with no selected features. Prior versions remain inspectable in history and exports.
 Availability and quality of third-party snippets vary; no live engine result is guaranteed.
+
+Untrusted synthesis text is escaped before Benchmark Markdown rendering. The shared frontend
+Markdown renderer refuses images, including any reflected through a later model reply, so viewing
+a document cannot issue remote image requests containing framing data.

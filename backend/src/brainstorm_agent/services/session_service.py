@@ -49,7 +49,7 @@ from brainstorm_agent.core.models import (
     StageValidationResult,
     StepDocument,
 )
-from brainstorm_agent.core.research import Benchmark, FeatureSelection, render_benchmark
+from brainstorm_agent.core.research import Benchmark, FeatureSelection, escape_markdown, render_benchmark
 from brainstorm_agent.core.stage_contracts import DeliveryFields
 from brainstorm_agent.exceptions import ConflictError, LLMResponseError, NotFoundError
 from brainstorm_agent.graph.builder import build_turn_graph
@@ -248,8 +248,6 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
                 },
             )
             output = AssistantTurnOutput.model_validate(graph_output["assistant_output"])
-            if output.processed_stage is Stage.STAGE_1_PROBLEM_FRAMING:
-                output.step_markdown += render_benchmark(self.list_benchmarks(session_id))
             processed_stage_state = StageState(
                 stage=output.processed_stage,
                 contradictions=graph_output["analysis"]["contradictions"],
@@ -272,6 +270,12 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
                 stage_is_clear_enough=output.stage_clear_enough,
                 transition_decision_reason=output.transition_decision_reason,
             )
+            if output.processed_stage is Stage.STAGE_1_PROBLEM_FRAMING:
+                self._render_benchmark_stage(processed_stage_state, self.list_benchmarks(session_id))
+                output.decisions, output.step_markdown = (
+                    processed_stage_state.decisions,
+                    processed_stage_state.latest_markdown,
+                )
             state.stage_states[output.processed_stage.value] = processed_stage_state
             proposed_next_stage = output.next_stage
             if (
@@ -778,7 +782,7 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
                 validation=validation,
             )
             if stage is Stage.STAGE_1_PROBLEM_FRAMING:
-                current.latest_markdown += render_benchmark(self.list_benchmarks(session_id))
+                self._render_benchmark_stage(current, self.list_benchmarks(session_id))
             state.stage_states[stage.value] = current
             state.pending_human_review = (
                 PendingHumanReview(
@@ -1119,7 +1123,9 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
             if stage is None:
                 raise ConflictError("Provide stage 1 framing before researching products.")  # noqa: TRY003 - Sanitized actionable application error
             history = self.list_benchmarks(session_id)
-            benchmark = await execute_research(self, stage, len(history) + 1)
+            # Reserve time for persistence and release before the Redis lease can expire.
+            async with asyncio.timeout(self.settings.redis_lock_timeout_seconds * 0.8):
+                benchmark = await execute_research(self, stage, len(history) + 1)
             self.db_session.add(
                 BenchmarkRecord(
                     id=benchmark.id,
@@ -1183,21 +1189,10 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
         """
         stage = Stage.STAGE_1_PROBLEM_FRAMING
         current = state.stage_states[stage.value]
-        current.decisions = [
-            item for item in current.decisions if item.rationale != "Owner-selected benchmark candidate"
-        ]
-        latest = history[-1]
-        current.decisions.extend(
-            DecisionItem(statement=item.feature, rationale="Owner-selected benchmark candidate")
-            for item in latest.synthesis.features
-            if item.id in latest.selected_ids
-        )
+        self._render_benchmark_stage(current, history)
         for downstream in state.stage_states.values():
             if Stage.ordered().index(downstream.stage) > Stage.ordered().index(stage):
                 downstream.stale = True
-        current.latest_markdown = current.latest_markdown.split("\n\n## Benchmark", 1)[0] + render_benchmark(
-            history,
-        )
         versions = [item.version for item in self.documents.list_all(session_id) if item.stage is stage]
         self.documents.create_version(
             StepDocument(
@@ -1215,3 +1210,44 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
             ),
         )
         self.sessions.save_state(session_id, state)
+
+    def _render_benchmark_stage(self, current: StageState, history: list[Benchmark]) -> None:
+        """Reconcile explicit selections and regenerate the complete framing document.
+
+        Args:
+            current (StageState): Mutable framing state.
+            history (list[Benchmark]): Ordered benchmark versions.
+        """
+        if not history:
+            return
+        marker = "Owner-selected benchmark candidate"
+        latest = history[-1]
+        current.decisions = [item for item in current.decisions if item.rationale != marker]
+        current.decisions.extend(
+            DecisionItem(id=item.id, statement=item.feature, rationale=marker)
+            for item in latest.synthesis.features
+            if item.id in latest.selected_ids
+        )
+        analysis = AssistantAnalysis.model_validate({
+            key: value
+            for key, value in current.model_dump().items()
+            if key in AssistantAnalysis.model_fields and key != "partial_fields"
+        })
+        analysis.decisions = [
+            item.model_copy(update={"statement": escape_markdown(item.statement)})
+            if item.rationale == marker
+            else item
+            for item in analysis.decisions
+        ]
+        validation = StageValidationResult(
+            stage=current.stage,
+            coverage=current.coverage,
+            readiness=current.readiness,
+            stage_is_clear_enough=current.stage_is_clear_enough,
+            transition_decision_reason=current.transition_decision_reason,
+        )
+        current.latest_markdown = self.renderer.render(
+            stage=current.stage,
+            analysis=analysis,
+            validation=validation,
+        ) + render_benchmark(history)

@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
     from brainstorm_agent.core.application import TurnEvent
+    from brainstorm_agent.core.research import Benchmark
     from brainstorm_agent.services.session_service import SessionService
 
 # Longest silence on a turn stream before a keepalive goes out. It stays well under
@@ -91,3 +92,25 @@ async def stream_in_worker(
                 await asyncio.shield(asyncio.wrap_future(worker))
             finally:
                 executor.shutdown(wait=False)
+
+
+async def research_in_worker(service: SessionService, session_id: str) -> Benchmark:
+    """Keep synchronous database and lock acquisition off the HTTP event loop.
+
+    Cancellation waits for the worker before the request-scoped database is closed.
+    The research operation itself has a deadline shorter than its lock lease.
+
+    Args:
+        service (SessionService): Owner-authorized request service.
+        session_id (str): Owned session id.
+
+    Returns:
+        Benchmark: Committed execution.
+    """
+    with ThreadPoolExecutor(max_workers=1, thread_name_prefix="session-research") as executor:
+        worker = executor.submit(lambda: asyncio.run(service.research(session_id)))
+        try:
+            return await asyncio.shield(asyncio.wrap_future(worker))
+        finally:
+            with CancelScope(shield=True):
+                await asyncio.shield(asyncio.wrap_future(worker))
