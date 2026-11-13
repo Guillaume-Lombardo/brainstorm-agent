@@ -1,10 +1,12 @@
 """Thin HTTP transport for the application session service."""
 
 from collections.abc import AsyncIterator  # noqa: TC003
+from contextlib import aclosing
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
+from starlette.concurrency import run_in_threadpool
 
 from brainstorm_agent.api.dependencies import get_session_service
 from brainstorm_agent.api.schemas import PostMessageRequest  # noqa: TC001
@@ -22,6 +24,7 @@ from brainstorm_agent.core.application import (
 from brainstorm_agent.core.enums import Stage  # noqa: TC001
 from brainstorm_agent.core.models import SessionOverview, StepDocument  # noqa: TC001
 from brainstorm_agent.services.session_service import SessionService
+from brainstorm_agent.services.streaming import stream_in_worker
 
 router = APIRouter(prefix="/sessions", tags=["application"])
 Service = Annotated[SessionService, Depends(get_session_service)]
@@ -246,11 +249,12 @@ async def stream_turn(session_id: str, payload: PostMessageRequest, service: Ser
     Returns:
         StreamingResponse: Application service result.
     """
-    service.prepare_turn(session_id)
+    await run_in_threadpool(service.prepare_turn, session_id)
 
     async def events() -> AsyncIterator[str]:
-        async for event in service.stream_turn(session_id, payload.content):
-            yield f"event: {event.type}\ndata: {event.model_dump_json()}\n\n"
+        async with aclosing(stream_in_worker(service, session_id, payload.content)) as stream:
+            async for event in stream:
+                yield f"event: {event.type}\ndata: {event.model_dump_json()}\n\n"
 
     return StreamingResponse(
         events(),

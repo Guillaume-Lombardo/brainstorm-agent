@@ -18,6 +18,7 @@ from brainstorm_agent.api.routes.auth import router as auth_router
 from brainstorm_agent.api.routes.openai import router as openai_router
 from brainstorm_agent.api.routes.sessions import router as session_router
 from brainstorm_agent.core.application import TurnEvent
+from brainstorm_agent.core.stage_contracts import STAGE_MODELS
 from brainstorm_agent.exceptions import ConflictError, LLMResponseError, LockAcquisitionError, NotFoundError
 from brainstorm_agent.logging import get_logger
 from brainstorm_agent.settings import get_settings
@@ -122,7 +123,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.add_middleware(
             CORSMiddleware,
             allow_origins=app_settings.cors_origins,
-            allow_credentials=True,
+            allow_credentials=False,
             allow_methods=["GET", "POST", "PATCH", "DELETE"],
             allow_headers=["Authorization", "Content-Type", "X-API-Key"],
         )
@@ -178,7 +179,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         schema = original_openapi()
         event = TypeAdapter(TurnEvent).json_schema(ref_template="#/components/schemas/{model}")
         schema["components"]["schemas"].update(event.pop("$defs", {}))
-        schema["components"]["schemas"]["TurnEvent"] = event
+        components = schema["components"]["schemas"]
+        components["TurnEvent"] = event
+        concrete_fields = []
+        for model in STAGE_MODELS.values():
+            fields = model.model_json_schema(ref_template="#/components/schemas/{model}")  # noqa: RUF027
+            components.update(fields.pop("$defs", {}))
+            components[model.__name__] = fields
+            concrete_fields.append({"$ref": f"#/components/schemas/{model.__name__}"})
+        components["StageFields"] = {"anyOf": concrete_fields}
         return schema
 
     app.openapi: Any = application_openapi

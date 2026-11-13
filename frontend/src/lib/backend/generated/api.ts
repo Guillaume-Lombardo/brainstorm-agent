@@ -918,6 +918,62 @@ export interface components {
       waves?: string[][];
     };
     /**
+     * BacklogFields
+     * @description Stage 6 Backlog Synthesis contract.
+     */
+    BacklogFields: {
+      /**
+       * Cross Cutting Work
+       * @description Cross cutting work
+       * @default null
+       */
+      cross_cutting_work: components["schemas"]["BacklogItem"][] | null;
+      /**
+       * Mvp User Stories
+       * @description Mvp user stories
+       * @default null
+       */
+      mvp_user_stories: components["schemas"]["BacklogItem"][] | null;
+      /**
+       * Risk Spikes
+       * @description Risk spikes
+       * @default null
+       */
+      risk_spikes: components["schemas"]["BacklogItem"][] | null;
+    };
+    /**
+     * BacklogItem
+     * @description Identified backlog entry updated by id across turns.
+     */
+    BacklogItem: {
+      /**
+       * Capability
+       * @default null
+       */
+      capability: string | null;
+      /**
+       * Definition Of Done
+       * @default
+       */
+      definition_of_done: string;
+      /** Ears Criteria */
+      ears_criteria?: string[];
+      /** Id */
+      id?: string;
+      /**
+       * Link
+       * @default
+       */
+      link: string;
+      /**
+       * Objective
+       * @default
+       */
+      objective: string;
+      /** Statement */
+      statement: string;
+    };
+    /**
      * Clarification
      * @description Explicit answer to an identified question.
      */
@@ -1083,6 +1139,60 @@ export interface components {
       items: components["schemas"]["StepDocument"][];
     };
     /**
+     * EventFields
+     * @description Stage 3 Event Storming contract.
+     */
+    EventFields: {
+      /**
+       * Actors
+       * @description Actors
+       * @default null
+       */
+      actors: string[] | null;
+      /**
+       * Aggregates
+       * @description Aggregates
+       * @default null
+       */
+      aggregates: string[] | null;
+      /**
+       * Business Rules
+       * @description Business rules
+       * @default null
+       */
+      business_rules: string[] | null;
+      /**
+       * Commands
+       * @description Commands
+       * @default null
+       */
+      commands: string[] | null;
+      /**
+       * Complexity Hotspots
+       * @description Complexity hotspots
+       * @default null
+       */
+      complexity_hotspots: string[] | null;
+      /**
+       * Domain Events
+       * @description Domain events
+       * @default null
+       */
+      domain_events: string[] | null;
+      /**
+       * Event Storming Relevant
+       * @description Event storming relevant
+       * @default null
+       */
+      event_storming_relevant: boolean | null;
+      /**
+       * Not Relevant Reason
+       * @description Not relevant reason
+       * @default null
+       */
+      not_relevant_reason: string | null;
+    };
+    /**
      * ExportJsonResponse
      * @description Structured JSON export payload.
      */
@@ -1174,6 +1284,42 @@ export interface components {
     HumanReviewsResponse: {
       /** Items */
       items: components["schemas"]["HumanReviewRecord"][];
+    };
+    /**
+     * ImpactFields
+     * @description Stage 4 Impact Mapping contract.
+     */
+    ImpactFields: {
+      /**
+       * Business Goal
+       * @description Business goal
+       * @default null
+       */
+      business_goal: string | null;
+      /**
+       * Deliverables
+       * @description Deliverables
+       * @default null
+       */
+      deliverables: string[] | null;
+      /**
+       * Expected Behaviors
+       * @description Expected behaviors
+       * @default null
+       */
+      expected_behaviors: string[] | null;
+      /**
+       * Influential Actors
+       * @description Influential actors
+       * @default null
+       */
+      influential_actors: string[] | null;
+      /**
+       * Value Hypotheses
+       * @description Value hypotheses
+       * @default null
+       */
+      value_hypotheses: string[] | null;
     };
     /**
      * MessageDelta
@@ -1521,6 +1667,36 @@ export interface components {
       transition_decision_reason: string;
     };
     /**
+     * PitchFields
+     * @description Stage 0 Pitch contract.
+     */
+    PitchFields: {
+      /**
+       * Ambiguities
+       * @description Ambiguities
+       * @default null
+       */
+      ambiguities: string[] | null;
+      /**
+       * Clear Points
+       * @description Clear points
+       * @default null
+       */
+      clear_points: string[] | null;
+      /**
+       * Missing Information
+       * @description Missing information
+       * @default null
+       */
+      missing_information: string[] | null;
+      /**
+       * Pitch Summary
+       * @description Pitch summary
+       * @default null
+       */
+      pitch_summary: string | null;
+    };
+    /**
      * PostMessageRequest
      * @description Request payload for a user message.
      */
@@ -1580,6 +1756,60 @@ export interface components {
       uncertainties: string[];
     };
     /**
+     * ProblemFields
+     * @description Stage 1 Problem Framing contract.
+     */
+    ProblemFields: {
+      /**
+       * Constraints
+       * @description Constraints
+       * @default null
+       */
+      constraints: string[] | null;
+      /**
+       * Five W One H
+       * @description Five w one h
+       * @default null
+       */
+      five_w_one_h: string | null;
+      /**
+       * Hypotheses
+       * @description Hypotheses
+       * @default null
+       */
+      hypotheses: string[] | null;
+      /**
+       * Initial Risks
+       * @description Initial risks
+       * @default null
+       */
+      initial_risks: string[] | null;
+      /**
+       * Measurable Objectives
+       * @description Measurable objectives
+       * @default null
+       */
+      measurable_objectives: string[] | null;
+      /**
+       * Non Goals
+       * @description Non goals
+       * @default null
+       */
+      non_goals: string[] | null;
+      /**
+       * Problem Statement
+       * @description Problem statement
+       * @default null
+       */
+      problem_statement: string | null;
+      /**
+       * Users Actors
+       * @description Users actors
+       * @default null
+       */
+      users_actors: string[] | null;
+    };
+    /**
      * QuestionPriority
      * @description Ordered elicitation topics.
      * @enum {string}
@@ -1624,6 +1854,38 @@ export interface components {
        * @enum {string}
        */
       type: "review.required";
+    };
+    /**
+     * RiskField
+     * @description Typed risk field with stable identity.
+     */
+    RiskField: {
+      /** Action */
+      action: string;
+      /** Category */
+      category: string;
+      /** Description */
+      description: string;
+      /** Id */
+      id?: string;
+      /** Impact */
+      impact: string;
+      /** Mitigation */
+      mitigation: string;
+      /** Probability */
+      probability: string;
+    };
+    /**
+     * RiskFields
+     * @description Stage 5 Risk Storming contract.
+     */
+    RiskFields: {
+      /**
+       * Risks By Category
+       * @description Risks by category
+       * @default null
+       */
+      risks_by_category: components["schemas"]["RiskField"][] | null;
     };
     /**
      * RiskItem
@@ -1812,11 +2074,14 @@ export interface components {
        */
       type: "stage.changed";
     };
-    /**
-     * StageFields
-     * @description Common strict contract and mapping view for domain rules.
-     */
-    StageFields: Record<string, never>;
+    StageFields:
+      | components["schemas"]["PitchFields"]
+      | components["schemas"]["ProblemFields"]
+      | components["schemas"]["StoryMapFields"]
+      | components["schemas"]["EventFields"]
+      | components["schemas"]["ImpactFields"]
+      | components["schemas"]["RiskFields"]
+      | components["schemas"]["BacklogFields"];
     /**
      * StagePatch
      * @description Replace supplied fields or identified item collections, then validate.
@@ -1935,6 +2200,54 @@ export interface components {
       uncertainties?: string[];
       /** Version */
       version: number;
+    };
+    /**
+     * StoryMapFields
+     * @description Stage 2 User Story Mapping contract.
+     */
+    StoryMapFields: {
+      /**
+       * Actors Personas
+       * @description Actors personas
+       * @default null
+       */
+      actors_personas: string[] | null;
+      /**
+       * Capabilities
+       * @description Capabilities
+       * @default null
+       */
+      capabilities: string[] | null;
+      /**
+       * Dependencies
+       * @description Dependencies
+       * @default null
+       */
+      dependencies: string[] | null;
+      /**
+       * Edge Cases
+       * @description Edge cases
+       * @default null
+       */
+      edge_cases: string[] | null;
+      /**
+       * Functional Gaps
+       * @description Functional gaps
+       * @default null
+       */
+      functional_gaps: string[] | null;
+      /**
+       * Mvp Scope
+       * @description Mvp scope
+       * @default null
+       */
+      mvp_scope: string[] | null;
+      /**
+       * User Journeys
+       * @description User journeys
+       * @default null
+       */
+      user_journeys: string[] | null;
     };
     /**
      * TurnCompleted

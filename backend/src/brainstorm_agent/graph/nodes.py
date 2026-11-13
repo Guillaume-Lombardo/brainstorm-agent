@@ -19,7 +19,7 @@ from brainstorm_agent.core.models import (
     StageValidationResult,
 )
 from brainstorm_agent.core.validation import validate_stage
-from brainstorm_agent.services.llm_client import OpenAICompatibleBrainstormLLM
+from brainstorm_agent.services.llm_client import StreamingReply
 
 if TYPE_CHECKING:
     from brainstorm_agent.graph.state import TurnGraphState
@@ -145,7 +145,7 @@ def make_render_node(renderer: MarkdownRenderer, llm: BrainstormLLM) -> TurnNode
             update={"open_questions": selected_questions(analysis.open_questions)},
         )
         callback = state.get("on_delta")
-        if callback is not None and isinstance(llm, OpenAICompatibleBrainstormLLM):
+        if callback is not None and isinstance(llm, StreamingReply):
             parts = []
             async for part in llm.stream_reply(
                 stage=stage,

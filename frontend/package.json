@@ -50,12 +50,12 @@
     "e2e": "playwright test",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "generate:api": "node scripts/generate-api.mjs",
     "lint": "eslint --max-warnings=0 .",
     "start": "next start",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "next typegen && tsc --noEmit",
-    "generate:api": "node scripts/generate-api.mjs"
+    "typecheck": "next typegen && tsc --noEmit"
   },
   "version": "0.1.0"
 }

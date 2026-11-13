@@ -69,3 +69,18 @@ def test_stream_error_is_terminal_sanitized_and_rolls_back(tmp_path: Path, mocke
     assert "private provider detail" not in response.text
     assert len(client.get(base + "/messages").json()["items"]) == 1
     assert client.get(base + "/documents").json()["items"] == []
+
+
+def test_openapi_exposes_concrete_stage_fields(tmp_path: Path) -> None:
+    client = TestClient(
+        create_app(
+            Settings(
+                database_url=f"sqlite+pysqlite:///{tmp_path / 'schema.db'}",
+                llm_mode=LLMMode.FAKE,
+                redis_url="redis://localhost:6399/0",
+            ),
+        ),
+    )
+    schemas = client.get("/openapi.json").json()["components"]["schemas"]
+    assert {"$ref": "#/components/schemas/PitchFields"} in schemas["StageFields"]["anyOf"]
+    assert "pitch_summary" in schemas["PitchFields"]["properties"]

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import difflib
-from collections.abc import AsyncIterator, Awaitable, Callable  # noqa: TC003
+from collections.abc import AsyncGenerator, Awaitable, Callable  # noqa: TC003
 from contextlib import suppress
 from typing import TYPE_CHECKING, Any
 from uuid import uuid4
@@ -446,8 +446,11 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
         Raises:
             missing_document: If no document exists yet.
         """
-        self._require_owned(session_id)
-        document = self.documents.get_current(session_id)
+        state = self.sessions.to_state(self._require_owned(session_id))
+        document = self.documents.get_current(
+            session_id,
+            excluded_stages=[item.stage for item in state.stage_states.values() if item.stale],
+        )
         if document is None:
             raise NotFoundError.missing_document(session_id)
         return document
@@ -622,8 +625,13 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
             for row in rows:
                 state = self.sessions.to_state(row)
                 if not state.deleted and (include_archived or not state.archived):
-                    items.append(self.sessions.overview(row, self.open_questions.list_open(row.id)))
-        return SessionPage(items=items[offset : offset + limit], total=len(items), offset=offset, limit=limit)
+                    items.append(row)
+        return SessionPage(
+            items=[self.get_session(row.id) for row in items[offset : offset + limit]],
+            total=len(items),
+            offset=offset,
+            limit=limit,
+        )
 
     def update_session(
         self,
@@ -708,9 +716,10 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
                 message = "Reopen the stage before editing it."
                 raise ConflictError(message)
             current = state.stage_states.get(stage.value, StageState(stage=stage))
+            previous_fields = current.extracted_fields.model_dump()
             data = current.model_dump()
-            data["extracted_fields"] = current.extracted_fields.model_dump() | patch.fields
-            allowed = {"facts", "assumptions", "decisions", "risks", "open_questions"}
+            data["extracted_fields"] = previous_fields | patch.fields
+            allowed = {"facts", "assumptions", "decisions", "risks"}
             if patch.items.keys() - allowed:
                 message = "Unknown item collection."
                 raise ConflictError(message)
@@ -721,7 +730,9 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
                 message = "Edit does not match the stage contract."
                 raise ConflictError(message) from exc
             current.partial_fields = {
-                key: value for key, value in current.partial_fields.items() if key not in patch.fields
+                key: value
+                for key, value in current.partial_fields.items()
+                if key not in patch.fields or patch.fields[key] == previous_fields.get(key)
             }
             analysis_data = {
                 key: value
@@ -752,7 +763,18 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
                 validation=validation,
             )
             state.stage_states[stage.value] = current
-            state.pending_human_review = None
+            state.pending_human_review = (
+                PendingHumanReview(
+                    from_stage=stage,
+                    to_stage=stage.next_stage(),
+                    summary=current.summary,
+                    transition_decision_reason=current.transition_decision_reason,
+                )
+                if self.settings.require_human_validation_for_transitions
+                and current.stage_is_clear_enough
+                and stage.next_stage() is not None
+                else None
+            )
             versions = [item.version for item in self.documents.list_all(session_id) if item.stage == stage]
             document = StepDocument(
                 session_id=session_id,
@@ -896,7 +918,7 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
         if self.get_session(session_id).pending_human_review is not None:
             raise ConflictError.pending_human_review_in_progress()
 
-    async def stream_turn(self, session_id: str, content: str) -> AsyncIterator[TurnEvent]:
+    async def stream_turn(self, session_id: str, content: str) -> AsyncGenerator[TurnEvent]:
         """Stream tentative provider deltas then committed state or terminal error.
 
         Args:
@@ -918,6 +940,7 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
         task = asyncio.create_task(
             self.aprocess_user_message(session_id=session_id, content=content, on_delta=on_delta),
         )
+        waiter: asyncio.Task[str] | None = None
         try:
             while not task.done() or not queue.empty():
                 waiter = asyncio.create_task(queue.get())
@@ -946,6 +969,10 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
             self.db_session.rollback()
             yield TurnError()
         finally:
+            if waiter is not None and not waiter.done():
+                waiter.cancel()
+                with suppress(asyncio.CancelledError):
+                    await waiter
             if not task.done():
                 task.cancel()
                 with suppress(asyncio.CancelledError):

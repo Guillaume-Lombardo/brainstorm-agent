@@ -22,14 +22,19 @@ Pagination uses offset/limit with a deterministic creation-time/id order.
 Only earlier visited stages may be reopened. This clears pending review and marks every visited
 downstream stage stale. Direct edits require the active stage, replace supplied field values or
 item collections, run the shared deterministic gate and create an immutable document version.
-Edits never advance the workflow. Section comments enter the next analysis context and are marked
+Edits never advance the workflow. Complete edits rebuild pending human review when configured.
+Blocking questions cannot be removed through direct edits; they require a conversational answer.
+Unchanged values retain partial-coverage findings. Section comments enter the next analysis context and are marked
 consumed only when that turn commits.
 
 The turn endpoint streams named SSE events containing discriminated JSON payloads:
 `turn.started`, `analysis.status`, `message.delta`, `document.updated`, `coverage.updated`,
 optional `stage.changed` and `review.required`, then `turn.completed`.
+A dedicated worker thread owns each turn's synchronous SQL/Redis operations and provider loop,
+relaying events to the HTTP loop without blocking other requests.
 Failures terminate with a sanitized `error`. Deltas come from the conversational provider stream
-and remain tentative until commit. Disconnect cancels the turn task. There is no event replay,
+and remain tentative until commit. Cancellation of the stream generator cancels its turn task. Transport disconnect detection is
+best effort; a turn already entering persistence can commit in full after a disconnect. There is no event replay,
 Last-Event-ID recovery or automatic retry contract. HTTP authorization and pending-review errors
 occur before stream headers; runtime failures use the terminal error event.
 

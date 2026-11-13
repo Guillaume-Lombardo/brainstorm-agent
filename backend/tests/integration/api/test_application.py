@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 from brainstorm_agent.api.dependencies import get_session_service
 from brainstorm_agent.api.main import create_app
 from brainstorm_agent.core.enums import LLMMode
+from brainstorm_agent.persistence.repositories import SessionRepository
 from brainstorm_agent.services.session_service import SessionService
 from brainstorm_agent.services.users import UserService
 from brainstorm_agent.settings import Settings
@@ -61,6 +62,7 @@ def test_reopen_edits_versions_comments_and_exports(tmp_path: Path) -> None:
     reopened = client.post(base + f"/stages/{STAGE}/reopen").json()
     assert reopened["stage_states"]["stage_1_problem_framing"]["stale"]
     assert reopened["current_stage"] == STAGE
+    assert client.get(base + "/document").json()["stage"] == STAGE
     edited = client.patch(
         base + f"/stages/{STAGE}",
         json={
@@ -169,7 +171,6 @@ def test_direct_edit_rechecks_gate_questions(tmp_path: Path) -> None:
     result = client.patch(
         base + f"/stages/{STAGE}",
         json={
-            "items": {"open_questions": []},
             "fields": {
                 "clear_points": ["Guided framing"],
                 "ambiguities": ["Audience"],
@@ -179,6 +180,42 @@ def test_direct_edit_rechecks_gate_questions(tmp_path: Path) -> None:
     )
     assert result.status_code == 200
     edited = result.json()["stage_states"][STAGE]
-    assert edited["stage_is_clear_enough"], edited["readiness"]
-    assert all(check["passed"] for check in edited["readiness"])
+    assert not edited["stage_is_clear_enough"]
+    assert client.patch(base + f"/stages/{STAGE}", json={"items": {"open_questions": []}}).status_code == 409
+    assert all(check["passed"] for check in edited["readiness"] if check["id"] != "blocking_questions")
     assert not any(question["id"].startswith("gate:") for question in edited["open_questions"])
+
+
+def test_edit_rebuilds_pending_review(tmp_path: Path) -> None:
+    client = client_for(tmp_path)
+    assert isinstance(client.app, FastAPI)
+    client.app.state.settings.require_human_validation_for_transitions = True
+    sid = client.post("/api/v1/sessions").json()["session_id"]
+    base = f"/api/v1/sessions/{sid}"
+    client.post(base + "/messages", json={"content": PITCH})
+    edited = client.patch(
+        base + f"/stages/{STAGE}/fields/pitch_summary",
+        json={"value": "Updated project framing service for teams"},
+    )
+    assert edited.json()["pending_human_review"] is not None
+    assert client.post(base + "/review", json={"stage": STAGE, "action": "approve"}).status_code == 200
+
+
+def test_identical_edit_preserves_partial_coverage(tmp_path: Path) -> None:
+    client = client_for(tmp_path)
+    assert isinstance(client.app, FastAPI)
+    client.app.state.settings.require_human_validation_for_transitions = True
+    sid = client.post("/api/v1/sessions").json()["session_id"]
+    base = f"/api/v1/sessions/{sid}"
+    client.post(base + "/messages", json={"content": PITCH})
+    with client.app.state.session_factory() as db:
+        repository = SessionRepository(db)
+        state = repository.to_state(repository.require(sid))
+        stage = state.stage_states[STAGE]
+        original = stage.extracted_fields.get("pitch_summary")
+        stage.partial_fields["pitch_summary"] = "Audience remains vague."
+        repository.save_state(sid, state)
+        db.commit()
+    result = client.patch(base + f"/stages/{STAGE}/fields/pitch_summary", json={"value": original}).json()
+    assert result["stage_states"][STAGE]["coverage"]["pitch_summary"] == "partial"
+    assert result["pending_human_review"] is None

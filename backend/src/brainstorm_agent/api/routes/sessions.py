@@ -253,6 +253,7 @@ def review_pending_transition(
     overview = session_service.review_pending_transition(
         session_id=session_id,
         approved=payload.decision.value == "approved",
+        request_changes=payload.decision.value == "request_changes",
         note=payload.note,
     )
     return SessionResponse.model_validate(overview.model_dump(mode="json"))

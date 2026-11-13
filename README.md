@@ -712,7 +712,7 @@ are unchanged. OpenAPI documents the full event union.
 
 - POST `/sessions/{id}/stages/{stage}/reopen`: earlier visited stage; downstream state becomes stale.
 - PATCH `/sessions/{id}/stages/{stage}`: `fields` maps field names to typed JSON values;
-  `items` maps facts/assumptions/decisions/risks/open_questions to replacement collections.
+  `items` maps facts/assumptions/decisions/risks to replacement collections.
   Only the active stage is editable; validation and a new document version follow every edit.
 - PATCH `/sessions/{id}/stages/{stage}/fields/{field}`: `{"value": ...}`.
 - POST `/sessions/{id}/comments`: `stage,section,body`; feeds the next successful analysis.

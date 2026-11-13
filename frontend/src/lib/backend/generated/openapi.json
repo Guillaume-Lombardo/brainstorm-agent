@@ -236,6 +236,118 @@
         "title": "BacklogExport",
         "type": "object"
       },
+      "BacklogFields": {
+        "additionalProperties": false,
+        "description": "Stage 6 Backlog Synthesis contract.",
+        "properties": {
+          "cross_cutting_work": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/BacklogItem"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cross cutting work",
+            "gate_required": true,
+            "title": "Cross Cutting Work"
+          },
+          "mvp_user_stories": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/BacklogItem"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Mvp user stories",
+            "gate_required": true,
+            "title": "Mvp User Stories"
+          },
+          "risk_spikes": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/BacklogItem"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Risk spikes",
+            "gate_required": true,
+            "title": "Risk Spikes"
+          }
+        },
+        "title": "BacklogFields",
+        "type": "object"
+      },
+      "BacklogItem": {
+        "additionalProperties": false,
+        "description": "Identified backlog entry updated by id across turns.",
+        "properties": {
+          "capability": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Capability"
+          },
+          "definition_of_done": {
+            "default": "",
+            "title": "Definition Of Done",
+            "type": "string"
+          },
+          "ears_criteria": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Ears Criteria",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "link": {
+            "default": "",
+            "title": "Link",
+            "type": "string"
+          },
+          "objective": {
+            "default": "",
+            "title": "Objective",
+            "type": "string"
+          },
+          "statement": {
+            "title": "Statement",
+            "type": "string"
+          }
+        },
+        "required": [
+          "statement"
+        ],
+        "title": "BacklogItem",
+        "type": "object"
+      },
       "Clarification": {
         "description": "Explicit answer to an identified question.",
         "properties": {
@@ -543,6 +655,144 @@
         "title": "DocumentsResponse",
         "type": "object"
       },
+      "EventFields": {
+        "additionalProperties": false,
+        "description": "Stage 3 Event Storming contract.",
+        "properties": {
+          "actors": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Actors",
+            "gate_required": false,
+            "title": "Actors"
+          },
+          "aggregates": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Aggregates",
+            "gate_required": false,
+            "title": "Aggregates"
+          },
+          "business_rules": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Business rules",
+            "gate_required": false,
+            "title": "Business Rules"
+          },
+          "commands": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Commands",
+            "gate_required": false,
+            "title": "Commands"
+          },
+          "complexity_hotspots": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Complexity hotspots",
+            "gate_required": false,
+            "title": "Complexity Hotspots"
+          },
+          "domain_events": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Domain events",
+            "gate_required": false,
+            "title": "Domain Events"
+          },
+          "event_storming_relevant": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Event storming relevant",
+            "gate_required": true,
+            "title": "Event Storming Relevant"
+          },
+          "not_relevant_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Not relevant reason",
+            "gate_required": false,
+            "title": "Not Relevant Reason"
+          }
+        },
+        "title": "EventFields",
+        "type": "object"
+      },
       "ExportJsonResponse": {
         "description": "Structured JSON export payload.",
         "properties": {
@@ -734,6 +984,96 @@
           "items"
         ],
         "title": "HumanReviewsResponse",
+        "type": "object"
+      },
+      "ImpactFields": {
+        "additionalProperties": false,
+        "description": "Stage 4 Impact Mapping contract.",
+        "properties": {
+          "business_goal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Business goal",
+            "gate_required": true,
+            "title": "Business Goal"
+          },
+          "deliverables": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Deliverables",
+            "gate_required": true,
+            "title": "Deliverables"
+          },
+          "expected_behaviors": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Expected behaviors",
+            "gate_required": true,
+            "title": "Expected Behaviors"
+          },
+          "influential_actors": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Influential actors",
+            "gate_required": true,
+            "title": "Influential Actors"
+          },
+          "value_hypotheses": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Value hypotheses",
+            "gate_required": true,
+            "title": "Value Hypotheses"
+          }
+        },
+        "title": "ImpactFields",
         "type": "object"
       },
       "MessageDelta": {
@@ -1431,6 +1771,79 @@
         "title": "PendingHumanReview",
         "type": "object"
       },
+      "PitchFields": {
+        "additionalProperties": false,
+        "description": "Stage 0 Pitch contract.",
+        "properties": {
+          "ambiguities": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Ambiguities",
+            "gate_required": true,
+            "title": "Ambiguities"
+          },
+          "clear_points": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Clear points",
+            "gate_required": true,
+            "title": "Clear Points"
+          },
+          "missing_information": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Missing information",
+            "gate_required": true,
+            "title": "Missing Information"
+          },
+          "pitch_summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Pitch summary",
+            "gate_required": true,
+            "title": "Pitch Summary"
+          }
+        },
+        "title": "PitchFields",
+        "type": "object"
+      },
       "PostMessageRequest": {
         "description": "Request payload for a user message.",
         "properties": {
@@ -1580,6 +1993,144 @@
         "title": "PostMessageResponse",
         "type": "object"
       },
+      "ProblemFields": {
+        "additionalProperties": false,
+        "description": "Stage 1 Problem Framing contract.",
+        "properties": {
+          "constraints": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Constraints",
+            "gate_required": true,
+            "title": "Constraints"
+          },
+          "five_w_one_h": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Five w one h",
+            "gate_required": true,
+            "title": "Five W One H"
+          },
+          "hypotheses": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Hypotheses",
+            "gate_required": true,
+            "title": "Hypotheses"
+          },
+          "initial_risks": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Initial risks",
+            "gate_required": true,
+            "title": "Initial Risks"
+          },
+          "measurable_objectives": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Measurable objectives",
+            "gate_required": true,
+            "title": "Measurable Objectives"
+          },
+          "non_goals": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Non goals",
+            "gate_required": true,
+            "title": "Non Goals"
+          },
+          "problem_statement": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Problem statement",
+            "gate_required": true,
+            "title": "Problem Statement"
+          },
+          "users_actors": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Users actors",
+            "gate_required": true,
+            "title": "Users Actors"
+          }
+        },
+        "title": "ProblemFields",
+        "type": "object"
+      },
       "QuestionPriority": {
         "description": "Ordered elicitation topics.",
         "enum": [
@@ -1671,6 +2222,75 @@
           "review"
         ],
         "title": "ReviewRequired",
+        "type": "object"
+      },
+      "RiskField": {
+        "additionalProperties": false,
+        "description": "Typed risk field with stable identity.",
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "impact": {
+            "title": "Impact",
+            "type": "string"
+          },
+          "mitigation": {
+            "title": "Mitigation",
+            "type": "string"
+          },
+          "probability": {
+            "title": "Probability",
+            "type": "string"
+          }
+        },
+        "required": [
+          "category",
+          "description",
+          "impact",
+          "probability",
+          "mitigation",
+          "action"
+        ],
+        "title": "RiskField",
+        "type": "object"
+      },
+      "RiskFields": {
+        "additionalProperties": false,
+        "description": "Stage 5 Risk Storming contract.",
+        "properties": {
+          "risks_by_category": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RiskField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Risks by category",
+            "gate_required": true,
+            "title": "Risks By Category"
+          }
+        },
+        "title": "RiskFields",
         "type": "object"
       },
       "RiskItem": {
@@ -2032,11 +2652,29 @@
         "type": "object"
       },
       "StageFields": {
-        "additionalProperties": false,
-        "description": "Common strict contract and mapping view for domain rules.",
-        "properties": {},
-        "title": "StageFields",
-        "type": "object"
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/PitchFields"
+          },
+          {
+            "$ref": "#/components/schemas/ProblemFields"
+          },
+          {
+            "$ref": "#/components/schemas/StoryMapFields"
+          },
+          {
+            "$ref": "#/components/schemas/EventFields"
+          },
+          {
+            "$ref": "#/components/schemas/ImpactFields"
+          },
+          {
+            "$ref": "#/components/schemas/RiskFields"
+          },
+          {
+            "$ref": "#/components/schemas/BacklogFields"
+          }
+        ]
       },
       "StagePatch": {
         "additionalProperties": false,
@@ -2272,6 +2910,133 @@
           "summary"
         ],
         "title": "StepDocument",
+        "type": "object"
+      },
+      "StoryMapFields": {
+        "additionalProperties": false,
+        "description": "Stage 2 User Story Mapping contract.",
+        "properties": {
+          "actors_personas": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Actors personas",
+            "gate_required": true,
+            "title": "Actors Personas"
+          },
+          "capabilities": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Capabilities",
+            "gate_required": true,
+            "title": "Capabilities"
+          },
+          "dependencies": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Dependencies",
+            "gate_required": true,
+            "title": "Dependencies"
+          },
+          "edge_cases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Edge cases",
+            "gate_required": true,
+            "title": "Edge Cases"
+          },
+          "functional_gaps": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Functional gaps",
+            "gate_required": true,
+            "title": "Functional Gaps"
+          },
+          "mvp_scope": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Mvp scope",
+            "gate_required": true,
+            "title": "Mvp Scope"
+          },
+          "user_journeys": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "User journeys",
+            "gate_required": true,
+            "title": "User Journeys"
+          }
+        },
+        "title": "StoryMapFields",
         "type": "object"
       },
       "TurnCompleted": {

@@ -295,18 +295,28 @@ class DocumentRepository:
         self.db_session.flush()
         return record
 
-    def get_current(self, session_id: str) -> StepDocument | None:
+    def get_current(
+        self,
+        session_id: str,
+        *,
+        excluded_stages: list[Stage] | None = None,
+    ) -> StepDocument | None:
         """Return the latest current stage document for a session.
 
         Args:
             session_id: Session identifier.
+            excluded_stages: Stages invalidated by reopening.
 
         Returns:
             StepDocument | None: Current document if one exists.
         """
         query = (
             select(DocumentRecord)
-            .where(DocumentRecord.session_id == session_id, DocumentRecord.is_current.is_(True))
+            .where(
+                DocumentRecord.session_id == session_id,
+                DocumentRecord.is_current.is_(True),
+                DocumentRecord.stage.not_in([stage.value for stage in excluded_stages or []]),
+            )
             .order_by(desc(DocumentRecord.created_at))
         )
         record = self.db_session.execute(query).scalars().first()
