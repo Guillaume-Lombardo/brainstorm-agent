@@ -23,6 +23,8 @@ from brainstorm_agent.core.application import (
 )
 from brainstorm_agent.core.enums import Stage  # noqa: TC001
 from brainstorm_agent.core.models import SessionOverview, StepDocument  # noqa: TC001
+from brainstorm_agent.core.research import Benchmark, FeatureSelection  # noqa: TC001
+from brainstorm_agent.services.search import SearchProviderName
 from brainstorm_agent.services.session_service import SessionService
 from brainstorm_agent.services.streaming import Keepalive, stream_in_worker
 
@@ -265,3 +267,70 @@ async def stream_turn(session_id: str, payload: PostMessageRequest, service: Ser
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+@router.get("/{session_id}/research")
+def research_history(session_id: str, service: Service) -> dict:
+    """Read owned benchmark history and configured availability.
+
+    Args:
+        session_id (str): Owned session.
+        service (Service): Application service.
+
+    Returns:
+        dict: Availability and versioned results.
+    """
+    return {
+        "enabled": service.settings.search_provider is not SearchProviderName.NONE,
+        "benchmarks": service.list_benchmarks(session_id),
+    }
+
+
+@router.post("/{session_id}/research")
+async def research_products(session_id: str, service: Service) -> StreamingResponse:
+    """Stream research completion while its async network calls execute.
+
+    Args:
+        session_id (str): Owned session.
+        service (Service): Application service.
+
+    Returns:
+        StreamingResponse: Start and terminal SSE events.
+    """
+    service.prepare_research(session_id)
+
+    async def events() -> AsyncIterator[str]:
+        yield "event: research.started\ndata: {}\n\n"
+        try:
+            result = await service.research(session_id)
+            yield f"event: research.completed\ndata: {result.model_dump_json()}\n\n"
+        except Exception:
+            service.db_session.rollback()
+            yield 'event: error\ndata: {"message":"La recherche a échoué. Vérifiez le fournisseur ou réessayez."}\n\n'
+
+    return StreamingResponse(
+        events(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@router.patch("/{session_id}/research/{benchmark_id}/selection")
+def select_research_features(
+    session_id: str,
+    benchmark_id: str,
+    payload: FeatureSelection,
+    service: Service,
+) -> Benchmark:
+    """Persist explicit owner selection.
+
+    Args:
+        session_id (str): Owned session.
+        benchmark_id (str): Execution id.
+        payload (FeatureSelection): Selected candidate ids.
+        service (Service): Application service.
+
+    Returns:
+        Benchmark: Updated execution.
+    """
+    return service.select_features(session_id, benchmark_id, payload)

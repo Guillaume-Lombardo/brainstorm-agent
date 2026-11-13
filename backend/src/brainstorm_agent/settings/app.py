@@ -11,6 +11,7 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 from brainstorm_agent.core.enums import AuthMode, ChallengePass, LLMMode, StructuredOutputMode
 from brainstorm_agent.exceptions import SettingsError
+from brainstorm_agent.services.search import SearchProviderName
 
 
 class Settings(BaseSettings):
@@ -102,6 +103,45 @@ class Settings(BaseSettings):
         default=5.0,
         validation_alias="REDIS_LOCK_BLOCKING_TIMEOUT_SECONDS",
     )
+
+    search_provider: SearchProviderName = SearchProviderName.NONE
+    searxng_base_url: str = ""
+    tavily_api_key: str | None = Field(default=None, repr=False)
+    tavily_search_url: str = "https://api.tavily.com/search"
+    brave_api_key: str | None = Field(default=None, repr=False)
+    brave_search_url: str = "https://api.search.brave.com/res/v1/web/search"
+    litellm_search_api_key: str | None = Field(default=None, repr=False)
+    litellm_search_url: str = ""
+    search_tool_name: str = ""
+    search_timeout_seconds: float = Field(default=20, gt=0, le=60)
+
+    @model_validator(mode="after")
+    def _validate_search(self) -> Settings:
+        """Validate required search routing at startup.
+
+        Returns:
+            Settings: Validated settings.
+
+        Raises:
+            ValueError: Missing required configuration or unsafe fake mode.
+        """
+        required = {
+            SearchProviderName.SEARXNG: ["searxng_base_url"],
+            SearchProviderName.TAVILY: ["tavily_api_key", "tavily_search_url"],
+            SearchProviderName.BRAVE: ["brave_api_key", "brave_search_url"],
+            SearchProviderName.LITELLM: ["litellm_search_api_key", "litellm_search_url", "search_tool_name"],
+        }
+        for name in required.get(self.search_provider, []):
+            if not getattr(self, name):
+                raise ValueError(f"SEARCH_PROVIDER={self.search_provider} requires {name.upper()}")  # noqa: TRY003 - Sanitized actionable application error
+            if name.endswith(("url", "base_url")) and urlsplit(getattr(self, name)).scheme not in {
+                "http",
+                "https",
+            }:
+                raise ValueError(f"{name.upper()} must use HTTP or HTTPS")  # noqa: TRY003 - Sanitized actionable application error
+        if self.search_provider is SearchProviderName.FAKE and self.llm_mode is not LLMMode.FAKE:
+            raise ValueError("SEARCH_PROVIDER=fake requires LLM_MODE=fake")  # noqa: TRY003 - Sanitized actionable application error
+        return self
 
     llm_mode: LLMMode = Field(default=LLMMode.OPENAI, validation_alias="LLM_MODE")
     llm_output_mode: StructuredOutputMode = Field(

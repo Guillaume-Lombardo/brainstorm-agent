@@ -114,3 +114,14 @@ class PromptLoader:
             str: Rendering prompt text.
         """
         return self._read("rendering/step-markdown.md")
+
+    def research_prompt(self, responsibility: str) -> str:
+        """Read one versioned research responsibility.
+
+        Args:
+            responsibility (str): Queries or synthesis prompt name.
+
+        Returns:
+            str: Versioned task prompt.
+        """
+        return self._read(f"research/{responsibility}.md")

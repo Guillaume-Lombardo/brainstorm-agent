@@ -236,3 +236,23 @@ test("a French pitch gets readable gate questions and a formatted reply", async 
   await expect(panel.locator('[data-recommended="true"]')).toHaveCount(3);
   await page.screenshot({ path: `${SCREENSHOTS}/07-questions-fr.png` });
 });
+
+
+test("research products and retain two benchmark features", async ({ page }) => {
+  await signIn(page, "journey@example.com");
+  await createSession(page, "Benchmark project");
+  await send(page, PITCH);
+  await expect(page.getByRole("button", {name: "Rechercher des produits similaires"})).toBeVisible();
+  await send(page, "problem: Teams need shared project framing");
+  await expect(page.getByRole("button", {name: "Send", exact: true})).toBeEnabled();
+  await page.getByRole("button", {name: "Rechercher des produits similaires"}).click();
+  const panel = page.getByRole("region", {name: "Benchmark"});
+  await expect(panel.getByText("Frameboard", {exact: true})).toBeVisible();
+  await panel.getByRole("checkbox").nth(0).check();
+  await panel.getByRole("checkbox").nth(1).check();
+  await panel.getByRole("button", {name: "Valider les fonctionnalités retenues"}).click();
+  await expect(panel.getByRole("button", {name: "Valider les fonctionnalités retenues"})).toBeEnabled();
+  await page.screenshot({path: `${SCREENSHOTS}/10-benchmark.png`, fullPage: true});
+  await page.reload();
+  await expect(page.getByRole("region", {name: "Benchmark"}).getByRole("checkbox").nth(0)).toBeChecked();
+});

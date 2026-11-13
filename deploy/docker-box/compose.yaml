@@ -26,6 +26,8 @@ x-backend-env: &backend-env
   JWT_AUDIENCE: brainstorm-backend
   AUTH_BRIDGE_SECRET: ${BRAINSTORM_AUTH_BRIDGE_SECRET:?set BRAINSTORM_AUTH_BRIDGE_SECRET as a Dockhand secret variable}
   RATE_LIMIT_ENABLED: "true"
+  SEARCH_PROVIDER: searxng
+  SEARXNG_BASE_URL: http://searxng:8080
   LLM_MODE: ${BRAINSTORM_LLM_MODE:-openai}
   OPENAI_BASE_URL: ${BRAINSTORM_LLM_BASE_URL:-http://10.16.0.117:4000/v1}
   OPENAI_API_KEY: ${BRAINSTORM_LLM_API_KEY:?set BRAINSTORM_LLM_API_KEY as a Dockhand secret variable}
@@ -43,6 +45,16 @@ x-backend-env: &backend-env
   REDIS_LOCK_TIMEOUT_SECONDS: ${BRAINSTORM_REDIS_LOCK_TIMEOUT_SECONDS:-1800}
 
 services:
+  searxng:
+    image: searxng/searxng:2026.11.13-8a53a6aa5
+    restart: unless-stopped
+    environment:
+      SEARXNG_SECRET: ${BRAINSTORM_SEARXNG_SECRET:?set BRAINSTORM_SEARXNG_SECRET as a secret variable}
+    volumes:
+      - ../searxng/settings.yml:/etc/searxng/settings.yml:ro
+    security_opt:
+      - no-new-privileges:true
+
   caddy:
     build: ../caddy
     restart: unless-stopped

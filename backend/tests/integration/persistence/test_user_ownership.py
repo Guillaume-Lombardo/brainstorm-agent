@@ -49,6 +49,8 @@ def test_shared_service_requires_owner_on_every_operation(tmp_path: Path, mocker
             other.export_markdown,
             other.export_json,
             other.list_human_reviews,
+            other.list_benchmarks,
+            other.prepare_research,
         ]:
             with pytest.raises(NotFoundError):
                 operation(session_id)

@@ -22,6 +22,7 @@ import { DeliveryView } from "./delivery-view";
 import { DocumentPanel } from "./document-panel";
 import { ExportMenu } from "./export-menu";
 import { OpenQuestions } from "./open-questions";
+import { ResearchPanel } from "./research-panel";
 import { ReviewBar } from "./review-bar";
 import { StageDetails } from "./stage-details";
 import { StageStepper } from "./stage-stepper";
@@ -201,6 +202,7 @@ function WorkspaceView({ initialSnapshot }: { initialSnapshot: SessionSnapshot }
           />
         </aside>
         <section className="flex min-h-[60vh] flex-col lg:min-h-0" aria-label="Conversation">
+          <ResearchPanel sessionId={sessionId} available={session.current_stage !== "stage_0_pitch"} disabled={busy || archived} onChanged={refresh} />
           <ChatPanel
             messages={state.messages}
             streaming={state.streaming}

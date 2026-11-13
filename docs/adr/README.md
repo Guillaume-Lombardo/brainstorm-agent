@@ -30,3 +30,4 @@
 - [0009-user-authentication](0009-user-authentication.md)
 - [ADR 0010: Application API and event stream](0010-application-api-and-event-stream.md)
 - [ADR 0011: Frontend architecture](0011-frontend-architecture.md)
+- [0012: Optional sourced product benchmark](0012-similar-products-research.md)
