@@ -11,7 +11,6 @@ from brainstorm_agent.services.locks import NoopSessionLockManager
 from brainstorm_agent.services.prompt_loader import PromptLoader
 from brainstorm_agent.settings import Settings
 
-
 if TYPE_CHECKING:
     from openai import AsyncOpenAI
 
