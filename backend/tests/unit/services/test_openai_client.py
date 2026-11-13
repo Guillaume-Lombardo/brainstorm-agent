@@ -147,7 +147,7 @@ def test_challenge_only_appends_findings():
     fields = analysis.extracted_fields.model_dump()
     result = run_async(llm.challenge(stage=analysis.stage, analysis=analysis))
     assert result.extracted_fields.model_dump() == fields
-    assert result.uncertainties == ["Contradiction"]
+    assert result.contradictions == ["Contradiction"]
 
 
 def test_missing_provider_configuration_fails_before_client_creation(mocker):

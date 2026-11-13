@@ -108,23 +108,23 @@
 
 #### Steps
 
-- [ ] Coverage taxonomy: each stage field is `clear | partial | missing`; code is authoritative for
+- [x] Coverage taxonomy: each stage field is `clear | partial | missing`; code is authoritative for
       `missing`, the LLM proposes `partial` with a reason.
-- [ ] Declarative stage rules with rejections (condition + message), e.g.:
-  - [ ] measurable objectives contain a metric or a target value;
-  - [ ] at least 3 risks across at least 2 categories, no generic mitigation (`TBD`, empty);
-  - [ ] MVP scope items exist in the capability list;
-  - [ ] every backlog item links to an existing goal, risk or hypothesis id;
-  - [ ] stage 3 "not relevant" requires a justification (migrate the existing rule).
-- [ ] Readiness checklist per stage, rendered in the stage document (`passed/total`).
-- [ ] Question budget: at most 3 questions per turn, prioritized (scope > security/compliance > UX >
+- [x] Declarative stage rules with rejections (condition + message), e.g.:
+  - [x] measurable objectives contain a metric or a target value;
+  - [x] at least 3 risks across at least 2 categories, no generic mitigation (`TBD`, empty);
+  - [x] MVP scope items exist in the capability list;
+  - [x] every backlog item links to an existing goal, risk or hypothesis id;
+  - [x] stage 3 "not relevant" requires a justification (migrate the existing rule).
+- [x] Readiness checklist per stage, rendered in the stage document (`passed/total`).
+- [x] Question budget: at most 3 questions per turn, prioritized (scope > security/compliance > UX >
       technical), each with `why_it_matters`, optional answer options and a recommended option.
-- [ ] Default assumptions for non-critical gaps (D5), flagged and listed for confirmation.
-- [ ] Timestamped `Clarifications` log (question -> answer) in each stage document.
-- [ ] Cross-stage consistency checks (impact-map actors vs stage 1 actors, backlog vs MVP scope).
-- [ ] Stage 6 backlog items carry objective, definition of done, link, and optional EARS acceptance
+- [x] Default assumptions for non-critical gaps (D5), flagged and listed for confirmation.
+- [x] Timestamped `Clarifications` log (question -> answer) in each stage document.
+- [x] Cross-stage consistency checks (impact-map actors vs stage 1 actors, backlog vs MVP scope).
+- [x] Stage 6 backlog items carry objective, definition of done, link, and optional EARS acceptance
       criteria ("WHEN ... THE SYSTEM SHALL ...").
-- [ ] Deterministic unit tests for every rule and for the transition decision table.
+- [x] Deterministic unit tests for every rule and for the transition decision table.
 
 ### Lot 3: Evaluation harness
 

@@ -6,11 +6,14 @@ from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
+from brainstorm_agent.core.elicitation import filter_defaults, selected_questions
 from brainstorm_agent.core.enums import Stage
 from brainstorm_agent.core.models import (
     AssistantAnalysis,
     AssistantTurnOutput,
     BrainstormSessionState,
+    Clarification,
+    OpenQuestionItem,
     StageState,
     StageValidationResult,
 )
@@ -47,6 +50,13 @@ def make_extract_node(llm: BrainstormLLM) -> TurnNode:
             if current_stage_state
             else None,
         )
+        if current_stage_state:
+            analysis.clarifications = [
+                Clarification(question_id=q.id, question=q.question, answer=state["user_message"])
+                for q in current_stage_state.open_questions
+                if q.id in analysis.resolved_question_ids
+            ]
+        filter_defaults(analysis)
         analysis = merge_analysis(previous=current_stage_state, patch=analysis)
         return {"analysis": analysis.model_dump(mode="json")}
 
@@ -83,10 +93,27 @@ def apply_stage_rules(state: TurnGraphState) -> dict[str, object]:
     """
     stage = Stage(state["current_stage"])
     analysis = AssistantAnalysis.model_validate(state["analysis"])
+    analysis.open_questions = [q for q in analysis.open_questions if not q.id.startswith("gate:")]
     validation = validate_stage(
         stage=stage,
         extracted_fields=analysis.extracted_fields.model_dump(exclude_none=True),
         open_questions=analysis.open_questions,
+        partial_fields=analysis.partial_fields,
+        contradictions=analysis.contradictions,
+        previous_fields={
+            key: item["extracted_fields"]
+            for key, item in state["session_state"].get("stage_states", {}).items()
+            if key != stage.value
+        },
+    )
+    analysis.open_questions.extend(
+        OpenQuestionItem(
+            id=f"gate:{uuid4()}:{item.id}",
+            question=f"Please clarify: {item.message}",
+            why_it_matters="This coded requirement must pass before advancing.",
+        )
+        for item in validation.readiness
+        if not item.passed and item.id != "blocking_questions"
     )
     analysis.stage_is_clear_enough = validation.stage_is_clear_enough
     analysis.transition_decision_reason = validation.transition_decision_reason
@@ -111,9 +138,12 @@ def make_render_node(renderer: MarkdownRenderer, llm: BrainstormLLM) -> TurnNode
         analysis = AssistantAnalysis.model_validate(state["analysis"])
         validation = StageValidationResult.model_validate(state["validation"])
         stage = Stage(state["current_stage"])
+        reply_analysis = analysis.model_copy(
+            update={"open_questions": selected_questions(analysis.open_questions)},
+        )
         analysis.assistant_message = await llm.reply(
             stage=stage,
-            analysis=analysis,
+            analysis=reply_analysis,
             user_message=state["user_message"],
         )
         markdown = renderer.render(
@@ -152,7 +182,9 @@ def decide_transition(state: TurnGraphState) -> dict[str, object]:
         assumptions=analysis.assumptions,
         decisions=analysis.decisions,
         uncertainties=analysis.uncertainties,
-        open_questions=analysis.open_questions,
+        open_questions=selected_questions(analysis.open_questions),
+        coverage=state["validation"]["coverage"],
+        readiness=state["validation"]["readiness"],
         risks=analysis.risks,
         step_markdown=state["markdown"],
         transition_decision_reason=analysis.transition_decision_reason,
@@ -178,6 +210,15 @@ def merge_analysis(*, previous: StageState | None, patch: AssistantAnalysis) -> 
     ]
     if previous is None:
         return patch
+    patch.clarifications = [*previous.clarifications, *patch.clarifications]
+    patch.partial_fields = {
+        **{
+            key: reason
+            for key, reason in previous.partial_fields.items()
+            if patch.extracted_fields.get(key) is None
+        },
+        **patch.partial_fields,
+    }
     fields = previous.extracted_fields.model_dump(exclude_none=True)
     updates = patch.extracted_fields.model_dump(exclude_none=True)
     for name, value in updates.items():

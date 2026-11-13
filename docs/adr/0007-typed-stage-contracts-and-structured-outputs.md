@@ -45,3 +45,31 @@ its size grows linearly with turns.
 
 New question ids are server-owned UUIDs, preventing provider aliases such as q1 from colliding
 with global SQL primary keys across sessions or stages. Updates reuse the current server id.
+
+## Lot 2: Declarative quality gates and elicitation
+
+Domain `Rule` records pair stable rule ids with predicates and rejection messages. A stage-keyed
+registry allows later stages to add rules without changing the validation engine. Field coverage
+is derived in code: empty values and explicit placeholders are missing; only present values may
+be partial, with a provider reason. Readiness combines required clear fields, registered rules,
+all open blocking questions and explicit contradictions. Provider approval never overrides it.
+The optional contradiction challenge now supplies blocking findings rather than advisory uncertainty.
+
+The checklist and coverage are returned to clients and rendered deterministically, including
+passed/total. Cross-stage rules consume serialized field snapshots: impact actors must exist in
+stage 1, MVP backlog capabilities in stage 2, and links in an explicit reference catalog. Goal and
+hypothesis references derive from stage/field/index; risk references use stable item ids. Upstream
+list replacement can change reference meaning; editing/reopening earlier stages and downstream
+staleness remain lot 6 concerns. Backlog objective, definition of done and traceability are checked
+in code; optional EARS criteria use an explicit syntactic contract.
+
+Full questions persist; presentation selects three by scope, security/compliance, UX, technical.
+The reply receives that same selection. Failed requirements generate actionable questions in code.
+Provider reply wording remains bounded by instructions; the structured question budget is enforced
+in code. Resolution ids record the current user answer with a server timestamp in Clarifications.
+New metadata persists in session JSON, preserving compatibility without SQL migrations.
+
+D5 uses an explicit allowlist of non-critical analytical gaps. Defaults remain assumptions marked
+to confirm and never populate fields, including when a provider proposes a critical default.
+Numeric targets, a minimum pitch length and placeholder rejection provide deterministic structural
+specificity checks; they cannot certify the truth or full semantic consistency of free text.

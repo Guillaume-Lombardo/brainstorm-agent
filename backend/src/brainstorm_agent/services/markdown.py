@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from zoneinfo import ZoneInfo
+
+from brainstorm_agent.core.elicitation import selected_questions
 
 if TYPE_CHECKING:
     from brainstorm_agent.core.enums import Stage
@@ -37,7 +40,9 @@ class MarkdownRenderer:
     def _assumption_lines(analysis: AssistantAnalysis) -> list[str]:
         if not analysis.assumptions:
             return ["- None explicitly recorded."]
-        return [f"- {item.statement}" for item in analysis.assumptions]
+        return [
+            f"- {item.statement}{' (to confirm)' if item.to_confirm else ''}" for item in analysis.assumptions
+        ]
 
     @staticmethod
     def _decision_lines(analysis: AssistantAnalysis) -> list[str]:
@@ -69,11 +74,12 @@ class MarkdownRenderer:
                 (
                     f"- {item.question}"
                     f"{' (blocking)' if item.blocking else ''}"
-                    f"{f': {item.why_it_matters}' if item.why_it_matters else ''}"
+                    f": {item.why_it_matters}"
+                    f" | Options: {item.options} | Recommended: {item.recommended_option or 'none'}"
                 )
-                for item in analysis.open_questions
+                for item in selected_questions(analysis.open_questions)
             ]
-        return [f"- {item.question}" for item in analysis.open_questions]
+        return [f"- {item.question}" for item in selected_questions(analysis.open_questions)]
 
     def render(
         self,
@@ -111,7 +117,7 @@ class MarkdownRenderer:
             "# Questions to Continue",
             "",
             *self._bullet_lines(
-                [item.question for item in analysis.open_questions],
+                [item.question for item in selected_questions(analysis.open_questions)],
                 empty_message="No further question required to complete this stage.",
             ),
             "",
@@ -144,6 +150,22 @@ class MarkdownRenderer:
             *[
                 f"- {name}: {value}"
                 for name, value in analysis.extracted_fields.model_dump(exclude_none=True).items()
+            ],
+            "",
+            "### Readiness",
+            "",
+            f"- {sum(item.passed for item in validation.readiness)}/{len(validation.readiness)} passed/total",
+            *[
+                f"- [{'x' if item.passed else ' '}] {item.id}: {item.message}"
+                for item in validation.readiness
+            ],
+            *[f"- {name}: {status.value}" for name, status in validation.coverage.items()],
+            "",
+            "### Clarifications",
+            "",
+            *[
+                f"- {item.created_at.astimezone(ZoneInfo('Europe/Paris')).isoformat()}: {item.question} -> {item.answer}"
+                for item in analysis.clarifications
             ],
             "",
             "### Transition Decision",

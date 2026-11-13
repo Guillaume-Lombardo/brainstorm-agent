@@ -189,6 +189,9 @@ class SessionService:
             output = AssistantTurnOutput.model_validate(graph_output["assistant_output"])
             processed_stage_state = StageState(
                 stage=output.processed_stage,
+                contradictions=graph_output["analysis"]["contradictions"],
+                partial_fields=graph_output["analysis"]["partial_fields"],
+                clarifications=graph_output["analysis"]["clarifications"],
                 summary=output.summary,
                 assistant_message=output.assistant_message,
                 extracted_fields=graph_output["analysis"]["extracted_fields"],
@@ -196,7 +199,7 @@ class SessionService:
                 assumptions=output.assumptions,
                 decisions=output.decisions,
                 uncertainties=output.uncertainties,
-                open_questions=output.open_questions,
+                open_questions=graph_output["analysis"]["open_questions"],
                 risks=output.risks,
                 latest_markdown=output.step_markdown,
                 stage_is_clear_enough=output.stage_clear_enough,
@@ -282,7 +285,7 @@ class SessionService:
                     assumptions=output.assumptions,
                     decisions=output.decisions,
                     uncertainties=output.uncertainties,
-                    open_questions=output.open_questions,
+                    open_questions=graph_output["analysis"]["open_questions"],
                     risks=output.risks,
                 ),
             )

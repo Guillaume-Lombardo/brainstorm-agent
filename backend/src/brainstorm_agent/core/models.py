@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from enum import StrEnum
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, SerializeAsAny, model_validator
@@ -27,6 +28,40 @@ def utc_now() -> datetime:
     return datetime.now(tz=UTC)
 
 
+class CoverageStatus(StrEnum):
+    """Field coverage owned by the deterministic validator."""
+
+    CLEAR = "clear"
+    PARTIAL = "partial"
+    MISSING = "missing"
+
+
+class QuestionPriority(StrEnum):
+    """Ordered elicitation topics."""
+
+    SCOPE = "scope"
+    SECURITY = "security/compliance"
+    UX = "ux"
+    TECHNICAL = "technical"
+
+
+class Clarification(BaseModel):
+    """Explicit answer to an identified question."""
+
+    question_id: str
+    question: str
+    answer: str
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class ReadinessItem(BaseModel):
+    """One deterministic checklist outcome."""
+
+    id: str
+    passed: bool
+    message: str
+
+
 class FactItem(BaseModel):
     """Structured fact captured during a turn."""
 
@@ -45,6 +80,8 @@ class AssumptionItem(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
     statement: str
     confidence: str = "medium"
+    to_confirm: bool = True
+    default_field: str | None = None
 
 
 class DecisionItem(BaseModel):
@@ -64,7 +101,10 @@ class OpenQuestionItem(BaseModel):
 
     id: str = Field(default_factory=lambda: str(uuid4()))
     question: str
-    why_it_matters: str | None = None
+    why_it_matters: str | None = "Required to resolve a stage uncertainty."
+    priority: QuestionPriority = QuestionPriority.SCOPE
+    options: list[str] = Field(default_factory=list)
+    recommended_option: str | None = None
     blocking: bool = True
     status: OpenQuestionStatus = OpenQuestionStatus.OPEN
 
@@ -161,6 +201,9 @@ class StageState(BaseModel):
         return value
 
     stage: Stage
+    contradictions: list[str] = Field(default_factory=list)
+    partial_fields: dict[str, str] = Field(default_factory=dict)
+    clarifications: list[Clarification] = Field(default_factory=list)
     summary: str = ""
     assistant_message: str = ""
     extracted_fields: SerializeAsAny[StageFields] = Field(default_factory=StageFields)
@@ -193,6 +236,8 @@ class StageValidationResult(BaseModel):
     """Rule-based assessment for stage completeness."""
 
     stage: Stage
+    coverage: dict[str, CoverageStatus] = Field(default_factory=dict)
+    readiness: list[ReadinessItem] = Field(default_factory=list)
     missing_fields: list[str] = Field(default_factory=list)
     blocking_reasons: list[str] = Field(default_factory=list)
     stage_is_clear_enough: bool = False
@@ -228,6 +273,9 @@ class AssistantAnalysis(BaseModel):
     resolved_question_ids: list[str] = Field(default_factory=list)
     prompt_tokens: int = 0
     completion_tokens: int = 0
+    contradictions: list[str] = Field(default_factory=list)
+    partial_fields: dict[str, str] = Field(default_factory=dict)
+    clarifications: list[Clarification] = Field(default_factory=list)
     summary: str
     assistant_message: str
     facts: list[FactItem] = Field(default_factory=list)
@@ -244,6 +292,8 @@ class AssistantAnalysis(BaseModel):
 class AssistantTurnOutput(BaseModel):
     """Structured assistant payload returned by the API."""
 
+    coverage: dict[str, CoverageStatus] = Field(default_factory=dict)
+    readiness: list[ReadinessItem] = Field(default_factory=list)
     prompt_tokens: int = 0
     completion_tokens: int = 0
     session_id: str

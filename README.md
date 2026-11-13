@@ -563,3 +563,30 @@ automatically. A missing issuer disables OIDC. Both bridge routes are limited by
 `LOGIN_RATE_LIMIT_REQUESTS` (5) per `LOGIN_RATE_LIMIT_WINDOW_SECONDS` (60), per
 normalized identity and flow (Credentials email or OIDC issuer/subject), returning 429 with `Retry-After`. Authentication-disabled
 development uses a single bootstrap owner. See [ADR 0009](docs/adr/0009-user-authentication.md).
+
+### Quality gates and clarification (lot 2)
+
+Every turn returns authoritative `coverage` (`clear`, `partial`, `missing`) and a `readiness`
+checklist; the Markdown document renders its `passed/total` count. Blank values and explicit
+placeholders (such as `TBD`) are missing regardless of provider approval. The provider may
+propose `partial_fields` with a reason. Required partial fields, unresolved contradictions and
+blocking questions prevent advancement. A pitch needs at least five words; objectives need
+numeric targets. These deterministic checks are bounded structural checks, not semantic proof.
+
+Stage rules enforce three concrete risks across two categories, explicit event-storming
+irrelevance, MVP capabilities, known impact actors and traceable backlog items. Stage 6 items
+include `objective`, `definition_of_done`, `link`, optional `ears_criteria` (WHEN ... THE SYSTEM
+SHALL ...); MVP items also supply `capability` from stage 2 MVP scope. The provider context exposes
+`previous_fields` and `reference_catalog`: risk ids and derived goal/hypothesis ids
+`<stage>:<field>:<zero-based-index>`. Revalidate links when an upstream list changes.
+
+At most three active questions are presented per turn, ordered scope, security/compliance, UX,
+technical, with `why_it_matters`, optional `options` and `recommended_option`. The full unresolved
+collection stays in session JSON and continues to block gates. Resolved question ids append a
+server-timestamped question/answer entry to the document's `Clarifications` log.
+
+D5 defaults are proposals in assumptions (`default_field`, `to_confirm`), allowed only for stage 2
+`functional_gaps`/`edge_cases` and stage 3 `complexity_hotspots`. They render as **to confirm**;
+no default populates stage fields or satisfies a required gate. Critical fields never default.
+Existing saved states load with empty new metadata; older incomplete backlog items need refinement
+before passing the stricter gate. No database migration or new environment setting is required.
