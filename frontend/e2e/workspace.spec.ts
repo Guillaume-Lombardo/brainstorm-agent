@@ -191,3 +191,23 @@ test("model failure, rate limit and expired session are explained", async ({ pag
   await expect(page.getByText("Session expired")).toBeVisible();
   await expect(page.getByRole("link", { name: "Sign in" })).toBeVisible();
 });
+
+test("a long conversation scrolls inside its panel, not the page", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 640 });
+  await signIn(page, "layout@example.com");
+  await createSession(page, `Layout ${Date.now()}`);
+  const turn = page.waitForResponse((response) => response.url().endsWith("/turns"));
+  await send(page, Array.from({ length: 60 }, (_, line) => `Idea line ${line + 1}`).join("\n"));
+  await (await turn).text();
+  await expect(page.getByTestId("streaming-turn")).toHaveCount(0);
+
+  // The header, stepper and document stay on screen; only the message list scrolls.
+  const overflow = await page.evaluate(
+    () => document.scrollingElement!.scrollHeight - window.innerHeight,
+  );
+  expect(overflow).toBeLessThanOrEqual(0);
+  await expect(page.getByRole("button", { name: "Sign out" })).toBeInViewport();
+  await expect(page.getByRole("navigation", { name: "Stages" })).toBeInViewport();
+  await expect(page.getByRole("tab", { name: "Document" })).toBeInViewport();
+  await expect(page.getByLabel("Message")).toBeInViewport();
+});
