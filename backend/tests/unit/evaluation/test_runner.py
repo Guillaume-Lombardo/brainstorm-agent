@@ -15,7 +15,7 @@ def test_live_adapter_constructs_without_network():
         settings=Settings(
             llm_mode=LLMMode.OPENAI,
             openai_base_url="https://example.invalid/v1",
-            openai_api_key="fixture",
+            openai_api_key="fixture",  # pragma: allowlist secret
         ),
         prompt_loader=PromptLoader(),
     )
