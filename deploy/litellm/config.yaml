@@ -7,4 +7,4 @@ model_list:
     litellm_params:
       model: openai/*
       api_base: os.environ/LLM_UPSTREAM_BASE_URL
-      api_key: os.environ/LLM_UPSTREAM_API_KEY
+      api_key: os.environ/LLM_UPSTREAM_API_KEY # pragma: allowlist secret
