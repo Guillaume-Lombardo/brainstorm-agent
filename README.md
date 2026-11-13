@@ -747,7 +747,8 @@ The test is skipped when that variable is absent.
 
 ### Similar products research
 
-Stage 1 and later expose an optional, explicitly triggered snippet benchmark. Users select features;
+Stage 1 and later expose an optional, explicitly triggered snippet benchmark, built from the pitch
+and from the stage 1 framing once answered (it can run right after the pitch). Users select features;
 only selected candidates become benchmark decisions and stage 2 context. Reruns are versioned.
 Markdown and JSON exports include Benchmark. Apply migration 0003 through the init service.
 

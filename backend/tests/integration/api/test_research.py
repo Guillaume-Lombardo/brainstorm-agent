@@ -42,9 +42,9 @@ def test_benchmark_flow(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, post
         == 200
     )
 
-    async def delayed_research(service: SessionService, stage: StageState, version: int) -> Benchmark:
+    async def delayed_research(service: SessionService, stages: list[StageState], version: int) -> Benchmark:
         await asyncio.sleep(0.06)
-        return await execute_research(service, stage, version)
+        return await execute_research(service, stages, version)
 
     monkeypatch.setattr("brainstorm_agent.services.session_service.execute_research", delayed_research)
     monkeypatch.setattr("brainstorm_agent.services.streaming.TURN_KEEPALIVE_SECONDS", 0.01)
@@ -65,3 +65,33 @@ def test_benchmark_flow(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, post
     fresh = TestClient(create_app(settings))
     assert fresh.get(base + "/research").json()["benchmarks"][-1]["selected_ids"] == selected
     assert "Shared framing" in json.dumps(client.get(base + "/export/json").json())
+
+
+def test_research_runs_as_soon_as_stage_one_starts(tmp_path: Path) -> None:
+    """Research uses the pitch when stage 1 has no turn yet (regression: generic stream error)."""
+    database_url = f"sqlite:///{tmp_path / 'research-entry.db'}"
+    upgrade_database(database_url=database_url)
+    settings = Settings(
+        llm_mode=LLMMode.FAKE,
+        search_provider=SearchProviderName.FAKE,
+        database_url=database_url,
+        redis_url="redis://localhost:6399/0",
+    )
+    client = TestClient(create_app(settings))
+    sid = client.post("/api/v1/sessions").json()["session_id"]
+    base = f"/api/v1/sessions/{sid}"
+    pitch = "pitch: A tool for teams to frame projects.\nclear: Staged workflow\nambiguities: Audience\nmissing: Adoption target"
+    assert client.post(base + "/messages", json={"content": pitch}).status_code == 200
+    assert client.get(base).json()["current_stage"] == "stage_1_problem_framing"
+
+    stream = client.post(base + "/research")
+
+    assert "event: research.completed" in stream.text, stream.text
+    benchmark = client.get(base + "/research").json()["benchmarks"][-1]
+    assert benchmark["queries"]
+    assert any("frame projects" in query for query in benchmark["queries"])
+    problem = client.post(base + "/messages", json={"content": "problem: Teams need project framing"})
+    assert problem.status_code == 200
+    assert client.get(base + "/research").json()["benchmarks"][-1]["id"] == benchmark["id"]
+    documents = client.get(base + "/stages/stage_1_problem_framing/documents").json()
+    assert "## Benchmark" in documents[-1]["markdown"]

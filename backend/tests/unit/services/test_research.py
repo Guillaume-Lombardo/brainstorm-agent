@@ -62,7 +62,7 @@ def test_queries_and_synthesis_use_json_object_with_schema_repair() -> None:
         "stage": Stage.STAGE_1_PROBLEM_FRAMING,
         "extracted_fields": {"problem_statement": "Teams need reliable project framing"},
     })
-    benchmark = asyncio.run(execute_research(service, stage, 1, FakeSearchProvider()))
+    benchmark = asyncio.run(execute_research(service, [stage], 1, FakeSearchProvider()))
     assert len(benchmark.queries) == 3
     assert len(benchmark.results) == 2
     assert len(requests) == 3
