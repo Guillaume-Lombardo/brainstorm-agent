@@ -228,25 +228,30 @@
 
 #### Steps
 
-- [ ] Scaffold `frontend/`: Next.js App Router, TypeScript strict, Tailwind, shadcn/ui, pnpm,
-      ESLint, Prettier, generated API types.
-- [ ] Auth.js: login/password page, "Sign in with SSO" shown only when OIDC is configured, sign-out,
+- [x] Scaffold `frontend/`: Next.js App Router, TypeScript strict, Tailwind, shadcn/ui, pnpm,
+      ESLint, Prettier (provisional hand-written API types; generated types in 7b).
+- [x] Auth.js: login/password page, "Sign in with SSO" shown only when OIDC is configured, sign-out,
       protected routes.
-- [ ] Server-side proxy (route handlers) to the backend: credentials stay server-side, SSE relayed.
-- [ ] Sessions page: list, create, rename, archive.
-- [ ] Session workspace:
-  - [ ] chat panel with token streaming and status events;
-  - [ ] document panel: rendered Markdown per stage, version history, diff view;
-  - [ ] stage stepper (8 stages) with readiness checklist, coverage per field and `stale` markers;
-  - [ ] open questions panel: answer options as buttons, recommended option highlighted;
-  - [ ] review bar: approve, reject, request changes, reopen stage;
-  - [ ] inline field edit and section comments;
-  - [ ] delivery slicing view: slice cards, dependency graph, waves, contract matrix;
-  - [ ] export menu (Markdown, JSON, slice specs, backlog JSON).
-- [ ] Loading, empty and error states (LLM error, 401/403, 409 pending review, 429 rate limit).
+- [x] Server-side proxy (route handlers) to the backend: credentials stay server-side, SSE relayed
+      (wired to the mock backend; real API in 7b).
+- [x] Sessions page: list, create, rename, archive.
+- [x] Session workspace (on the mock backend):
+  - [x] chat panel with token streaming and status events;
+  - [x] document panel: rendered Markdown per stage, version history, diff view;
+  - [x] stage stepper (8 stages) with readiness checklist, coverage per field and `stale` markers;
+  - [x] open questions panel: answer options as buttons, recommended option highlighted;
+  - [x] review bar: approve, reject, request changes, reopen stage;
+  - [x] inline field edit and section comments;
+  - [x] delivery slicing view: slice cards, dependency graph, waves, contract matrix;
+  - [x] export menu (Markdown, JSON, slice specs, backlog JSON).
+- [x] Loading, empty and error states (LLM error, 401/403, 409 pending review, 429 rate limit).
 - [ ] Tests: Vitest + Testing Library for components; Playwright end-to-end against the backend in
       `fake` LLM mode, including login.
-- [ ] Frontend lint, type check, tests and build in CI and pre-commit.
+  Done in 7a: Vitest + Testing Library suite and Playwright end-to-end tests against the mock
+  backend, including login.
+- [ ] 7b: wire the real API (generated OpenAPI types, `BACKEND_MODE=http` endpoints and SSE
+      contract from lot 6), Playwright end-to-end against the backend `fake` mode.
+- [x] Frontend lint, type check, tests and build in CI and pre-commit.
 
 ### Lot 8: Packaging and deployment
 

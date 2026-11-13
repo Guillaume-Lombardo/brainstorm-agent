@@ -31,7 +31,7 @@ The service does not skip stages and does not persist critical state in Redis.
 ## Repository layout
 
 - `backend/`: Python source, tests, migrations, packaging and Dockerfile
-- `frontend/`: reserved for Next.js (lot 7)
+- `frontend/`: Next.js workspace (see `frontend/README.md`)
 - `docs/`, `skills/`: shared governance
 - `deploy/`, `docker-compose*.yml`, `examples/`: cross-service deployment
 
@@ -88,6 +88,24 @@ uv run brainstorm-agent migrate --revision head
 uv run brainstorm-agent hash-api-key "replace-me"
 uv run brainstorm-agent hash-api-key "replace-me" --pepper "server-side-secret"
 ```
+
+## Frontend
+
+`frontend/` is a Next.js (App Router) workspace: login (password, plus SSO when OIDC is
+configured), sessions list and the framing workspace (streamed chat, versioned stage documents
+with diff, 8-stage stepper with readiness and coverage, open questions, review bar, delivery
+slicing view, exports). The browser only calls the Next.js server, which proxies to the backend
+with a short-lived signed JWT. Until the application API lands, `BACKEND_MODE=mock` serves an
+in-memory demo backend.
+
+```bash
+cd frontend
+pnpm install
+cp .env.template .env.local   # set AUTH_SECRET
+pnpm dev
+```
+
+See [frontend/README.md](frontend/README.md) for the architecture, checks and container image.
 
 ## Docker Compose
 
@@ -464,6 +482,17 @@ uv run pytest -m end2end --no-cov
 uv run pytest -m "unit or integration or end2end" --cov=src
 cd ..
 uv run --project backend pre-commit run --all-files
+```
+
+Run frontend quality gates from `frontend/`:
+
+```bash
+pnpm format:check
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
+pnpm e2e
 ```
 
 ### Typed stage contracts (prompt v2)
