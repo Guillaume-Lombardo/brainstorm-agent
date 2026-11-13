@@ -6,6 +6,7 @@
 **/dist
 **/.coverage*
 **/.env
+**/.env.*
 .git
 .agent-tmp
 # Built from its own context (frontend/.dockerignore); never sent with the root context.
