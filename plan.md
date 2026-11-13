@@ -325,3 +325,10 @@ Markdown/JSON exports, French workspace panel and internal SearXNG deployment.
 - [x] Deliver frontend panel and fake end-to-end coverage.
 - [x] Configure pinned internal SearXNG, document settings and run Docker smoke.
 - [x] Complete checks, review loop, rebase and ready PR (no merge).
+
+### Production cross-path acceptance fixes
+
+Validated scope: reproduce the deployed expense-sharing journey; correct the Questions panel's
+English chrome and exposed internal priority codes without changing question content or gates.
+Add a failing regression test first, verify the frontend, run the requested review loop, and open
+an unmerged ready PR. Report ambiguous model behavior separately; do not change production.
