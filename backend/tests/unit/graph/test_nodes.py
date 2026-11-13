@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import asyncio
+from collections.abc import AsyncIterator  # noqa: TC003
+
 import pytest
+from pytest_mock import MockerFixture  # noqa: TC002
 from sqlalchemy import String
 
 from brainstorm_agent.core.enums import Stage
@@ -12,8 +16,14 @@ from brainstorm_agent.core.models import (
     StageState,
 )
 from brainstorm_agent.core.stage_contracts import BacklogFields, BacklogItem, ProblemFields
-from brainstorm_agent.graph.nodes import apply_stage_rules, decide_transition, merge_analysis
+from brainstorm_agent.graph.nodes import (
+    apply_stage_rules,
+    decide_transition,
+    make_render_node,
+    merge_analysis,
+)
 from brainstorm_agent.persistence.models import OpenQuestionRecord
+from brainstorm_agent.services.llm_client import OpenAICompatibleBrainstormLLM
 
 
 def test_patch_preserves_fields_ids_and_resolves_questions():
@@ -116,3 +126,40 @@ def test_transition_table_respects_order_and_terminal_stage(stage, ready):
     result = AssistantTurnOutput.model_validate(result)
     assert result.next_stage == (stage.next_stage() if ready else None)
     assert result.current_stage == ((stage.next_stage() or stage) if ready else stage)
+
+
+def test_render_delivers_provider_deltas_before_return(mocker: MockerFixture) -> None:
+
+    delivered = []
+    llm = mocker.Mock(spec=OpenAICompatibleBrainstormLLM)
+
+    async def provider_deltas(**_kwargs: object) -> AsyncIterator[str]:
+        await asyncio.sleep(0)
+        yield "First "
+        assert delivered == ["First "]
+        yield "second."
+
+    async def consume(delta: str) -> None:
+        await asyncio.sleep(0)
+        delivered.append(delta)
+
+    llm.stream_reply = provider_deltas
+    renderer = mocker.Mock()
+    renderer.render.return_value = "# Document"
+    node = make_render_node(renderer, llm)
+
+    async def render() -> dict[str, object]:
+        return await node({
+            "session_id": "session",
+            "current_stage": "stage_0_pitch",
+            "session_state": {},
+            "user_message": "Hello",
+            "on_delta": consume,
+            "analysis": {"stage": "stage_0_pitch", "summary": "Summary", "assistant_message": ""},
+            "validation": {"stage": "stage_0_pitch", "transition_decision_reason": "Incomplete"},
+        })
+
+    result = asyncio.run(render())
+    assert delivered == ["First ", "second."]
+    assert AssistantAnalysis.model_validate(result["analysis"]).assistant_message == "First second."
+    llm.reply.assert_not_called()

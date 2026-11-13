@@ -68,3 +68,25 @@ def test_session_lock_exceeds_all_call_timeouts(challenge, calls):
         openai_timeout_seconds=10,
         redis_lock_timeout_seconds=calls * 10 + 1,
     )
+
+
+@pytest.mark.parametrize(
+    "origin",
+    [
+        "*",
+        "null",
+        "https://example.com/path",
+        "https://user:pass@example.com",  # pragma: allowlist secret
+        "https://example.com?query=1",
+    ],  # pragma: allowlist secret
+)
+def test_cors_rejects_non_origin_allowlist_entries(origin: str) -> None:
+    with pytest.raises(ValueError, match="CORS origins"):
+        Settings(cors_origins=[origin])
+
+
+def test_cors_accepts_explicit_origins() -> None:
+    assert Settings(cors_origins=["http://localhost:3000", "https://example.com"]).cors_origins == [
+        "http://localhost:3000",
+        "https://example.com",
+    ]

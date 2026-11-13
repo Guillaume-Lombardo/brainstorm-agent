@@ -641,7 +641,7 @@ acyclic graph. Waves derive from explicit dependencies, contract owners and the 
 `services.delivery.export_slice_specs(fields, previous_fields)` returns filename-to-Markdown contents;
 `export_backlog_json(fields, previous_fields)` returns JSON including backlog, dependencies and waves.
 Both reject invalid plans. `previous_fields` maps stage string identifiers to serialized fields.
-HTTP export endpoints are delivered separately in lot 6. Fake mode accepts `slices: <JSON array>`
+HTTP export endpoints are exposed by lot 6. Fake mode accepts `slices: <JSON array>`
 or scripted typed responses. No environment variables or SQL migration are introduced.
 
 ## Evaluation
@@ -695,3 +695,41 @@ reported separately from deterministic gate expectations.
 Simulator/judge errors are reported separately as `actor_errors`. A simulator
 failure excludes the unattempted target turn from transition metrics. A judge
 failure leaves the measured target gate result intact and omits its quality score.
+
+### Application API (lot 6)
+
+All session endpoints use the authenticated owner from ADR 0009. Foreign and soft-deleted
+sessions return 404. `GET /api/v1/sessions?offset=0&limit=20&include_archived=false` returns
+`items,total,offset,limit` (limit 1–100). Creation accepts an optional `title`; session PATCH accepts
+`title,archived`; DELETE soft-deletes.
+
+`POST /sessions/{id}/turns` (under `/api/v1`) accepts `{"content":"..."}` and returns
+`text/event-stream`. Named events carry JSON with a `type` discriminator: `turn.started`,
+`analysis.status`, live `message.delta`, committed `document.updated`, `coverage.updated`,
+optional `stage.changed`/`review.required`, then `turn.completed` or a sanitized `error`.
+Deltas are tentative until completion. Reconnect/replay is not supported. Legacy message endpoints
+are unchanged. OpenAPI documents the full event union.
+
+- POST `/sessions/{id}/stages/{stage}/reopen`: earlier visited stage; downstream state becomes stale.
+- PATCH `/sessions/{id}/stages/{stage}`: `fields` maps field names to typed JSON values;
+  `items` maps facts/assumptions/decisions/risks to replacement collections.
+  Only the active stage is editable; validation and a new document version follow every edit.
+- PATCH `/sessions/{id}/stages/{stage}/fields/{field}`: `{"value": ...}`.
+- POST `/sessions/{id}/comments`: `stage,section,body`; feeds the next successful analysis.
+- POST `/sessions/{id}/review`: `stage,action,note?`; actions are
+  `approve|reject|request_changes`. The plural legacy reviews endpoint remains supported.
+- GET `/sessions/{id}/stages/{stage}/documents`: immutable versions.
+- GET `/sessions/{id}/stages/{stage}/documents/diff?from_version=1&to_version=2`: unified diff.
+- GET `/sessions/{id}/export/markdown|json|backlog_json|slice_specs`: consolidated document,
+  snapshot, backlog with slice assignments, dependencies and waves, or validated slice specifications. Missing, invalid or stale delivery plans return 409.
+
+Session snapshots expose stage coverage, readiness, prioritized question options, clarifications
+and stale markers. `CORS_ORIGINS` is an explicit JSON allowlist, empty by default.
+Run `cd frontend && pnpm generate:api` to regenerate the committed OpenAPI and TypeScript in
+`src/lib/backend/generated/`. Full UI adaptation to the real contract remains lot 7b.
+
+The CI quality job also runs the application persistence regression on an isolated PostgreSQL 17
+database: Alembic upgrades, bounded question/review identifiers, streamed turns, review persistence
+and soft deletion. For an equivalent local check, set `TEST_POSTGRES_URL` to an isolated database
+named `brainstorm_test` and run `tests/integration/persistence/test_application_postgres.py`.
+The test is skipped when that variable is absent.

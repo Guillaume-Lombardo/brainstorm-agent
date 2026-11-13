@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 from typing import Annotated
+from urllib.parse import urlsplit
 
 from pydantic import Field, computed_field, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
@@ -22,8 +23,40 @@ class Settings(BaseSettings):
         populate_by_name=True,
     )
 
+    @field_validator("cors_origins")
+    @classmethod
+    def validate_cors_origins(cls, values: list[str]) -> list[str]:
+        """Require explicit HTTP origins without credentials, paths or wildcards.
+
+        Args:
+            values (list[str]): Configured browser origins.
+
+        Returns:
+            list[str]: Validated explicit origins.
+
+        Raises:
+            ValueError: An origin is not an explicit HTTP origin.
+        """
+        for value in values:
+            parsed = urlsplit(value)
+            if any((
+                parsed.scheme not in {"http", "https"},
+                not parsed.hostname,
+                "*" in value,
+                bool(parsed.username),
+                bool(parsed.password),
+                bool(parsed.path),
+                bool(parsed.query),
+                bool(parsed.fragment),
+            )):
+                message = "CORS origins must be explicit HTTP origins."
+                raise ValueError(message)
+            _ = parsed.port
+        return values
+
     project_name: str = "brainstorm-agent"
     app_env: str = Field(default="dev", validation_alias="APP_ENV")
+    cors_origins: list[str] = Field(default_factory=list)
     api_v1_prefix: str = "/api/v1"
     host: str = Field(default="127.0.0.1", validation_alias="HOST")
     port: int = Field(default=8000, validation_alias="PORT")

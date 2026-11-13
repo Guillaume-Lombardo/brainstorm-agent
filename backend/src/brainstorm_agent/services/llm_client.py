@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Protocol, cast
+from typing import TYPE_CHECKING, Any, Protocol, cast, runtime_checkable
 
 from openai import AsyncOpenAI, pydantic_function_tool
 from pydantic import BaseModel, ConfigDict, ValidationError, create_model
@@ -104,6 +104,30 @@ def _strip_gate_metadata(value: object) -> None:
     elif isinstance(value, list):
         for child in value:
             _strip_gate_metadata(child)
+
+
+@runtime_checkable
+class StreamingReply(Protocol):
+    """Optional incremental conversational provider capability."""
+
+    def stream_reply(
+        self,
+        *,
+        stage: Stage,
+        analysis: AssistantAnalysis,
+        user_message: str,
+    ) -> AsyncIterator[str]:
+        """Return provider deltas as they arrive.
+
+        Args:
+            stage (Stage): Processed stage.
+            analysis (AssistantAnalysis): Validated state.
+            user_message (str): Latest user input.
+
+        Returns:
+            AsyncIterator[str]: Incremental conversational text.
+        """
+        ...
 
 
 class BrainstormLLM(Protocol):

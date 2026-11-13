@@ -151,9 +151,13 @@ class SessionRepository:
         completed_stages = [
             Stage(stage_name)
             for stage_name, stage_state in state.stage_states.items()
-            if stage_state.stage_is_clear_enough
+            if stage_state.stage_is_clear_enough and not stage_state.stale
         ]
         return SessionOverview(
+            title=state.title,
+            archived=state.archived,
+            stage_states=state.stage_states,
+            comments=state.comments,
             session_id=record.id,
             current_stage=Stage(record.current_stage),
             created_at=record.created_at,
@@ -291,18 +295,28 @@ class DocumentRepository:
         self.db_session.flush()
         return record
 
-    def get_current(self, session_id: str) -> StepDocument | None:
+    def get_current(
+        self,
+        session_id: str,
+        *,
+        excluded_stages: list[Stage] | None = None,
+    ) -> StepDocument | None:
         """Return the latest current stage document for a session.
 
         Args:
             session_id: Session identifier.
+            excluded_stages: Stages invalidated by reopening.
 
         Returns:
             StepDocument | None: Current document if one exists.
         """
         query = (
             select(DocumentRecord)
-            .where(DocumentRecord.session_id == session_id, DocumentRecord.is_current.is_(True))
+            .where(
+                DocumentRecord.session_id == session_id,
+                DocumentRecord.is_current.is_(True),
+                DocumentRecord.stage.not_in([stage.value for stage in excluded_stages or []]),
+            )
             .order_by(desc(DocumentRecord.created_at))
         )
         record = self.db_session.execute(query).scalars().first()

@@ -3,17 +3,22 @@
 from __future__ import annotations
 
 from time import perf_counter
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 from fastapi import Depends, FastAPI, Request, Response
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse
+from pydantic import TypeAdapter
 from sqlalchemy import text
 
 from brainstorm_agent.api.dependencies import configure_application_state, enforce_api_security
+from brainstorm_agent.api.routes.application import router as application_router
 from brainstorm_agent.api.routes.auth import router as auth_router
 from brainstorm_agent.api.routes.openai import router as openai_router
 from brainstorm_agent.api.routes.sessions import router as session_router
+from brainstorm_agent.core.application import TurnEvent
+from brainstorm_agent.core.stage_contracts import STAGE_MODELS
 from brainstorm_agent.exceptions import ConflictError, LLMResponseError, LockAcquisitionError, NotFoundError
 from brainstorm_agent.logging import get_logger
 from brainstorm_agent.settings import get_settings
@@ -114,10 +119,23 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         version="0.1.0",
         description="Strict staged brainstorming backend with LangGraph orchestration.",
     )
+    if app_settings.cors_origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=app_settings.cors_origins,
+            allow_credentials=False,
+            allow_methods=["GET", "POST", "PATCH", "DELETE"],
+            allow_headers=["Authorization", "Content-Type", "X-API-Key"],
+        )
     logger = get_logger("brainstorm_agent.api")
     configure_application_state(app, app_settings)
     app.include_router(auth_router, prefix=app_settings.api_v1_prefix)
     app.include_router(openai_router, dependencies=[Depends(enforce_api_security)])
+    app.include_router(
+        application_router,
+        prefix=app_settings.api_v1_prefix,
+        dependencies=[Depends(enforce_api_security)],
+    )
     app.include_router(
         session_router,
         prefix=app_settings.api_v1_prefix,
@@ -155,4 +173,22 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     _register_health_routes(app)
     _register_exception_handlers(app)
+    original_openapi = app.openapi
+
+    def application_openapi() -> dict[str, Any]:
+        schema = original_openapi()
+        event = TypeAdapter(TurnEvent).json_schema(ref_template="#/components/schemas/{model}")
+        schema["components"]["schemas"].update(event.pop("$defs", {}))
+        components = schema["components"]["schemas"]
+        components["TurnEvent"] = event
+        concrete_fields = []
+        for model in STAGE_MODELS.values():
+            fields = model.model_json_schema(ref_template="#/components/schemas/{model}")  # noqa: RUF027
+            components.update(fields.pop("$defs", {}))
+            components[model.__name__] = fields
+            concrete_fields.append({"$ref": f"#/components/schemas/{model.__name__}"})
+        components["StageFields"] = {"anyOf": concrete_fields}
+        return schema
+
+    app.openapi: Any = application_openapi
     return app

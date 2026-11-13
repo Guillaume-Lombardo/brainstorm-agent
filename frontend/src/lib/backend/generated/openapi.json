@@ -1,0 +1,5873 @@
+{
+  "components": {
+    "schemas": {
+      "AnalysisStatus": {
+        "description": "Analysis progress before conversational deltas.",
+        "properties": {
+          "status": {
+            "const": "running",
+            "default": "running",
+            "title": "Status",
+            "type": "string"
+          },
+          "type": {
+            "const": "analysis.status",
+            "default": "analysis.status",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "title": "AnalysisStatus",
+        "type": "object"
+      },
+      "AssistantTurnOutput": {
+        "description": "Structured assistant payload returned by the API.",
+        "properties": {
+          "assistant_message": {
+            "title": "Assistant Message",
+            "type": "string"
+          },
+          "assumptions": {
+            "items": {
+              "$ref": "#/components/schemas/AssumptionItem"
+            },
+            "title": "Assumptions",
+            "type": "array"
+          },
+          "completion_tokens": {
+            "default": 0,
+            "title": "Completion Tokens",
+            "type": "integer"
+          },
+          "coverage": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/CoverageStatus"
+            },
+            "title": "Coverage",
+            "type": "object"
+          },
+          "current_stage": {
+            "$ref": "#/components/schemas/Stage"
+          },
+          "decisions": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionItem"
+            },
+            "title": "Decisions",
+            "type": "array"
+          },
+          "facts": {
+            "items": {
+              "$ref": "#/components/schemas/FactItem"
+            },
+            "title": "Facts",
+            "type": "array"
+          },
+          "next_stage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Stage"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "open_questions": {
+            "items": {
+              "$ref": "#/components/schemas/OpenQuestionItem"
+            },
+            "title": "Open Questions",
+            "type": "array"
+          },
+          "pending_review": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PendingHumanReview"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "processed_stage": {
+            "$ref": "#/components/schemas/Stage"
+          },
+          "prompt_tokens": {
+            "default": 0,
+            "title": "Prompt Tokens",
+            "type": "integer"
+          },
+          "readiness": {
+            "items": {
+              "$ref": "#/components/schemas/ReadinessItem"
+            },
+            "title": "Readiness",
+            "type": "array"
+          },
+          "requires_human_review": {
+            "default": false,
+            "title": "Requires Human Review",
+            "type": "boolean"
+          },
+          "risks": {
+            "items": {
+              "$ref": "#/components/schemas/RiskItem"
+            },
+            "title": "Risks",
+            "type": "array"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "stage_clear_enough": {
+            "title": "Stage Clear Enough",
+            "type": "boolean"
+          },
+          "step_markdown": {
+            "title": "Step Markdown",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "transition_decision_reason": {
+            "title": "Transition Decision Reason",
+            "type": "string"
+          },
+          "uncertainties": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Uncertainties",
+            "type": "array"
+          }
+        },
+        "required": [
+          "session_id",
+          "current_stage",
+          "processed_stage",
+          "stage_clear_enough",
+          "assistant_message",
+          "summary",
+          "step_markdown",
+          "transition_decision_reason"
+        ],
+        "title": "AssistantTurnOutput",
+        "type": "object"
+      },
+      "AssumptionItem": {
+        "additionalProperties": false,
+        "description": "Structured assumption captured during a turn.",
+        "properties": {
+          "confidence": {
+            "default": "medium",
+            "title": "Confidence",
+            "type": "string"
+          },
+          "default_field": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Default Field"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "statement": {
+            "title": "Statement",
+            "type": "string"
+          },
+          "to_confirm": {
+            "default": true,
+            "title": "To Confirm",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "statement"
+        ],
+        "title": "AssumptionItem",
+        "type": "object"
+      },
+      "BacklogExport": {
+        "description": "Validated backlog, effective dependencies and delivery waves.",
+        "properties": {
+          "backlog": {
+            "$ref": "#/components/schemas/BacklogFields"
+          },
+          "slices": {
+            "items": {
+              "$ref": "#/components/schemas/ExportedSlice"
+            },
+            "title": "Slices",
+            "type": "array"
+          },
+          "waves": {
+            "items": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": "Waves",
+            "type": "array"
+          }
+        },
+        "required": [
+          "backlog",
+          "slices",
+          "waves"
+        ],
+        "title": "BacklogExport",
+        "type": "object"
+      },
+      "BacklogFields": {
+        "additionalProperties": false,
+        "description": "Stage 6 Backlog Synthesis contract.",
+        "properties": {
+          "cross_cutting_work": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/BacklogItem"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cross cutting work",
+            "gate_required": true,
+            "title": "Cross Cutting Work"
+          },
+          "mvp_user_stories": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/BacklogItem"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Mvp user stories",
+            "gate_required": true,
+            "title": "Mvp User Stories"
+          },
+          "risk_spikes": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/BacklogItem"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Risk spikes",
+            "gate_required": true,
+            "title": "Risk Spikes"
+          }
+        },
+        "title": "BacklogFields",
+        "type": "object"
+      },
+      "BacklogItem": {
+        "additionalProperties": false,
+        "description": "Identified backlog entry updated by id across turns.",
+        "properties": {
+          "capability": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Capability"
+          },
+          "definition_of_done": {
+            "default": "",
+            "title": "Definition Of Done",
+            "type": "string"
+          },
+          "ears_criteria": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Ears Criteria",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "link": {
+            "default": "",
+            "title": "Link",
+            "type": "string"
+          },
+          "objective": {
+            "default": "",
+            "title": "Objective",
+            "type": "string"
+          },
+          "statement": {
+            "title": "Statement",
+            "type": "string"
+          }
+        },
+        "required": [
+          "statement"
+        ],
+        "title": "BacklogItem",
+        "type": "object"
+      },
+      "Clarification": {
+        "description": "Explicit answer to an identified question.",
+        "properties": {
+          "answer": {
+            "title": "Answer",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "question": {
+            "title": "Question",
+            "type": "string"
+          },
+          "question_id": {
+            "title": "Question Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "question_id",
+          "question",
+          "answer"
+        ],
+        "title": "Clarification",
+        "type": "object"
+      },
+      "CommentInput": {
+        "description": "Section feedback for the next turn.",
+        "properties": {
+          "body": {
+            "maxLength": 10000,
+            "minLength": 1,
+            "title": "Body",
+            "type": "string"
+          },
+          "section": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Section",
+            "type": "string"
+          },
+          "stage": {
+            "$ref": "#/components/schemas/Stage"
+          }
+        },
+        "required": [
+          "stage",
+          "section",
+          "body"
+        ],
+        "title": "CommentInput",
+        "type": "object"
+      },
+      "ConversationHistoryResponse": {
+        "description": "Conversation history response.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ConversationTurn"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "ConversationHistoryResponse",
+        "type": "object"
+      },
+      "ConversationTurn": {
+        "description": "Conversation message persisted in history.",
+        "properties": {
+          "completion_tokens": {
+            "default": 0,
+            "title": "Completion Tokens",
+            "type": "integer"
+          },
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "modality": {
+            "$ref": "#/components/schemas/Modality",
+            "default": "text"
+          },
+          "prompt_tokens": {
+            "default": 0,
+            "title": "Prompt Tokens",
+            "type": "integer"
+          },
+          "role": {
+            "$ref": "#/components/schemas/MessageRole"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "stage": {
+            "$ref": "#/components/schemas/Stage"
+          }
+        },
+        "required": [
+          "session_id",
+          "role",
+          "content",
+          "stage"
+        ],
+        "title": "ConversationTurn",
+        "type": "object"
+      },
+      "CoverageStatus": {
+        "description": "Field coverage owned by the deterministic validator.",
+        "enum": [
+          "clear",
+          "partial",
+          "missing"
+        ],
+        "title": "CoverageStatus",
+        "type": "string"
+      },
+      "CoverageUpdated": {
+        "description": "Authoritative persisted stage state, including gate data.",
+        "properties": {
+          "stage": {
+            "$ref": "#/components/schemas/StageState"
+          },
+          "type": {
+            "const": "coverage.updated",
+            "default": "coverage.updated",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "stage"
+        ],
+        "title": "CoverageUpdated",
+        "type": "object"
+      },
+      "CreateSessionInput": {
+        "description": "Optional creation metadata.",
+        "properties": {
+          "title": {
+            "default": "Untitled session",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "title": "CreateSessionInput",
+        "type": "object"
+      },
+      "CreateSessionResponse": {
+        "description": "Response for session creation.",
+        "properties": {
+          "current_stage": {
+            "$ref": "#/components/schemas/Stage"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "current_stage",
+          "message"
+        ],
+        "title": "CreateSessionResponse",
+        "type": "object"
+      },
+      "CredentialsRequest": {
+        "description": "Credentials submitted by the trusted Next.js server.",
+        "properties": {
+          "email": {
+            "maxLength": 320,
+            "minLength": 1,
+            "title": "Email",
+            "type": "string"
+          },
+          "password": {
+            "maxLength": 1024,
+            "minLength": 1,
+            "title": "Password",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "CredentialsRequest",
+        "type": "object"
+      },
+      "DecisionItem": {
+        "additionalProperties": false,
+        "description": "Structured decision captured during a turn.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "rationale": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Rationale"
+          },
+          "statement": {
+            "title": "Statement",
+            "type": "string"
+          }
+        },
+        "required": [
+          "statement"
+        ],
+        "title": "DecisionItem",
+        "type": "object"
+      },
+      "DeliveryContract": {
+        "additionalProperties": false,
+        "description": "Shared interface with a stable identifier and concrete specification.",
+        "properties": {
+          "id": {
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "specification": {
+            "minLength": 1,
+            "title": "Specification",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "specification"
+        ],
+        "title": "DeliveryContract",
+        "type": "object"
+      },
+      "DeliveryFields": {
+        "additionalProperties": false,
+        "description": "Stage 7 contracts; waves are derived by the domain, never supplied by a model.",
+        "properties": {
+          "slices": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/DeliverySlice"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Vertical slices including slice-0 walking skeleton and shared contracts. Replace the complete slice list on update.",
+            "gate_required": true,
+            "title": "Slices"
+          }
+        },
+        "title": "DeliveryFields",
+        "type": "object"
+      },
+      "DeliverySlice": {
+        "additionalProperties": false,
+        "description": "One independently developable delivery unit; slice-0 is the foundation.",
+        "properties": {
+          "backlog_item_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Backlog Item Ids",
+            "type": "array"
+          },
+          "consumed_contracts": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Consumed Contracts",
+            "type": "array"
+          },
+          "dependencies": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Dependencies",
+            "type": "array"
+          },
+          "goal": {
+            "minLength": 1,
+            "title": "Goal",
+            "type": "string"
+          },
+          "id": {
+            "minLength": 1,
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "title": "Id",
+            "type": "string"
+          },
+          "integration_scenarios": {
+            "items": {
+              "$ref": "#/components/schemas/IntegrationScenario"
+            },
+            "title": "Integration Scenarios",
+            "type": "array"
+          },
+          "owned_domain": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Owned Domain",
+            "type": "array"
+          },
+          "provided_contracts": {
+            "items": {
+              "$ref": "#/components/schemas/DeliveryContract"
+            },
+            "title": "Provided Contracts",
+            "type": "array"
+          },
+          "stubs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Stubs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "goal"
+        ],
+        "title": "DeliverySlice",
+        "type": "object"
+      },
+      "DocumentDiff": {
+        "description": "Unified line diff of two immutable versions of one stage.",
+        "properties": {
+          "diff": {
+            "title": "Diff",
+            "type": "string"
+          },
+          "from_version": {
+            "title": "From Version",
+            "type": "integer"
+          },
+          "stage": {
+            "$ref": "#/components/schemas/Stage"
+          },
+          "to_version": {
+            "title": "To Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "stage",
+          "from_version",
+          "to_version",
+          "diff"
+        ],
+        "title": "DocumentDiff",
+        "type": "object"
+      },
+      "DocumentUpdated": {
+        "description": "Committed document version.",
+        "properties": {
+          "document": {
+            "$ref": "#/components/schemas/StepDocument"
+          },
+          "type": {
+            "const": "document.updated",
+            "default": "document.updated",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "document"
+        ],
+        "title": "DocumentUpdated",
+        "type": "object"
+      },
+      "DocumentsResponse": {
+        "description": "Versioned documents response.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/StepDocument"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "DocumentsResponse",
+        "type": "object"
+      },
+      "EventFields": {
+        "additionalProperties": false,
+        "description": "Stage 3 Event Storming contract.",
+        "properties": {
+          "actors": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Actors",
+            "gate_required": false,
+            "title": "Actors"
+          },
+          "aggregates": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Aggregates",
+            "gate_required": false,
+            "title": "Aggregates"
+          },
+          "business_rules": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Business rules",
+            "gate_required": false,
+            "title": "Business Rules"
+          },
+          "commands": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Commands",
+            "gate_required": false,
+            "title": "Commands"
+          },
+          "complexity_hotspots": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Complexity hotspots",
+            "gate_required": false,
+            "title": "Complexity Hotspots"
+          },
+          "domain_events": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Domain events",
+            "gate_required": false,
+            "title": "Domain Events"
+          },
+          "event_storming_relevant": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Event storming relevant",
+            "gate_required": true,
+            "title": "Event Storming Relevant"
+          },
+          "not_relevant_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Not relevant reason",
+            "gate_required": false,
+            "title": "Not Relevant Reason"
+          }
+        },
+        "title": "EventFields",
+        "type": "object"
+      },
+      "ExportJsonResponse": {
+        "description": "Structured JSON export payload.",
+        "properties": {
+          "payload": {
+            "additionalProperties": true,
+            "title": "Payload",
+            "type": "object"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "payload"
+        ],
+        "title": "ExportJsonResponse",
+        "type": "object"
+      },
+      "ExportMarkdownResponse": {
+        "description": "Markdown export payload.",
+        "properties": {
+          "markdown": {
+            "title": "Markdown",
+            "type": "string"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "markdown"
+        ],
+        "title": "ExportMarkdownResponse",
+        "type": "object"
+      },
+      "ExportedSlice": {
+        "additionalProperties": false,
+        "description": "Delivery slice enriched with its computed wave.",
+        "properties": {
+          "backlog_item_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Backlog Item Ids",
+            "type": "array"
+          },
+          "consumed_contracts": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Consumed Contracts",
+            "type": "array"
+          },
+          "dependencies": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Dependencies",
+            "type": "array"
+          },
+          "goal": {
+            "minLength": 1,
+            "title": "Goal",
+            "type": "string"
+          },
+          "id": {
+            "minLength": 1,
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "title": "Id",
+            "type": "string"
+          },
+          "integration_scenarios": {
+            "items": {
+              "$ref": "#/components/schemas/IntegrationScenario"
+            },
+            "title": "Integration Scenarios",
+            "type": "array"
+          },
+          "owned_domain": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Owned Domain",
+            "type": "array"
+          },
+          "provided_contracts": {
+            "items": {
+              "$ref": "#/components/schemas/DeliveryContract"
+            },
+            "title": "Provided Contracts",
+            "type": "array"
+          },
+          "stubs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Stubs",
+            "type": "array"
+          },
+          "wave": {
+            "title": "Wave",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "goal",
+          "wave"
+        ],
+        "title": "ExportedSlice",
+        "type": "object"
+      },
+      "FactItem": {
+        "additionalProperties": false,
+        "description": "Structured fact captured during a turn.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "source": {
+            "default": "user",
+            "title": "Source",
+            "type": "string"
+          },
+          "statement": {
+            "title": "Statement",
+            "type": "string"
+          }
+        },
+        "required": [
+          "statement"
+        ],
+        "title": "FactItem",
+        "type": "object"
+      },
+      "FieldPatch": {
+        "description": "A typed JSON value; the selected stage contract validates its type.",
+        "properties": {
+          "value": {
+            "title": "Value"
+          }
+        },
+        "required": [
+          "value"
+        ],
+        "title": "FieldPatch",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "HumanReviewDecision": {
+        "description": "Decision taken during optional human review.",
+        "enum": [
+          "approved",
+          "rejected",
+          "request_changes"
+        ],
+        "title": "HumanReviewDecision",
+        "type": "string"
+      },
+      "HumanReviewRecord": {
+        "description": "Persisted human review decision.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "decision": {
+            "$ref": "#/components/schemas/HumanReviewDecision"
+          },
+          "from_stage": {
+            "$ref": "#/components/schemas/Stage"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "proposed_next_stage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Stage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "from_stage",
+          "proposed_next_stage",
+          "decision"
+        ],
+        "title": "HumanReviewRecord",
+        "type": "object"
+      },
+      "HumanReviewRequest": {
+        "description": "Request payload for approving or rejecting a pending transition.",
+        "properties": {
+          "decision": {
+            "$ref": "#/components/schemas/HumanReviewDecision"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "required": [
+          "decision"
+        ],
+        "title": "HumanReviewRequest",
+        "type": "object"
+      },
+      "HumanReviewsResponse": {
+        "description": "List of human review decisions for a session.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/HumanReviewRecord"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "HumanReviewsResponse",
+        "type": "object"
+      },
+      "ImpactFields": {
+        "additionalProperties": false,
+        "description": "Stage 4 Impact Mapping contract.",
+        "properties": {
+          "business_goal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Business goal",
+            "gate_required": true,
+            "title": "Business Goal"
+          },
+          "deliverables": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Deliverables",
+            "gate_required": true,
+            "title": "Deliverables"
+          },
+          "expected_behaviors": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Expected behaviors",
+            "gate_required": true,
+            "title": "Expected Behaviors"
+          },
+          "influential_actors": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Influential actors",
+            "gate_required": true,
+            "title": "Influential Actors"
+          },
+          "value_hypotheses": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Value hypotheses",
+            "gate_required": true,
+            "title": "Value Hypotheses"
+          }
+        },
+        "title": "ImpactFields",
+        "type": "object"
+      },
+      "IntegrationScenario": {
+        "additionalProperties": false,
+        "description": "An executable integration example in GWT or EARS form.",
+        "properties": {
+          "ears": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Ears"
+          },
+          "given": {
+            "default": "",
+            "title": "Given",
+            "type": "string"
+          },
+          "then": {
+            "default": "",
+            "title": "Then",
+            "type": "string"
+          },
+          "when": {
+            "default": "",
+            "title": "When",
+            "type": "string"
+          }
+        },
+        "title": "IntegrationScenario",
+        "type": "object"
+      },
+      "MessageDelta": {
+        "description": "An incremental conversational provider delta.",
+        "properties": {
+          "delta": {
+            "title": "Delta",
+            "type": "string"
+          },
+          "type": {
+            "const": "message.delta",
+            "default": "message.delta",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "delta"
+        ],
+        "title": "MessageDelta",
+        "type": "object"
+      },
+      "MessageRole": {
+        "description": "Conversation roles.",
+        "enum": [
+          "user",
+          "assistant"
+        ],
+        "title": "MessageRole",
+        "type": "string"
+      },
+      "Modality": {
+        "description": "Supported input modalities.",
+        "enum": [
+          "text"
+        ],
+        "title": "Modality",
+        "type": "string"
+      },
+      "OIDCRequest": {
+        "description": "Claims already verified by the trusted Next.js OIDC callback.",
+        "properties": {
+          "display_name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Display Name",
+            "type": "string"
+          },
+          "email": {
+            "maxLength": 320,
+            "minLength": 1,
+            "title": "Email",
+            "type": "string"
+          },
+          "issuer": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Issuer",
+            "type": "string"
+          },
+          "subject": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Subject",
+            "type": "string"
+          }
+        },
+        "required": [
+          "issuer",
+          "subject",
+          "email",
+          "display_name"
+        ],
+        "title": "OIDCRequest",
+        "type": "object"
+      },
+      "OpenAIBrainstormPayload": {
+        "description": "Additional state payload returned by the brainstorming facade.",
+        "properties": {
+          "current_stage": {
+            "$ref": "#/components/schemas/Stage"
+          },
+          "next_stage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Stage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "open_questions": {
+            "items": {
+              "$ref": "#/components/schemas/OpenQuestionItem"
+            },
+            "title": "Open Questions",
+            "type": "array"
+          },
+          "processed_stage": {
+            "$ref": "#/components/schemas/Stage"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "stage_clear_enough": {
+            "title": "Stage Clear Enough",
+            "type": "boolean"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "transition_decision_reason": {
+            "title": "Transition Decision Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "current_stage",
+          "processed_stage",
+          "next_stage",
+          "stage_clear_enough",
+          "summary",
+          "open_questions",
+          "transition_decision_reason"
+        ],
+        "title": "OpenAIBrainstormPayload",
+        "type": "object"
+      },
+      "OpenAIChatCompletionRequest": {
+        "description": "OpenAI-compatible chat completion request.",
+        "properties": {
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/OpenAIChatMessage"
+            },
+            "title": "Messages",
+            "type": "array"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "title": "Metadata",
+            "type": "object"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "stream": {
+            "default": false,
+            "title": "Stream",
+            "type": "boolean"
+          },
+          "user": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User"
+          }
+        },
+        "required": [
+          "model",
+          "messages"
+        ],
+        "title": "OpenAIChatCompletionRequest",
+        "type": "object"
+      },
+      "OpenAIChatCompletionResponse": {
+        "description": "OpenAI-compatible chat completion response.",
+        "properties": {
+          "brainstorm": {
+            "$ref": "#/components/schemas/OpenAIBrainstormPayload"
+          },
+          "choices": {
+            "items": {
+              "$ref": "#/components/schemas/OpenAICompletionChoice"
+            },
+            "title": "Choices",
+            "type": "array"
+          },
+          "created": {
+            "title": "Created",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "object": {
+            "default": "chat.completion",
+            "title": "Object",
+            "type": "string"
+          },
+          "usage": {
+            "$ref": "#/components/schemas/OpenAIUsage"
+          }
+        },
+        "required": [
+          "model",
+          "choices",
+          "usage",
+          "brainstorm"
+        ],
+        "title": "OpenAIChatCompletionResponse",
+        "type": "object"
+      },
+      "OpenAIChatMessage": {
+        "description": "OpenAI-compatible chat message.",
+        "properties": {
+          "content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/OpenAIContentPart"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content"
+          },
+          "role": {
+            "enum": [
+              "system",
+              "developer",
+              "user",
+              "assistant",
+              "tool"
+            ],
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role",
+          "content"
+        ],
+        "title": "OpenAIChatMessage",
+        "type": "object"
+      },
+      "OpenAICompletionChoice": {
+        "description": "Choice payload for OpenAI-compatible chat completions.",
+        "properties": {
+          "finish_reason": {
+            "default": "stop",
+            "title": "Finish Reason",
+            "type": "string"
+          },
+          "index": {
+            "default": 0,
+            "title": "Index",
+            "type": "integer"
+          },
+          "message": {
+            "$ref": "#/components/schemas/OpenAICompletionMessage"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "title": "OpenAICompletionChoice",
+        "type": "object"
+      },
+      "OpenAICompletionMessage": {
+        "description": "Assistant message in OpenAI-compatible completion responses.",
+        "properties": {
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "role": {
+            "const": "assistant",
+            "default": "assistant",
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "title": "OpenAICompletionMessage",
+        "type": "object"
+      },
+      "OpenAIContentPart": {
+        "description": "Text content part for OpenAI-compatible chat messages.",
+        "properties": {
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "title": "OpenAIContentPart",
+        "type": "object"
+      },
+      "OpenAIModelCard": {
+        "description": "OpenAI-compatible model card.",
+        "properties": {
+          "created": {
+            "title": "Created",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "object": {
+            "default": "model",
+            "title": "Object",
+            "type": "string"
+          },
+          "owned_by": {
+            "default": "brainstorm-agent",
+            "title": "Owned By",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "created"
+        ],
+        "title": "OpenAIModelCard",
+        "type": "object"
+      },
+      "OpenAIModelsResponse": {
+        "description": "OpenAI-compatible models listing.",
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/OpenAIModelCard"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "object": {
+            "default": "list",
+            "title": "Object",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "OpenAIModelsResponse",
+        "type": "object"
+      },
+      "OpenAIResponseOutputMessage": {
+        "description": "Output message in `/v1/responses` responses.",
+        "properties": {
+          "content": {
+            "items": {
+              "$ref": "#/components/schemas/OpenAIResponseOutputText"
+            },
+            "title": "Content",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "role": {
+            "const": "assistant",
+            "default": "assistant",
+            "title": "Role",
+            "type": "string"
+          },
+          "type": {
+            "const": "message",
+            "default": "message",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "title": "OpenAIResponseOutputMessage",
+        "type": "object"
+      },
+      "OpenAIResponseOutputText": {
+        "description": "Text content item in OpenAI-compatible response output.",
+        "properties": {
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "type": {
+            "const": "output_text",
+            "default": "output_text",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "OpenAIResponseOutputText",
+        "type": "object"
+      },
+      "OpenAIResponsesInputMessage": {
+        "description": "OpenAI-compatible item for the `/v1/responses` input list.",
+        "properties": {
+          "content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/OpenAIContentPart"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content"
+          },
+          "role": {
+            "enum": [
+              "system",
+              "developer",
+              "user",
+              "assistant",
+              "tool"
+            ],
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role",
+          "content"
+        ],
+        "title": "OpenAIResponsesInputMessage",
+        "type": "object"
+      },
+      "OpenAIResponsesRequest": {
+        "description": "OpenAI-compatible request payload for `/v1/responses`.",
+        "properties": {
+          "input": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/OpenAIResponsesInputMessage"
+                },
+                "type": "array"
+              }
+            ],
+            "title": "Input"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "title": "Metadata",
+            "type": "object"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "stream": {
+            "default": false,
+            "title": "Stream",
+            "type": "boolean"
+          },
+          "user": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User"
+          }
+        },
+        "required": [
+          "model",
+          "input"
+        ],
+        "title": "OpenAIResponsesRequest",
+        "type": "object"
+      },
+      "OpenAIResponsesResponse": {
+        "description": "OpenAI-compatible `/v1/responses` payload.",
+        "properties": {
+          "brainstorm": {
+            "$ref": "#/components/schemas/OpenAIBrainstormPayload"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "object": {
+            "const": "response",
+            "default": "response",
+            "title": "Object",
+            "type": "string"
+          },
+          "output": {
+            "items": {
+              "$ref": "#/components/schemas/OpenAIResponseOutputMessage"
+            },
+            "title": "Output",
+            "type": "array"
+          },
+          "usage": {
+            "$ref": "#/components/schemas/OpenAIUsage"
+          }
+        },
+        "required": [
+          "model",
+          "output",
+          "usage",
+          "brainstorm"
+        ],
+        "title": "OpenAIResponsesResponse",
+        "type": "object"
+      },
+      "OpenAIUsage": {
+        "description": "Approximate token usage payload.",
+        "properties": {
+          "completion_tokens": {
+            "title": "Completion Tokens",
+            "type": "integer"
+          },
+          "prompt_tokens": {
+            "title": "Prompt Tokens",
+            "type": "integer"
+          },
+          "total_tokens": {
+            "title": "Total Tokens",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "prompt_tokens",
+          "completion_tokens",
+          "total_tokens"
+        ],
+        "title": "OpenAIUsage",
+        "type": "object"
+      },
+      "OpenQuestionItem": {
+        "additionalProperties": false,
+        "description": "Structured open question captured during a turn.",
+        "properties": {
+          "blocking": {
+            "default": true,
+            "title": "Blocking",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "options": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Options",
+            "type": "array"
+          },
+          "priority": {
+            "$ref": "#/components/schemas/QuestionPriority",
+            "default": "scope"
+          },
+          "question": {
+            "title": "Question",
+            "type": "string"
+          },
+          "recommended_option": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Recommended Option"
+          },
+          "status": {
+            "$ref": "#/components/schemas/OpenQuestionStatus",
+            "default": "open"
+          },
+          "why_it_matters": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": "Required to resolve a stage uncertainty.",
+            "title": "Why It Matters"
+          }
+        },
+        "required": [
+          "question"
+        ],
+        "title": "OpenQuestionItem",
+        "type": "object"
+      },
+      "OpenQuestionStatus": {
+        "description": "Lifecycle for open questions.",
+        "enum": [
+          "open",
+          "resolved"
+        ],
+        "title": "OpenQuestionStatus",
+        "type": "string"
+      },
+      "PendingHumanReview": {
+        "description": "Pending transition awaiting explicit human review.",
+        "properties": {
+          "from_stage": {
+            "$ref": "#/components/schemas/Stage"
+          },
+          "requested_at": {
+            "format": "date-time",
+            "title": "Requested At",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "to_stage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Stage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "transition_decision_reason": {
+            "title": "Transition Decision Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "from_stage",
+          "to_stage",
+          "summary",
+          "transition_decision_reason"
+        ],
+        "title": "PendingHumanReview",
+        "type": "object"
+      },
+      "PitchFields": {
+        "additionalProperties": false,
+        "description": "Stage 0 Pitch contract.",
+        "properties": {
+          "ambiguities": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Ambiguities",
+            "gate_required": true,
+            "title": "Ambiguities"
+          },
+          "clear_points": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Clear points",
+            "gate_required": true,
+            "title": "Clear Points"
+          },
+          "missing_information": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Missing information",
+            "gate_required": true,
+            "title": "Missing Information"
+          },
+          "pitch_summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Pitch summary",
+            "gate_required": true,
+            "title": "Pitch Summary"
+          }
+        },
+        "title": "PitchFields",
+        "type": "object"
+      },
+      "PostMessageRequest": {
+        "description": "Request payload for a user message.",
+        "properties": {
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "modality": {
+            "$ref": "#/components/schemas/Modality",
+            "default": "text"
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "title": "PostMessageRequest",
+        "type": "object"
+      },
+      "PostMessageResponse": {
+        "description": "Response payload for one processed turn.",
+        "properties": {
+          "assistant_message": {
+            "title": "Assistant Message",
+            "type": "string"
+          },
+          "assumptions": {
+            "items": {
+              "$ref": "#/components/schemas/AssumptionItem"
+            },
+            "title": "Assumptions",
+            "type": "array"
+          },
+          "completion_tokens": {
+            "default": 0,
+            "title": "Completion Tokens",
+            "type": "integer"
+          },
+          "current_stage": {
+            "$ref": "#/components/schemas/Stage"
+          },
+          "decisions": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionItem"
+            },
+            "title": "Decisions",
+            "type": "array"
+          },
+          "facts": {
+            "items": {
+              "$ref": "#/components/schemas/FactItem"
+            },
+            "title": "Facts",
+            "type": "array"
+          },
+          "next_stage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Stage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "open_questions": {
+            "items": {
+              "$ref": "#/components/schemas/OpenQuestionItem"
+            },
+            "title": "Open Questions",
+            "type": "array"
+          },
+          "pending_review": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PendingHumanReview"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "processed_stage": {
+            "$ref": "#/components/schemas/Stage"
+          },
+          "prompt_tokens": {
+            "default": 0,
+            "title": "Prompt Tokens",
+            "type": "integer"
+          },
+          "requires_human_review": {
+            "default": false,
+            "title": "Requires Human Review",
+            "type": "boolean"
+          },
+          "risks": {
+            "items": {
+              "$ref": "#/components/schemas/RiskItem"
+            },
+            "title": "Risks",
+            "type": "array"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "stage_clear_enough": {
+            "title": "Stage Clear Enough",
+            "type": "boolean"
+          },
+          "step_markdown": {
+            "title": "Step Markdown",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "transition_decision_reason": {
+            "title": "Transition Decision Reason",
+            "type": "string"
+          },
+          "uncertainties": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Uncertainties",
+            "type": "array"
+          }
+        },
+        "required": [
+          "session_id",
+          "current_stage",
+          "processed_stage",
+          "stage_clear_enough",
+          "assistant_message",
+          "summary",
+          "facts",
+          "assumptions",
+          "decisions",
+          "uncertainties",
+          "open_questions",
+          "risks",
+          "step_markdown",
+          "transition_decision_reason",
+          "next_stage"
+        ],
+        "title": "PostMessageResponse",
+        "type": "object"
+      },
+      "ProblemFields": {
+        "additionalProperties": false,
+        "description": "Stage 1 Problem Framing contract.",
+        "properties": {
+          "constraints": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Constraints",
+            "gate_required": true,
+            "title": "Constraints"
+          },
+          "five_w_one_h": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Five w one h",
+            "gate_required": true,
+            "title": "Five W One H"
+          },
+          "hypotheses": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Hypotheses",
+            "gate_required": true,
+            "title": "Hypotheses"
+          },
+          "initial_risks": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Initial risks",
+            "gate_required": true,
+            "title": "Initial Risks"
+          },
+          "measurable_objectives": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Measurable objectives",
+            "gate_required": true,
+            "title": "Measurable Objectives"
+          },
+          "non_goals": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Non goals",
+            "gate_required": true,
+            "title": "Non Goals"
+          },
+          "problem_statement": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Problem statement",
+            "gate_required": true,
+            "title": "Problem Statement"
+          },
+          "users_actors": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Users actors",
+            "gate_required": true,
+            "title": "Users Actors"
+          }
+        },
+        "title": "ProblemFields",
+        "type": "object"
+      },
+      "QuestionPriority": {
+        "description": "Ordered elicitation topics.",
+        "enum": [
+          "scope",
+          "security/compliance",
+          "ux",
+          "technical"
+        ],
+        "title": "QuestionPriority",
+        "type": "string"
+      },
+      "ReadinessItem": {
+        "description": "One deterministic checklist outcome.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "passed": {
+            "title": "Passed",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "passed",
+          "message"
+        ],
+        "title": "ReadinessItem",
+        "type": "object"
+      },
+      "ReviewAction": {
+        "description": "Explicit owner review choices.",
+        "enum": [
+          "approve",
+          "reject",
+          "request_changes"
+        ],
+        "title": "ReviewAction",
+        "type": "string"
+      },
+      "ReviewInput": {
+        "description": "Review of the currently pending stage, with an optional note.",
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/ReviewAction"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 10000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "stage": {
+            "$ref": "#/components/schemas/Stage"
+          }
+        },
+        "required": [
+          "stage",
+          "action"
+        ],
+        "title": "ReviewInput",
+        "type": "object"
+      },
+      "ReviewRequired": {
+        "description": "Transition awaits owner review.",
+        "properties": {
+          "review": {
+            "$ref": "#/components/schemas/PendingHumanReview"
+          },
+          "type": {
+            "const": "review.required",
+            "default": "review.required",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "review"
+        ],
+        "title": "ReviewRequired",
+        "type": "object"
+      },
+      "RiskField": {
+        "additionalProperties": false,
+        "description": "Typed risk field with stable identity.",
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "impact": {
+            "title": "Impact",
+            "type": "string"
+          },
+          "mitigation": {
+            "title": "Mitigation",
+            "type": "string"
+          },
+          "probability": {
+            "title": "Probability",
+            "type": "string"
+          }
+        },
+        "required": [
+          "category",
+          "description",
+          "impact",
+          "probability",
+          "mitigation",
+          "action"
+        ],
+        "title": "RiskField",
+        "type": "object"
+      },
+      "RiskFields": {
+        "additionalProperties": false,
+        "description": "Stage 5 Risk Storming contract.",
+        "properties": {
+          "risks_by_category": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RiskField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Risks by category",
+            "gate_required": true,
+            "title": "Risks By Category"
+          }
+        },
+        "title": "RiskFields",
+        "type": "object"
+      },
+      "RiskItem": {
+        "additionalProperties": false,
+        "description": "Structured risk captured during a turn.",
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "impact": {
+            "title": "Impact",
+            "type": "string"
+          },
+          "mitigation": {
+            "title": "Mitigation",
+            "type": "string"
+          },
+          "probability": {
+            "title": "Probability",
+            "type": "string"
+          }
+        },
+        "required": [
+          "category",
+          "description",
+          "impact",
+          "probability",
+          "mitigation",
+          "action"
+        ],
+        "title": "RiskItem",
+        "type": "object"
+      },
+      "SectionComment": {
+        "description": "Owner annotation consumed as context by the next successful turn.",
+        "properties": {
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "consumed": {
+            "default": false,
+            "title": "Consumed",
+            "type": "boolean"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "section": {
+            "title": "Section",
+            "type": "string"
+          },
+          "stage": {
+            "$ref": "#/components/schemas/Stage"
+          }
+        },
+        "required": [
+          "stage",
+          "section",
+          "body"
+        ],
+        "title": "SectionComment",
+        "type": "object"
+      },
+      "SessionOverview": {
+        "description": "Session snapshot returned by the API.",
+        "properties": {
+          "archived": {
+            "default": false,
+            "title": "Archived",
+            "type": "boolean"
+          },
+          "comments": {
+            "items": {
+              "$ref": "#/components/schemas/SectionComment"
+            },
+            "title": "Comments",
+            "type": "array"
+          },
+          "completed_stages": {
+            "items": {
+              "$ref": "#/components/schemas/Stage"
+            },
+            "title": "Completed Stages",
+            "type": "array"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "current_stage": {
+            "$ref": "#/components/schemas/Stage"
+          },
+          "open_questions": {
+            "items": {
+              "$ref": "#/components/schemas/OpenQuestionItem"
+            },
+            "title": "Open Questions",
+            "type": "array"
+          },
+          "pending_human_review": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PendingHumanReview"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "stage_states": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/StageState"
+            },
+            "title": "Stage States",
+            "type": "object"
+          },
+          "title": {
+            "default": "Untitled session",
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "current_stage",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "SessionOverview",
+        "type": "object"
+      },
+      "SessionPage": {
+        "description": "Stable offset pagination ordered by creation time and id.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SessionOverview"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "title": "Offset",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "offset",
+          "limit"
+        ],
+        "title": "SessionPage",
+        "type": "object"
+      },
+      "SessionPatch": {
+        "additionalProperties": false,
+        "description": "Editable session metadata.",
+        "properties": {
+          "archived": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "title": "SessionPatch",
+        "type": "object"
+      },
+      "SessionResponse": {
+        "description": "Detailed session response.",
+        "properties": {
+          "archived": {
+            "default": false,
+            "title": "Archived",
+            "type": "boolean"
+          },
+          "comments": {
+            "items": {
+              "$ref": "#/components/schemas/SectionComment"
+            },
+            "title": "Comments",
+            "type": "array"
+          },
+          "completed_stages": {
+            "items": {
+              "$ref": "#/components/schemas/Stage"
+            },
+            "title": "Completed Stages",
+            "type": "array"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "current_stage": {
+            "$ref": "#/components/schemas/Stage"
+          },
+          "open_questions": {
+            "items": {
+              "$ref": "#/components/schemas/OpenQuestionItem"
+            },
+            "title": "Open Questions",
+            "type": "array"
+          },
+          "pending_human_review": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PendingHumanReview"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "stage_states": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/StageState"
+            },
+            "title": "Stage States",
+            "type": "object"
+          },
+          "title": {
+            "default": "Untitled session",
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "current_stage",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "SessionResponse",
+        "type": "object"
+      },
+      "SliceSpecsExport": {
+        "description": "Standalone Markdown artifacts keyed by safe slice filename.",
+        "properties": {
+          "available": {
+            "const": true,
+            "default": true,
+            "title": "Available",
+            "type": "boolean"
+          },
+          "specs": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Specs",
+            "type": "object"
+          }
+        },
+        "required": [
+          "specs"
+        ],
+        "title": "SliceSpecsExport",
+        "type": "object"
+      },
+      "Stage": {
+        "description": "Ordered brainstorming stages.",
+        "enum": [
+          "stage_0_pitch",
+          "stage_1_problem_framing",
+          "stage_2_user_story_mapping",
+          "stage_3_event_storming",
+          "stage_4_impact_mapping",
+          "stage_5_risk_storming",
+          "stage_6_backlog_synthesis",
+          "stage_7_delivery_slicing"
+        ],
+        "title": "Stage",
+        "type": "string"
+      },
+      "StageChanged": {
+        "description": "Committed stage transition.",
+        "properties": {
+          "from_stage": {
+            "$ref": "#/components/schemas/Stage"
+          },
+          "to_stage": {
+            "$ref": "#/components/schemas/Stage"
+          },
+          "type": {
+            "const": "stage.changed",
+            "default": "stage.changed",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "from_stage",
+          "to_stage"
+        ],
+        "title": "StageChanged",
+        "type": "object"
+      },
+      "StageFields": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/PitchFields"
+          },
+          {
+            "$ref": "#/components/schemas/ProblemFields"
+          },
+          {
+            "$ref": "#/components/schemas/StoryMapFields"
+          },
+          {
+            "$ref": "#/components/schemas/EventFields"
+          },
+          {
+            "$ref": "#/components/schemas/ImpactFields"
+          },
+          {
+            "$ref": "#/components/schemas/RiskFields"
+          },
+          {
+            "$ref": "#/components/schemas/BacklogFields"
+          },
+          {
+            "$ref": "#/components/schemas/DeliveryFields"
+          }
+        ]
+      },
+      "StagePatch": {
+        "additionalProperties": false,
+        "description": "Replace supplied fields or identified item collections, then validate.",
+        "properties": {
+          "fields": {
+            "additionalProperties": true,
+            "title": "Fields",
+            "type": "object"
+          },
+          "items": {
+            "additionalProperties": {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "title": "Items",
+            "type": "object"
+          }
+        },
+        "title": "StagePatch",
+        "type": "object"
+      },
+      "StageState": {
+        "description": "Current structured state for one stage.",
+        "properties": {
+          "assistant_message": {
+            "default": "",
+            "title": "Assistant Message",
+            "type": "string"
+          },
+          "assumptions": {
+            "items": {
+              "$ref": "#/components/schemas/AssumptionItem"
+            },
+            "title": "Assumptions",
+            "type": "array"
+          },
+          "clarifications": {
+            "items": {
+              "$ref": "#/components/schemas/Clarification"
+            },
+            "title": "Clarifications",
+            "type": "array"
+          },
+          "contradictions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Contradictions",
+            "type": "array"
+          },
+          "coverage": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/CoverageStatus"
+            },
+            "title": "Coverage",
+            "type": "object"
+          },
+          "decisions": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionItem"
+            },
+            "title": "Decisions",
+            "type": "array"
+          },
+          "extracted_fields": {
+            "$ref": "#/components/schemas/StageFields"
+          },
+          "facts": {
+            "items": {
+              "$ref": "#/components/schemas/FactItem"
+            },
+            "title": "Facts",
+            "type": "array"
+          },
+          "latest_markdown": {
+            "default": "",
+            "title": "Latest Markdown",
+            "type": "string"
+          },
+          "open_questions": {
+            "items": {
+              "$ref": "#/components/schemas/OpenQuestionItem"
+            },
+            "title": "Open Questions",
+            "type": "array"
+          },
+          "partial_fields": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Partial Fields",
+            "type": "object"
+          },
+          "readiness": {
+            "items": {
+              "$ref": "#/components/schemas/ReadinessItem"
+            },
+            "title": "Readiness",
+            "type": "array"
+          },
+          "risks": {
+            "items": {
+              "$ref": "#/components/schemas/RiskItem"
+            },
+            "title": "Risks",
+            "type": "array"
+          },
+          "stage": {
+            "$ref": "#/components/schemas/Stage"
+          },
+          "stage_is_clear_enough": {
+            "default": false,
+            "title": "Stage Is Clear Enough",
+            "type": "boolean"
+          },
+          "stale": {
+            "default": false,
+            "title": "Stale",
+            "type": "boolean"
+          },
+          "summary": {
+            "default": "",
+            "title": "Summary",
+            "type": "string"
+          },
+          "transition_decision_reason": {
+            "default": "",
+            "title": "Transition Decision Reason",
+            "type": "string"
+          },
+          "uncertainties": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Uncertainties",
+            "type": "array"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "stage"
+        ],
+        "title": "StageState",
+        "type": "object"
+      },
+      "StepDocument": {
+        "description": "Rendered Markdown artifact for a stage turn.",
+        "properties": {
+          "assumptions": {
+            "items": {
+              "$ref": "#/components/schemas/AssumptionItem"
+            },
+            "title": "Assumptions",
+            "type": "array"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "decisions": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionItem"
+            },
+            "title": "Decisions",
+            "type": "array"
+          },
+          "facts": {
+            "items": {
+              "$ref": "#/components/schemas/FactItem"
+            },
+            "title": "Facts",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "markdown": {
+            "title": "Markdown",
+            "type": "string"
+          },
+          "open_questions": {
+            "items": {
+              "$ref": "#/components/schemas/OpenQuestionItem"
+            },
+            "title": "Open Questions",
+            "type": "array"
+          },
+          "risks": {
+            "items": {
+              "$ref": "#/components/schemas/RiskItem"
+            },
+            "title": "Risks",
+            "type": "array"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "stage": {
+            "$ref": "#/components/schemas/Stage"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "uncertainties": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Uncertainties",
+            "type": "array"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "session_id",
+          "stage",
+          "version",
+          "markdown",
+          "summary"
+        ],
+        "title": "StepDocument",
+        "type": "object"
+      },
+      "StoryMapFields": {
+        "additionalProperties": false,
+        "description": "Stage 2 User Story Mapping contract.",
+        "properties": {
+          "actors_personas": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Actors personas",
+            "gate_required": true,
+            "title": "Actors Personas"
+          },
+          "capabilities": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Capabilities",
+            "gate_required": true,
+            "title": "Capabilities"
+          },
+          "dependencies": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Dependencies",
+            "gate_required": true,
+            "title": "Dependencies"
+          },
+          "edge_cases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Edge cases",
+            "gate_required": true,
+            "title": "Edge Cases"
+          },
+          "functional_gaps": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Functional gaps",
+            "gate_required": true,
+            "title": "Functional Gaps"
+          },
+          "mvp_scope": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Mvp scope",
+            "gate_required": true,
+            "title": "Mvp Scope"
+          },
+          "user_journeys": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "User journeys",
+            "gate_required": true,
+            "title": "User Journeys"
+          }
+        },
+        "title": "StoryMapFields",
+        "type": "object"
+      },
+      "TurnCompleted": {
+        "description": "Terminal success, emitted only after commit.",
+        "properties": {
+          "output": {
+            "$ref": "#/components/schemas/AssistantTurnOutput"
+          },
+          "turn_id": {
+            "title": "Turn Id",
+            "type": "string"
+          },
+          "type": {
+            "const": "turn.completed",
+            "default": "turn.completed",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "turn_id",
+          "output"
+        ],
+        "title": "TurnCompleted",
+        "type": "object"
+      },
+      "TurnError": {
+        "description": "Terminal failure; tentative deltas must be discarded.",
+        "properties": {
+          "code": {
+            "const": "turn_failed",
+            "default": "turn_failed",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "The turn failed; retry the request.",
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "const": "error",
+            "default": "error",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "title": "TurnError",
+        "type": "object"
+      },
+      "TurnEvent": {
+        "discriminator": {
+          "mapping": {
+            "analysis.status": "#/components/schemas/AnalysisStatus",
+            "coverage.updated": "#/components/schemas/CoverageUpdated",
+            "document.updated": "#/components/schemas/DocumentUpdated",
+            "error": "#/components/schemas/TurnError",
+            "message.delta": "#/components/schemas/MessageDelta",
+            "review.required": "#/components/schemas/ReviewRequired",
+            "stage.changed": "#/components/schemas/StageChanged",
+            "turn.completed": "#/components/schemas/TurnCompleted",
+            "turn.started": "#/components/schemas/TurnStarted"
+          },
+          "propertyName": "type"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/TurnStarted"
+          },
+          {
+            "$ref": "#/components/schemas/AnalysisStatus"
+          },
+          {
+            "$ref": "#/components/schemas/MessageDelta"
+          },
+          {
+            "$ref": "#/components/schemas/DocumentUpdated"
+          },
+          {
+            "$ref": "#/components/schemas/CoverageUpdated"
+          },
+          {
+            "$ref": "#/components/schemas/StageChanged"
+          },
+          {
+            "$ref": "#/components/schemas/ReviewRequired"
+          },
+          {
+            "$ref": "#/components/schemas/TurnCompleted"
+          },
+          {
+            "$ref": "#/components/schemas/TurnError"
+          }
+        ]
+      },
+      "TurnStarted": {
+        "description": "First event of an accepted stream.",
+        "properties": {
+          "stage": {
+            "$ref": "#/components/schemas/Stage"
+          },
+          "turn_id": {
+            "title": "Turn Id",
+            "type": "string"
+          },
+          "type": {
+            "const": "turn.started",
+            "default": "turn.started",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "turn_id",
+          "stage"
+        ],
+        "title": "TurnStarted",
+        "type": "object"
+      },
+      "UserResponse": {
+        "description": "Public identity; password hashes never leave the backend.",
+        "properties": {
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "display_name"
+        ],
+        "title": "UserResponse",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "Strict staged brainstorming backend with LangGraph orchestration.",
+    "title": "brainstorm-agent",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/auth/oidc": {
+      "post": {
+        "description": "Resolve trusted OIDC claims using issuer and subject.\n\nArgs:\n    body: OIDCRequest: Verified provider identity.\n    request: Request: Incoming bridge request.\n    db: Session: Request transaction.\n\nReturns:\n    UserResponse: Provisioned or linked user.\n\nRaises:\n    HTTPException: OIDC disabled, wrong issuer or identity conflict.",
+        "operationId": "provision_oidc_api_v1_auth_oidc_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OIDCRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Provision Oidc",
+        "tags": [
+          "authentication"
+        ]
+      }
+    },
+    "/api/v1/auth/verify": {
+      "post": {
+        "description": "Verify local credentials for the Credentials provider.\n\nArgs:\n    body: CredentialsRequest: Candidate login.\n    request: Request: Incoming bridge request.\n    db: Session: Request transaction.\n\nReturns:\n    UserResponse: Verified user.\n\nRaises:\n    HTTPException: Invalid credentials or disabled account.",
+        "operationId": "verify_credentials_api_v1_auth_verify_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CredentialsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Verify Credentials",
+        "tags": [
+          "authentication"
+        ]
+      }
+    },
+    "/api/v1/sessions": {
+      "get": {
+        "description": "List owner sessions with bounded pagination.\n\nArgs:\n    service (Service): Request parameter or session service.\n    offset (Annotated[int, Query(ge=0)]): Request parameter or session service.\n    limit (Annotated[int, Query(ge=1, le=100)]): Request parameter or session service.\n    include_archived (bool): Request parameter or session service.\n\nReturns:\n    SessionPage: Application service result.",
+        "operationId": "list_sessions_api_v1_sessions_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_archived",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Archived",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Sessions",
+        "tags": [
+          "application"
+        ]
+      },
+      "post": {
+        "description": "Create a new brainstorming session.\n\nArgs:\n    session_service: Session application service.\n    payload: Optional creation metadata.\n\nReturns:\n    CreateSessionResponse: Newly created session payload.",
+        "operationId": "create_session_api_v1_sessions_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/CreateSessionInput"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateSessionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Session",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
+    "/api/v1/sessions/{session_id}": {
+      "delete": {
+        "description": "Soft-delete an owned session.\n\nArgs:\n    session_id (str): Request parameter or session service.\n    service (Service): Request parameter or session service.",
+        "operationId": "delete_session_api_v1_sessions__session_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Session",
+        "tags": [
+          "application"
+        ]
+      },
+      "get": {
+        "description": "Return the current state of a session.\n\nArgs:\n    session_id: Session identifier.\n    session_service: Session application service.\n\nReturns:\n    SessionResponse: Session snapshot.",
+        "operationId": "get_session_api_v1_sessions__session_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Session",
+        "tags": [
+          "sessions"
+        ]
+      },
+      "patch": {
+        "description": "Rename or archive an owned session.\n\nArgs:\n    session_id (str): Request parameter or session service.\n    payload (SessionPatch): Request parameter or session service.\n    service (Service): Request parameter or session service.\n\nReturns:\n    SessionOverview: Application service result.",
+        "operationId": "update_session_api_v1_sessions__session_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionOverview"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Session",
+        "tags": [
+          "application"
+        ]
+      }
+    },
+    "/api/v1/sessions/{session_id}/comments": {
+      "post": {
+        "description": "Save section feedback for the next successful turn.\n\nArgs:\n    session_id (str): Request parameter or session service.\n    payload (CommentInput): Request parameter or session service.\n    service (Service): Request parameter or session service.\n\nReturns:\n    SessionOverview: Application service result.",
+        "operationId": "add_comment_api_v1_sessions__session_id__comments_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommentInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionOverview"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Comment",
+        "tags": [
+          "application"
+        ]
+      }
+    },
+    "/api/v1/sessions/{session_id}/document": {
+      "get": {
+        "description": "Return the latest current stage document.\n\nArgs:\n    session_id: Session identifier.\n    session_service: Session application service.\n\nReturns:\n    StepDocument: Current stage document.",
+        "operationId": "get_current_document_api_v1_sessions__session_id__document_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StepDocument"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Current Document",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
+    "/api/v1/sessions/{session_id}/documents": {
+      "get": {
+        "description": "Return all versioned stage documents for a session.\n\nArgs:\n    session_id: Session identifier.\n    session_service: Session application service.\n\nReturns:\n    DocumentsResponse: Versioned documents.",
+        "operationId": "list_documents_api_v1_sessions__session_id__documents_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Documents",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
+    "/api/v1/sessions/{session_id}/export/backlog_json": {
+      "get": {
+        "description": "Export validated backlog assignments, dependencies and delivery waves.\n\nArgs:\n    session_id (str): Request parameter or session service.\n    service (Service): Request parameter or session service.\n\nReturns:\n    BacklogExport: Application service result.",
+        "operationId": "export_backlog_api_v1_sessions__session_id__export_backlog_json_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BacklogExport"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Backlog",
+        "tags": [
+          "application"
+        ]
+      }
+    },
+    "/api/v1/sessions/{session_id}/export/json": {
+      "get": {
+        "description": "Export the full session as structured JSON.\n\nArgs:\n    session_id: Session identifier.\n    session_service: Session application service.\n\nReturns:\n    ExportJsonResponse: Structured JSON export payload.",
+        "operationId": "export_json_api_v1_sessions__session_id__export_json_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportJsonResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Json",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
+    "/api/v1/sessions/{session_id}/export/markdown": {
+      "get": {
+        "description": "Export the full session as consolidated Markdown.\n\nArgs:\n    session_id: Session identifier.\n    session_service: Session application service.\n\nReturns:\n    ExportMarkdownResponse: Markdown export payload.",
+        "operationId": "export_markdown_api_v1_sessions__session_id__export_markdown_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportMarkdownResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Markdown",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
+    "/api/v1/sessions/{session_id}/export/slice_specs": {
+      "get": {
+        "description": "Export validated standalone Markdown slice specifications.\n\nArgs:\n    session_id (str): Request parameter or session service.\n    service (Service): Request parameter or session service.\n\nReturns:\n    SliceSpecsExport: Application service result.",
+        "operationId": "export_specs_api_v1_sessions__session_id__export_slice_specs_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SliceSpecsExport"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Specs",
+        "tags": [
+          "application"
+        ]
+      }
+    },
+    "/api/v1/sessions/{session_id}/messages": {
+      "get": {
+        "description": "Return message history for a session.\n\nArgs:\n    session_id: Session identifier.\n    session_service: Session application service.\n\nReturns:\n    ConversationHistoryResponse: Ordered conversation turns.",
+        "operationId": "list_messages_api_v1_sessions__session_id__messages_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationHistoryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Messages",
+        "tags": [
+          "sessions"
+        ]
+      },
+      "post": {
+        "description": "Process one user message for a session.\n\nArgs:\n    session_id: Session identifier.\n    payload: Message payload.\n    session_service: Session application service.\n\nReturns:\n    PostMessageResponse: Structured assistant response.",
+        "operationId": "post_message_api_v1_sessions__session_id__messages_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostMessageRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostMessageResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Message",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
+    "/api/v1/sessions/{session_id}/messages/stream": {
+      "post": {
+        "description": "Process one user message and return an SSE stream with the final payload.\n\nArgs:\n    session_id: Session identifier.\n    payload: Message payload.\n    session_service: Session application service.\n\nReturns:\n    StreamingResponse: Server-sent events stream.",
+        "operationId": "post_message_stream_api_v1_sessions__session_id__messages_stream_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostMessageRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Message Stream",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
+    "/api/v1/sessions/{session_id}/review": {
+      "post": {
+        "description": "Approve, reject, or request changes on the pending stage.\n\nArgs:\n    session_id (str): Request parameter or session service.\n    payload (ReviewInput): Request parameter or session service.\n    service (Service): Request parameter or session service.\n\nReturns:\n    SessionOverview: Application service result.",
+        "operationId": "submit_review_api_v1_sessions__session_id__review_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionOverview"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Submit Review",
+        "tags": [
+          "application"
+        ]
+      }
+    },
+    "/api/v1/sessions/{session_id}/reviews": {
+      "get": {
+        "description": "List human review decisions for a session.\n\nArgs:\n    session_id: Session identifier.\n    session_service: Session application service.\n\nReturns:\n    HumanReviewsResponse: Human review history.",
+        "operationId": "list_human_reviews_api_v1_sessions__session_id__reviews_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HumanReviewsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Human Reviews",
+        "tags": [
+          "sessions"
+        ]
+      },
+      "post": {
+        "description": "Approve or reject a pending human-reviewed transition.\n\nArgs:\n    session_id: Session identifier.\n    payload: Review payload.\n    session_service: Session application service.\n\nReturns:\n    SessionResponse: Updated session overview.",
+        "operationId": "review_pending_transition_api_v1_sessions__session_id__reviews_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HumanReviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Review Pending Transition",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
+    "/api/v1/sessions/{session_id}/stages/{stage}": {
+      "patch": {
+        "description": "Replace supplied fields/item collections and revalidate without advancing.\n\nArgs:\n    session_id (str): Request parameter or session service.\n    stage (Stage): Request parameter or session service.\n    payload (StagePatch): Request parameter or session service.\n    service (Service): Request parameter or session service.\n\nReturns:\n    SessionOverview: Application service result.",
+        "operationId": "edit_stage_api_v1_sessions__session_id__stages__stage__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "stage",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Stage"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StagePatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionOverview"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Edit Stage",
+        "tags": [
+          "application"
+        ]
+      }
+    },
+    "/api/v1/sessions/{session_id}/stages/{stage}/documents": {
+      "get": {
+        "description": "List immutable versions for one owned stage.\n\nArgs:\n    session_id (str): Request parameter or session service.\n    stage (Stage): Request parameter or session service.\n    service (Service): Request parameter or session service.\n\nReturns:\n    list[StepDocument]: Application service result.",
+        "operationId": "stage_documents_api_v1_sessions__session_id__stages__stage__documents_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "stage",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Stage"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/StepDocument"
+                  },
+                  "title": "Response Stage Documents Api V1 Sessions  Session Id  Stages  Stage  Documents Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Stage Documents",
+        "tags": [
+          "application"
+        ]
+      }
+    },
+    "/api/v1/sessions/{session_id}/stages/{stage}/documents/diff": {
+      "get": {
+        "description": "Compare two versions of the same stage document.\n\nArgs:\n    session_id (str): Request parameter or session service.\n    stage (Stage): Request parameter or session service.\n    service (Service): Request parameter or session service.\n    from_version (Annotated[int, Query(ge=1)]): Request parameter or session service.\n    to_version (Annotated[int, Query(ge=1)]): Request parameter or session service.\n\nReturns:\n    DocumentDiff: Application service result.",
+        "operationId": "document_diff_api_v1_sessions__session_id__stages__stage__documents_diff_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "stage",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Stage"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from_version",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "title": "From Version",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to_version",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "title": "To Version",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentDiff"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Document Diff",
+        "tags": [
+          "application"
+        ]
+      }
+    },
+    "/api/v1/sessions/{session_id}/stages/{stage}/fields/{field}": {
+      "patch": {
+        "description": "Edit one stage field using its typed JSON value.\n\nArgs:\n    session_id (str): Request parameter or session service.\n    stage (Stage): Request parameter or session service.\n    field (str): Request parameter or session service.\n    payload (FieldPatch): Request parameter or session service.\n    service (Service): Request parameter or session service.\n\nReturns:\n    SessionOverview: Application service result.",
+        "operationId": "edit_field_api_v1_sessions__session_id__stages__stage__fields__field__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "stage",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Stage"
+            }
+          },
+          {
+            "in": "path",
+            "name": "field",
+            "required": true,
+            "schema": {
+              "title": "Field",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FieldPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionOverview"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Edit Field",
+        "tags": [
+          "application"
+        ]
+      }
+    },
+    "/api/v1/sessions/{session_id}/stages/{stage}/reopen": {
+      "post": {
+        "description": "Reopen a previously visited stage, marking downstream stages stale.\n\nArgs:\n    session_id (str): Request parameter or session service.\n    stage (Stage): Request parameter or session service.\n    service (Service): Request parameter or session service.\n\nReturns:\n    SessionOverview: Application service result.",
+        "operationId": "reopen_stage_api_v1_sessions__session_id__stages__stage__reopen_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "stage",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Stage"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionOverview"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reopen Stage",
+        "tags": [
+          "application"
+        ]
+      }
+    },
+    "/api/v1/sessions/{session_id}/turns": {
+      "post": {
+        "description": "Stream analysis status, live reply deltas, committed state, and terminal result.\n\nArgs:\n    session_id (str): Request parameter or session service.\n    payload (PostMessageRequest): Request parameter or session service.\n    service (Service): Request parameter or session service.\n\nReturns:\n    StreamingResponse: Application service result.",
+        "operationId": "stream_turn_api_v1_sessions__session_id__turns_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostMessageRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/TurnEvent"
+                }
+              }
+            },
+            "description": "SSE: event is the discriminant, data is JSON. Deltas are tentative until turn.completed. Exactly one terminal event: turn.completed or error. No replay/resume support."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Stream Turn",
+        "tags": [
+          "application"
+        ]
+      }
+    },
+    "/healthz": {
+      "get": {
+        "operationId": "healthcheck_healthz_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Healthcheck Healthz Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Healthcheck"
+      }
+    },
+    "/livez": {
+      "get": {
+        "operationId": "livez_livez_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Livez Livez Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Livez"
+      }
+    },
+    "/metrics": {
+      "get": {
+        "operationId": "metrics_metrics_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Metrics"
+      }
+    },
+    "/readyz": {
+      "get": {
+        "operationId": "readyz_readyz_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Readyz Readyz Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Readyz"
+      }
+    },
+    "/v1/chat/completions": {
+      "post": {
+        "description": "Process an OpenAI-compatible chat completion request.\n\nArgs:\n    payload: OpenAI-compatible request payload.\n    response: FastAPI response object used for response headers.\n    settings: Application settings.\n    session_service: Session application service.\n\nReturns:\n    OpenAIChatCompletionResponse | JSONResponse | StreamingResponse:\n        Completion payload, stream, or OpenAI-shaped error.",
+        "operationId": "create_chat_completion_v1_chat_completions_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OpenAIChatCompletionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenAIChatCompletionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Chat Completion",
+        "tags": [
+          "openai-compatible"
+        ]
+      }
+    },
+    "/v1/models": {
+      "get": {
+        "description": "List the OpenAI-compatible models exposed by the backend.\n\nArgs:\n    settings: Application settings.\n\nReturns:\n    OpenAIModelsResponse: Exposed public model aliases.",
+        "operationId": "list_models_v1_models_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenAIModelsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Models",
+        "tags": [
+          "openai-compatible"
+        ]
+      }
+    },
+    "/v1/responses": {
+      "post": {
+        "description": "Process an OpenAI-compatible `/v1/responses` request.\n\nArgs:\n    payload: OpenAI-compatible responses request payload.\n    response: FastAPI response object used for response headers.\n    settings: Application settings.\n    session_service: Session application service.\n\nReturns:\n    OpenAIResponsesResponse | JSONResponse | StreamingResponse: Response payload or stream.",
+        "operationId": "create_response_v1_responses_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OpenAIResponsesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenAIResponsesResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Response",
+        "tags": [
+          "openai-compatible"
+        ]
+      }
+    }
+  }
+}
