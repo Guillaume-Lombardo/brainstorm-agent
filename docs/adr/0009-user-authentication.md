@@ -21,7 +21,9 @@ from the server. The backend returns only id, email and display name. Auth.js
 will enable OIDC only when configured, verify the provider callback, tokens and
 email verification, then call `/api/v1/auth/oidc` with verified claims. Both bridge
 endpoints require the server-only `X-Auth-Bridge` secret and use the existing rate
-limiter before password hashing or provisioning. Never expose this secret in the
+limiter before password hashing or provisioning. Budgets are isolated per normalized
+login email for Credentials and per issuer/subject for OIDC. Limiter keys hash
+these identities rather than retaining their raw values. Never expose this secret in the
 browser. Rotate it through the deployment secret store, not source control.
 
 OIDC resolution uses issuer and subject, never automatic email matching. An email
@@ -32,7 +34,8 @@ raw provider tokens or run an OIDC authorization flow itself.
 
 The Next.js server calls session APIs with a short-lived signed JWT whose `sub`
 is the backend user id and whose `exp` is mandatory. Configure issuer and audience
-on both servers. API keys remain supported: `AUTH_API_KEY_OWNERS` maps their stored
+on both servers, use separate signing secrets across services and choose at least
+32 random bytes for the bridge secret. API keys remain supported: `AUTH_API_KEY_OWNERS` maps their stored
 normalized hash to an active user id. Unmapped keys and unknown/disabled JWT users
 are denied. Existing key lists and peppering remain unchanged.
 
@@ -52,7 +55,7 @@ through CLI and mapping service keys explicitly to its id.
 Deploy migration before enabling the updated service; provision users and map keys.
 This deliberately breaks access for historical JWT subjects not in the user table
 and unmapped API keys. The frontend server is a trusted authentication boundary.
-The default login limit is five bridge calls per minute per connecting server IP,
-shared across both bridge routes; it can be tuned for multiple users. Redis is
+The default login limit is five calls per minute per identity and flow, so one
+failed login cannot exhaust every user's budget behind the frontend server. Redis is
 preferred; the existing in-memory fallback is per process and resets at restart.
 No frontend implementation is included in this lot.

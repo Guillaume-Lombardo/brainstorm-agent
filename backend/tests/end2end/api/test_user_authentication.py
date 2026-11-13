@@ -145,10 +145,62 @@ def test_login_throttle_and_oidc(tmp_path: Path) -> None:
     assert client.post("/api/v1/auth/oidc", headers=BRIDGE, json=claims).json() == first.json()
     claims["subject"] = "subject-2"
     assert client.post("/api/v1/auth/oidc", headers=BRIDGE, json=claims).status_code == 409
+    claims["subject"] = "subject-1"
+    assert client.post("/api/v1/auth/oidc", headers=BRIDGE, json=claims).status_code == 200
     throttled = client.post(
-        "/api/v1/auth/verify",
+        "/api/v1/auth/oidc",
         headers=BRIDGE,
-        json={"email": "absent", "password": "wrong"},  # pragma: allowlist secret
+        json=claims,
     )
     assert throttled.status_code == 429
     assert int(throttled.headers["Retry-After"]) > 0
+
+
+def test_login_budget_isolated_by_identity_and_flow(tmp_path: Path) -> None:
+    app = create_app(
+        Settings(
+            database_url=f"sqlite:///{tmp_path / 'login-budgets.db'}",
+            llm_mode=LLMMode.FAKE,
+            redis_url="redis://localhost:6399",
+            auth_bridge_secret=BRIDGE["X-Auth-Bridge"],
+            login_rate_limit_requests=2,
+            oidc_issuer="https://identity.example.invalid",
+        )
+    )
+    with app.state.session_factory() as db:
+        UserService(db).create("bob@example.invalid", "Bob", "bob-password")
+        db.commit()
+    client = TestClient(app)
+    for email in ["alice@example.invalid", " ALICE@example.invalid "]:
+        assert (
+            client.post(
+                "/api/v1/auth/verify", headers=BRIDGE, json={"email": email, "password": "wrong"}
+            ).status_code
+            == 401
+        )
+    limited = client.post(
+        "/api/v1/auth/verify", headers=BRIDGE, json={"email": "alice@example.invalid", "password": "wrong"}
+    )
+    assert limited.status_code == 429
+    assert int(limited.headers["Retry-After"]) > 0
+    assert (
+        client.post(
+            "/api/v1/auth/verify",
+            headers=BRIDGE,
+            json={"email": "bob@example.invalid", "password": "bob-password"},
+        ).status_code
+        == 200
+    )
+    assert (
+        client.post(
+            "/api/v1/auth/oidc",
+            headers=BRIDGE,
+            json={
+                "issuer": "https://identity.example.invalid",
+                "subject": "alice-oidc",
+                "email": "alice@example.invalid",
+                "display_name": "Alice",
+            },
+        ).status_code
+        == 200
+    )

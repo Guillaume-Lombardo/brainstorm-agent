@@ -523,7 +523,8 @@ The recommended frontend integration uses Auth.js Credentials on the Next.js
 server: POST `{email, password}` to `/api/v1/auth/verify`, with server-only
 `X-Auth-Bridge: <AUTH_BRIDGE_SECRET>`. Response: `{id, email, display_name}`.
 Next.js then signs short-lived backend JWTs for this user. The browser must never
-receive the bridge secret or JWT signing secret.
+receive the bridge secret or JWT signing secret. Use a high-entropy bridge secret
+(at least 32 random bytes) and a signing secret dedicated to this service.
 
 With `OIDC_ISSUER` configured, the trusted Auth.js OIDC callback verifies tokens
 and email verification, then POSTs `{issuer, subject, email, display_name}` to
@@ -531,5 +532,5 @@ and email verification, then POSTs `{issuer, subject, email, display_name}` to
 pairs resolve the same user; email collisions return 409 and never link accounts
 automatically. A missing issuer disables OIDC. Both bridge routes are limited by
 `LOGIN_RATE_LIMIT_REQUESTS` (5) per `LOGIN_RATE_LIMIT_WINDOW_SECONDS` (60), per
-connecting server IP, returning 429 with `Retry-After`. Authentication-disabled
+normalized identity and flow (Credentials email or OIDC issuer/subject), returning 429 with `Retry-After`. Authentication-disabled
 development uses a single bootstrap owner. See [ADR 0009](docs/adr/0009-user-authentication.md).

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+from hashlib import sha256
 from secrets import compare_digest
 from typing import Annotated
 
@@ -41,21 +43,34 @@ class UserResponse(BaseModel):
 
 
 def require_bridge(request: Request) -> None:
-    """Authenticate the frontend server and throttle before password work.
+    """Authenticate the frontend server before processing credential claims.
 
     Args:
         request: Request: Incoming bridge request.
 
     Raises:
-        HTTPException: Missing bridge credentials or exhausted login budget.
+        HTTPException: Missing bridge credentials.
     """
     settings = request.app.state.settings
     expected = settings.auth_bridge_secret
     provided = request.headers.get("X-Auth-Bridge", "")
     if not expected or not compare_digest(expected.encode(), provided.encode()):
         raise HTTPException(401, "Valid bridge credentials are required.")
+
+
+def enforce_login_limit(request: Request, *, identity: str) -> None:
+    """Throttle one normalized identity without retaining it in limiter keys.
+
+    Args:
+        request: Request: Incoming bridge request.
+        identity: str: Flow-prefixed normalized identity.
+
+    Raises:
+        HTTPException: Identity login budget exhausted.
+    """
+    settings = request.app.state.settings
     allowed, retry = request.app.state.rate_limiter.check(
-        identifier=f"login:{request.client.host if request.client else 'unknown'}",
+        identifier=f"login:{sha256(identity.encode()).hexdigest()}",
         limit=settings.login_rate_limit_requests,
         window_seconds=settings.login_rate_limit_window_seconds,
     )
@@ -66,12 +81,14 @@ def require_bridge(request: Request) -> None:
 @router.post("/verify", dependencies=[Depends(require_bridge)])
 def verify_credentials(
     body: CredentialsRequest,
+    request: Request,
     db: Annotated[Session, Depends(get_db_session)],
 ) -> UserResponse:
     """Verify local credentials for the Credentials provider.
 
     Args:
         body: CredentialsRequest: Candidate login.
+        request: Request: Incoming bridge request.
         db: Session: Request transaction.
 
     Returns:
@@ -80,6 +97,7 @@ def verify_credentials(
     Raises:
         HTTPException: Invalid credentials or disabled account.
     """
+    enforce_login_limit(request, identity=f"verify:{body.email.strip().lower()}")
     user = UserService(db).verify(body.email, body.password)
     if user is None:
         raise HTTPException(401, "Invalid credentials.")
@@ -108,6 +126,7 @@ def provision_oidc(
     """
     if not request.app.state.settings.oidc_issuer or body.issuer != request.app.state.settings.oidc_issuer:
         raise HTTPException(403, "OIDC issuer is not enabled.")
+    enforce_login_limit(request, identity="oidc:" + json.dumps([body.issuer, body.subject]))
     try:
         user = UserService(db).provision_oidc(body.issuer, body.subject, body.email, body.display_name)
         db.commit()

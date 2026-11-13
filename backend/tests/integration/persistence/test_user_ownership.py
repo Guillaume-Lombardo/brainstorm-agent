@@ -8,10 +8,12 @@ if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 import pytest
+from sqlalchemy.exc import IntegrityError
 
 from brainstorm_agent.async_runner import run_async
 from brainstorm_agent.core.enums import LLMMode
 from brainstorm_agent.exceptions import NotFoundError
+from brainstorm_agent.persistence.models import UserRecord
 from brainstorm_agent.persistence.session import (
     create_engine_from_settings,
     create_session_factory,
@@ -80,4 +82,23 @@ def test_oidc_conflicts_and_disabled_identity(tmp_path: Path) -> None:
         db.commit()
         with pytest.raises(ValueError, match="Identity unavailable"):
             users.provision_oidc("issuer", "subject", oidc.email, "New")
+    engine.dispose()
+
+
+def test_duplicate_user_error_hides_password_hash(tmp_path: Path) -> None:
+    settings = Settings(database_url=f"sqlite:///{tmp_path / 'hidden-parameters.db'}")
+    upgrade_database(database_url=settings.database_url)
+    engine = create_engine_from_settings(settings)
+    with create_session_factory(engine)() as db:
+        user = UserService(db).create("duplicate@example.invalid", "Duplicate", "password")
+        stored_hash = user.password_hash
+        assert stored_hash is not None
+        db.commit()
+        db.add(
+            UserRecord(id="duplicate", email=user.email, display_name="Duplicate", password_hash=stored_hash)
+        )
+        with pytest.raises(IntegrityError) as captured:
+            db.flush()
+        assert stored_hash not in str(captured.value)
+        assert "parameters hidden" in str(captured.value)
     engine.dispose()
