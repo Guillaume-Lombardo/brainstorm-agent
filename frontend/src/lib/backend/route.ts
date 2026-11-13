@@ -2,18 +2,61 @@ import "server-only";
 
 import { auth } from "@/auth";
 
-import type { BackendClient, Caller } from "./client";
 import { BackendError } from "./errors";
+import type { Caller, HttpBackend } from "./http";
 import { getBackend } from "./index";
-import { isStageId, type StageId } from "./types";
+import { isStage, type Stage } from "./types";
+
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 /** JSON error response with the shared `ErrorBody` shape. */
-export function errorResponse(error: BackendError): Response {
-  const headers = new Headers();
+function errorResponse(error: BackendError): Response {
+  const headers = new Headers({ "cache-control": "no-store" });
   if (error.retryAfterSeconds !== undefined) {
     headers.set("retry-after", String(error.retryAfterSeconds));
   }
   return Response.json(error.toBody(), { status: error.status, headers });
+}
+
+/** Origin the browser must send on mutating requests: `AUTH_URL`, else the `Host` header. */
+function expectedOrigin(request: Request): string | null {
+  const configured = process.env.AUTH_URL?.trim();
+  if (configured) {
+    try {
+      return new URL(configured).origin;
+    } catch {
+      return null;
+    }
+  }
+  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+  if (!host) {
+    return null;
+  }
+  const protocol = request.headers.get("x-forwarded-proto") ?? new URL(request.url).protocol;
+  return `${protocol.replace(/:$/, "")}://${host}`;
+}
+
+/**
+ * Cross-site request forgery guard for mutating routes. The session cookie is
+ * `SameSite=Lax`; on top of it, a mutating request must come from this origin and,
+ * when it has a body, be JSON (which a cross-site form cannot send without CORS).
+ */
+export function checkMutation(request: Request): BackendError | null {
+  if (SAFE_METHODS.has(request.method)) {
+    return null;
+  }
+  const site = request.headers.get("sec-fetch-site");
+  const origin = request.headers.get("origin");
+  if ((site && site !== "same-origin") || (origin && origin !== expectedOrigin(request))) {
+    return new BackendError("forbidden", "Cross-site requests are not allowed.");
+  }
+  const length = request.headers.get("content-length");
+  const hasBody = request.body !== null && length !== "0";
+  const type = request.headers.get("content-type") ?? "";
+  if (hasBody && !/^application\/json\b/i.test(type)) {
+    return new BackendError("validation_error", "The request body must be application/json.");
+  }
+  return null;
 }
 
 /**
@@ -21,8 +64,13 @@ export function errorResponse(error: BackendError): Response {
  * never leave the server: the browser only sees this proxy's JSON or SSE.
  */
 export async function withCaller(
-  handler: (caller: Caller, backend: BackendClient) => Promise<Response>,
+  request: Request,
+  handler: (caller: Caller, backend: HttpBackend) => Promise<Response>,
 ): Promise<Response> {
+  const rejected = checkMutation(request);
+  if (rejected) {
+    return errorResponse(rejected);
+  }
   const session = await auth();
   const userId = session?.user?.id;
   if (!userId) {
@@ -74,8 +122,8 @@ export function optionalString(body: Record<string, unknown>, key: string): stri
   return value;
 }
 
-export function requireStage(value: string): StageId {
-  if (!isStageId(value)) {
+export function requireStage(value: string): Stage {
+  if (!isStage(value)) {
     throw new BackendError("validation_error", `Unknown stage "${value}".`);
   }
   return value;
@@ -91,4 +139,11 @@ export function sseResponse(stream: ReadableStream<Uint8Array>): Response {
       "x-accel-buffering": "no",
     },
   });
+}
+
+/** JSON response that must never be cached (per-user data). */
+export function json(body: unknown, init: ResponseInit = {}): Response {
+  const headers = new Headers(init.headers);
+  headers.set("cache-control", "no-store");
+  return Response.json(body, { ...init, headers });
 }

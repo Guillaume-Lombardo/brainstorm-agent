@@ -1,18 +1,19 @@
-import { readJsonObject, requireString, withCaller } from "@/lib/backend/route";
+import { json, readJsonObject, requireString, withCaller } from "@/lib/backend/route";
 
 export const dynamic = "force-dynamic";
 
+/** `?archived=include` also lists archived sessions. */
 export async function GET(request: Request): Promise<Response> {
   const includeArchived = new URL(request.url).searchParams.get("archived") === "include";
-  return withCaller(async (caller, backend) =>
-    Response.json(await backend.listSessions(caller, { includeArchived })),
+  return withCaller(request, async (caller, backend) =>
+    json(await backend.listSessions(caller, { includeArchived })),
   );
 }
 
 export async function POST(request: Request): Promise<Response> {
-  return withCaller(async (caller, backend) => {
+  return withCaller(request, async (caller, backend) => {
     const body = await readJsonObject(request);
-    const session = await backend.createSession(caller, { title: requireString(body, "title") });
-    return Response.json(session, { status: 201 });
+    const created = await backend.createSession(caller, requireString(body, "title").trim());
+    return json(created, { status: 201 });
   });
 }

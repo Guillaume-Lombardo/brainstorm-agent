@@ -1,16 +1,45 @@
 import type { components } from "./generated/api";
 
 /**
- * Provisional application contract between the Next.js server and the backend.
+ * Names for the generated backend contract (`generated/api.ts`, ADR 0010).
  *
- * Presentation types for the mock workspace (full HTTP mapping is lot 7b).
- * Generated primitives are reused where shapes already match.
- * These types mirror the planned lot 6 API (sessions, typed SSE turn events,
- * reviews, reopen/stale, direct edits, exports). They are hand-written until
- * the OpenAPI-to-TypeScript generation of lot 6 replaces them. Browser code
- * imports them as types only; it never talks to the backend directly.
+ * Every shape exchanged with the backend comes from the OpenAPI snapshot; this module
+ * only gives them short names and adds the constants the UI iterates over. The proxy
+ * error envelope at the end is the one contract owned by the Next.js server itself.
+ * Browser code imports these as types; it never talks to the backend directly.
  */
+type Schemas = components["schemas"];
 
+export type Stage = Schemas["Stage"];
+export type CoverageStatus = Schemas["CoverageStatus"];
+export type SessionOverview = Schemas["SessionOverview"];
+export type SessionPage = Schemas["SessionPage"];
+export type SessionPatch = Schemas["SessionPatch"];
+export type CreateSessionResponse = Schemas["CreateSessionResponse"];
+export type StageState = Schemas["StageState"];
+export type ReadinessItem = Schemas["ReadinessItem"];
+export type OpenQuestionItem = Schemas["OpenQuestionItem"];
+export type PendingHumanReview = Schemas["PendingHumanReview"];
+export type SectionComment = Schemas["SectionComment"];
+export type StepDocument = Schemas["StepDocument"];
+export type DocumentDiff = Schemas["DocumentDiff"];
+export type ConversationTurn = Schemas["ConversationTurn"];
+export type ReviewAction = Schemas["ReviewAction"];
+export type ReviewInput = Schemas["ReviewInput"];
+export type CommentInput = Schemas["CommentInput"];
+export type UserResponse = Schemas["UserResponse"];
+export type OidcRequest = Schemas["OIDCRequest"];
+export type DeliveryFields = Schemas["DeliveryFields"];
+export type DeliverySlice = Schemas["DeliverySlice"];
+export type IntegrationScenario = Schemas["IntegrationScenario"];
+export type BacklogExport = Schemas["BacklogExport"];
+export type SliceSpecsExport = Schemas["SliceSpecsExport"];
+export type ExportMarkdownResponse = Schemas["ExportMarkdownResponse"];
+export type ExportJsonResponse = Schemas["ExportJsonResponse"];
+export type TurnEvent = Schemas["TurnEvent"];
+type TurnEventType = TurnEvent["type"];
+
+/** The workflow order; `satisfies` keeps it in sync with the generated enum. */
 export const STAGES = [
   "stage_0_pitch",
   "stage_1_problem_framing",
@@ -20,11 +49,9 @@ export const STAGES = [
   "stage_5_risk_storming",
   "stage_6_backlog_synthesis",
   "stage_7_delivery_slicing",
-] as const;
+] as const satisfies readonly Stage[];
 
-export type StageId = components["schemas"]["Stage"];
-
-export const STAGE_LABELS: Record<StageId, string> = {
+export const STAGE_LABELS: Record<Stage, string> = {
   stage_0_pitch: "Pitch",
   stage_1_problem_framing: "Problem framing",
   stage_2_user_story_mapping: "User story mapping",
@@ -35,175 +62,30 @@ export const STAGE_LABELS: Record<StageId, string> = {
   stage_7_delivery_slicing: "Delivery slicing",
 };
 
-export function isStageId(value: string): value is StageId {
+export function isStage(value: string): value is Stage {
   return (STAGES as readonly string[]).includes(value);
 }
 
-export type StageStatus = "locked" | "active" | "awaiting_review" | "validated" | "stale";
+const REVIEW_ACTIONS = [
+  "approve",
+  "reject",
+  "request_changes",
+] as const satisfies readonly ReviewAction[];
 
-/** A stage can only be reopened once every stage before it is validated. */
-export function earlierStagesValidated(
-  stages: readonly { stage: StageId; status: StageStatus }[],
-  stage: StageId,
-): boolean {
-  const index = STAGES.indexOf(stage);
-  return stages.every(
-    (state) => STAGES.indexOf(state.stage) >= index || state.status === "validated",
-  );
+export function isReviewAction(value: string): value is ReviewAction {
+  return (REVIEW_ACTIONS as readonly string[]).includes(value);
 }
 
-export type Coverage = components["schemas"]["CoverageStatus"];
-
-export interface AuthenticatedUser {
-  id: string;
-  email: string;
-  displayName: string;
-}
-
-export interface FieldCoverage {
-  field: string;
-  label: string;
-  coverage: Coverage;
-  value: string | null;
-  critical: boolean;
-  /** Why the field is only partially covered (proposed by the LLM). */
-  reason?: string;
-}
-
-export interface ReadinessCheck {
-  id: string;
-  label: string;
-  passed: boolean;
-}
-
-export interface StageState {
-  stage: StageId;
-  status: StageStatus;
-  fields: FieldCoverage[];
-  readiness: ReadinessCheck[];
-  documentVersion: number;
-}
-
-export interface AnswerOption {
-  id: string;
-  label: string;
-  recommended: boolean;
-}
-
-export interface OpenQuestion {
-  id: string;
-  stage: StageId;
-  question: string;
-  whyItMatters: string;
-  options: AnswerOption[];
-}
-
-export interface ChatMessage {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  stage: StageId;
-  createdAt: string;
-}
-
-export interface DocumentVersion {
-  stage: StageId;
-  version: number;
-  createdAt: string;
-  markdown: string;
-}
-
-export interface SectionComment {
-  id: string;
-  stage: StageId;
-  section: string;
-  body: string;
-  createdAt: string;
-}
-
-export interface PendingReview {
-  stage: StageId;
-  requestedAt: string;
-}
-
-export interface SessionSummary {
-  id: string;
-  title: string;
-  currentStage: StageId;
-  archived: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface SessionDetail extends SessionSummary {
-  stages: StageState[];
-  messages: ChatMessage[];
-  openQuestions: OpenQuestion[];
-  pendingReview: PendingReview | null;
-  comments: SectionComment[];
-}
-
-export type ContractKind = "api" | "event" | "data";
-
-export interface Contract {
-  id: string;
-  name: string;
-  kind: ContractKind;
-  ownerSliceId: string;
-}
-
-export interface Slice {
-  id: string;
-  name: string;
-  goal: string;
-  ownedDomain: string;
-  backlogItemIds: string[];
-  provides: string[];
-  consumes: string[];
-  dependsOn: string[];
-  integrationScenarios: string[];
-  stubs: string[];
-}
-
-export interface Wave {
-  index: number;
-  sliceIds: string[];
-}
-
-export interface DeliverySlicing {
-  slices: Slice[];
-  waves: Wave[];
-  contracts: Contract[];
-}
-
-export const REVIEW_ACTIONS = ["approve", "reject", "request_changes"] as const;
-export type ReviewAction = components["schemas"]["ReviewAction"];
-
-export const EXPORT_FORMATS = ["markdown", "json", "slice_specs", "backlog_json"] as const;
+/** Export endpoints of the backend (`/api/v1/sessions/{id}/export/{format}`). */
+const EXPORT_FORMATS = ["markdown", "json", "slice_specs", "backlog_json"] as const;
 export type ExportFormat = (typeof EXPORT_FORMATS)[number];
 
-export interface ExportFile {
-  filename: string;
-  contentType: string;
-  body: string;
+export function isExportFormat(value: string): value is ExportFormat {
+  return (EXPORT_FORMATS as readonly string[]).includes(value);
 }
 
-/** Typed events streamed during one turn (Server-Sent Events, `event:` = type). */
-export type TurnEvent =
-  | { type: "turn.started"; turnId: string; stage: StageId }
-  | { type: "analysis.status"; status: string; message: string }
-  | { type: "message.delta"; messageId: string; delta: string }
-  | { type: "document.updated"; document: DocumentVersion }
-  | { type: "coverage.updated"; stage: StageState }
-  | { type: "stage.changed"; from: StageId; to: StageId }
-  | { type: "review.required"; review: PendingReview }
-  | { type: "questions.updated"; questions: OpenQuestion[] }
-  | { type: "turn.completed"; turnId: string; message: ChatMessage }
-  | { type: "error"; code: string; message: string };
-
-export type TurnEventType = TurnEvent["type"];
-
-export const TURN_EVENT_TYPES: readonly TurnEventType[] = [
+/** Every event of the turn stream; `satisfies` rejects a name the contract lacks. */
+export const TURN_EVENT_TYPES = [
   "turn.started",
   "analysis.status",
   "message.delta",
@@ -211,22 +93,29 @@ export const TURN_EVENT_TYPES: readonly TurnEventType[] = [
   "coverage.updated",
   "stage.changed",
   "review.required",
-  "questions.updated",
   "turn.completed",
   "error",
-];
+] as const satisfies readonly TurnEventType[];
 
-/** Error codes shared by the server proxy and the browser client. */
+/** Error codes of the Next.js proxy, shared with the browser client. */
 export type ErrorCode =
   | "unauthorized"
   | "forbidden"
   | "not_found"
+  | "conflict"
   | "review_pending"
   | "rate_limited"
   | "llm_error"
   | "validation_error"
   | "backend_unavailable";
 
+/** JSON error envelope returned by every `/api/backend/*` route. */
 export interface ErrorBody {
   error: { code: ErrorCode; message: string; retryAfterSeconds?: number };
+}
+
+/** `GET /api/backend/sessions/{id}`: the session state and its conversation, fetched together. */
+export interface SessionSnapshot {
+  session: SessionOverview;
+  messages: ConversationTurn[];
 }

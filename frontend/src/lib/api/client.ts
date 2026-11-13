@@ -1,11 +1,15 @@
 import type {
-  DeliverySlicing,
-  DocumentVersion,
+  BacklogExport,
+  CreateSessionResponse,
+  DocumentDiff,
   ExportFormat,
   ReviewAction,
-  SessionDetail,
-  SessionSummary,
-  StageId,
+  SessionOverview,
+  SessionPage,
+  SessionPatch,
+  SessionSnapshot,
+  Stage,
+  StepDocument,
   TurnEvent,
 } from "@/lib/backend/types";
 
@@ -14,7 +18,7 @@ import { parseTurnEvents } from "./sse";
 
 const BASE = "/api/backend/sessions";
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+async function send(path: string, init: RequestInit = {}): Promise<Response> {
   const response = await fetch(path, {
     ...init,
     headers: {
@@ -26,68 +30,81 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (!response.ok) {
     throw await apiErrorFromResponse(response);
   }
-  return (await response.json()) as T;
+  return response;
+}
+
+async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  return (await (await send(path, init)).json()) as T;
 }
 
 const sessionPath = (sessionId: string) => `${BASE}/${encodeURIComponent(sessionId)}`;
+const stagePath = (sessionId: string, stage: Stage) =>
+  `${sessionPath(sessionId)}/stages/${encodeURIComponent(stage)}`;
 
 /** Browser-side client of the Next.js proxy (`/api/backend/*`). */
 export const api = {
-  listSessions(includeArchived: boolean): Promise<SessionSummary[]> {
+  listSessions(includeArchived: boolean): Promise<SessionPage> {
     return request(`${BASE}${includeArchived ? "?archived=include" : ""}`);
   },
-  createSession(title: string): Promise<SessionSummary> {
+  createSession(title: string): Promise<CreateSessionResponse> {
     return request(BASE, { method: "POST", body: JSON.stringify({ title }) });
   },
-  updateSession(
-    sessionId: string,
-    patch: { title?: string; archived?: boolean },
-  ): Promise<SessionSummary> {
+  updateSession(sessionId: string, patch: SessionPatch): Promise<SessionOverview> {
     return request(sessionPath(sessionId), { method: "PATCH", body: JSON.stringify(patch) });
   },
-  getSession(sessionId: string): Promise<SessionDetail> {
+  getSession(sessionId: string): Promise<SessionSnapshot> {
     return request(sessionPath(sessionId));
   },
-  listDocumentVersions(sessionId: string, stage: StageId): Promise<DocumentVersion[]> {
-    return request(`${sessionPath(sessionId)}/stages/${stage}/documents`);
+  listDocuments(sessionId: string, stage: Stage): Promise<StepDocument[]> {
+    return request(`${stagePath(sessionId, stage)}/documents`);
+  },
+  documentDiff(sessionId: string, stage: Stage, from: number, to: number): Promise<DocumentDiff> {
+    return request(`${stagePath(sessionId, stage)}/documents/diff?from=${from}&to=${to}`);
   },
   submitReview(
     sessionId: string,
-    input: { stage: StageId; action: ReviewAction; note?: string },
-  ): Promise<SessionDetail> {
-    return request(`${sessionPath(sessionId)}/reviews`, {
+    input: { stage: Stage; action: ReviewAction; note?: string },
+  ): Promise<SessionOverview> {
+    return request(`${sessionPath(sessionId)}/review`, {
       method: "POST",
       body: JSON.stringify(input),
     });
   },
-  reopenStage(sessionId: string, stage: StageId): Promise<SessionDetail> {
-    return request(`${sessionPath(sessionId)}/stages/${stage}/reopen`, { method: "POST" });
+  reopenStage(sessionId: string, stage: Stage): Promise<SessionOverview> {
+    return request(`${stagePath(sessionId, stage)}/reopen`, { method: "POST" });
   },
-  updateField(
+  editField(
     sessionId: string,
-    stage: StageId,
+    stage: Stage,
     field: string,
-    value: string,
-  ): Promise<SessionDetail> {
-    return request(
-      `${sessionPath(sessionId)}/stages/${stage}/fields/${encodeURIComponent(field)}`,
-      { method: "PATCH", body: JSON.stringify({ value }) },
-    );
+    value: unknown,
+  ): Promise<SessionOverview> {
+    return request(`${stagePath(sessionId, stage)}/fields/${encodeURIComponent(field)}`, {
+      method: "PATCH",
+      body: JSON.stringify({ value }),
+    });
   },
   addComment(
     sessionId: string,
-    input: { stage: StageId; section: string; body: string },
-  ): Promise<SessionDetail> {
+    input: { stage: Stage; section: string; body: string },
+  ): Promise<SessionOverview> {
     return request(`${sessionPath(sessionId)}/comments`, {
       method: "POST",
       body: JSON.stringify(input),
     });
   },
-  getDeliverySlicing(sessionId: string): Promise<DeliverySlicing> {
-    return request(`${sessionPath(sessionId)}/delivery-slicing`);
+  getDeliveryPlan(sessionId: string): Promise<BacklogExport> {
+    return request(`${sessionPath(sessionId)}/delivery-plan`);
   },
-  exportUrl(sessionId: string, format: ExportFormat): string {
-    return `${sessionPath(sessionId)}/export/${format}`;
+  /** Fetch an export; errors (409 for an unready delivery plan) become `ApiError`s. */
+  async downloadExport(
+    sessionId: string,
+    format: ExportFormat,
+  ): Promise<{ blob: Blob; filename: string }> {
+    const response = await send(`${sessionPath(sessionId)}/export/${format}`);
+    const disposition = response.headers.get("content-disposition") ?? "";
+    const filename = /filename="([^"]+)"/.exec(disposition)?.[1] ?? `export-${format}`;
+    return { blob: await response.blob(), filename };
   },
   /** Send a message and yield the turn's typed events as they arrive. */
   async *sendMessage(

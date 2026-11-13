@@ -4,6 +4,7 @@ const STATUS_BY_CODE: Record<ErrorCode, number> = {
   unauthorized: 401,
   forbidden: 403,
   not_found: 404,
+  conflict: 409,
   review_pending: 409,
   validation_error: 422,
   rate_limited: 429,
@@ -11,21 +12,29 @@ const STATUS_BY_CODE: Record<ErrorCode, number> = {
   backend_unavailable: 503,
 };
 
-/** Error raised by a backend client; carries the HTTP status relayed to the browser. */
+/**
+ * Brand shared by every copy of the class: Next.js may bundle this module more than
+ * once (route handlers, Auth.js callbacks), so `instanceof` checks the brand, not the
+ * prototype chain of one particular copy.
+ */
+const BRAND = Symbol.for("brainstorm-agent.BackendError");
+
+/** Error raised by the backend client; carries the HTTP status relayed to the browser. */
 export class BackendError extends Error {
+  static [Symbol.hasInstance](value: unknown): value is BackendError {
+    return typeof value === "object" && value !== null && BRAND in value;
+  }
+
+  readonly [BRAND] = true;
   readonly code: ErrorCode;
   readonly status: number;
   readonly retryAfterSeconds?: number;
 
-  constructor(
-    code: ErrorCode,
-    message: string,
-    options: { retryAfterSeconds?: number; status?: number } = {},
-  ) {
+  constructor(code: ErrorCode, message: string, options: { retryAfterSeconds?: number } = {}) {
     super(message);
     this.name = "BackendError";
     this.code = code;
-    this.status = options.status ?? STATUS_BY_CODE[code];
+    this.status = STATUS_BY_CODE[code];
     this.retryAfterSeconds = options.retryAfterSeconds;
   }
 
@@ -42,7 +51,7 @@ export class BackendError extends Error {
   }
 }
 
-/** Map an HTTP status returned by the backend to a shared error code. */
+/** Map an HTTP status returned by the backend to a proxy error code. */
 export function codeForStatus(status: number): ErrorCode {
   switch (status) {
     case 401:
@@ -52,7 +61,7 @@ export function codeForStatus(status: number): ErrorCode {
     case 404:
       return "not_found";
     case 409:
-      return "review_pending";
+      return "conflict";
     case 400:
     case 422:
       return "validation_error";

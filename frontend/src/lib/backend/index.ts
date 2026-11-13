@@ -1,29 +1,18 @@
 import "server-only";
 
-import type { BackendClient } from "./client";
-import { httpBackendOptions, mockBackendOptions, resolveBackendMode } from "./config";
+import { httpBackendOptions } from "./config";
 import { HttpBackend } from "./http";
-import { MockBackend } from "./mock";
 
-export type { BackendClient, Caller } from "./client";
+export type { Caller } from "./http";
 export { BackendError } from "./errors";
 
-const globalForBackend = globalThis as typeof globalThis & {
-  __brainstormBackend?: BackendClient;
-};
+let backend: HttpBackend | undefined;
 
 /**
- * The single entry point to the backend for server code (route handlers,
- * Auth.js callbacks). The instance is cached on `globalThis` so the in-memory
- * mock keeps its state across hot reloads and route bundles.
+ * The single entry point to the backend for server code (route handlers, Auth.js
+ * callbacks). Configuration is read on first use, so builds need no secrets.
  */
-export function getBackend(): BackendClient {
-  if (!globalForBackend.__brainstormBackend) {
-    const env = process.env;
-    globalForBackend.__brainstormBackend =
-      resolveBackendMode(env) === "http"
-        ? new HttpBackend(httpBackendOptions(env))
-        : new MockBackend(mockBackendOptions(env));
-  }
-  return globalForBackend.__brainstormBackend;
+export function getBackend(): HttpBackend {
+  backend ??= new HttpBackend(httpBackendOptions(process.env));
+  return backend;
 }

@@ -1,44 +1,48 @@
 import { describe, expect, it } from "vitest";
 
-import { BackendConfigError, httpBackendOptions, resolveBackendMode } from "./config";
+import { BackendConfigError, httpBackendOptions } from "./config";
 
-describe("resolveBackendMode", () => {
-  it("defaults to mock outside production only", () => {
-    expect(resolveBackendMode({ NODE_ENV: "development" })).toBe("mock");
-    expect(() => resolveBackendMode({ NODE_ENV: "production" })).toThrow(BackendConfigError);
-    expect(resolveBackendMode({ NODE_ENV: "production", BACKEND_MODE: "HTTP" })).toBe("http");
-  });
-
-  it("rejects unknown modes", () => {
-    expect(() => resolveBackendMode({ BACKEND_MODE: "fake" })).toThrow(/mock" or "http/);
-  });
-});
+const JWT_SECRET = "j".repeat(32); // pragma: allowlist secret
+const BRIDGE_SECRET = "b".repeat(32); // pragma: allowlist secret
+const BASE = {
+  BACKEND_URL: "http://backend:8000",
+  BACKEND_JWT_SECRET: JWT_SECRET,
+  AUTH_BRIDGE_SECRET: BRIDGE_SECRET,
+};
 
 describe("httpBackendOptions", () => {
-  it("requires the backend URL and the JWT secret", () => {
-    expect(() => httpBackendOptions({ BACKEND_JWT_SECRET: "x" })).toThrow(/BACKEND_URL/);
-    expect(() => httpBackendOptions({ BACKEND_URL: "http://b" })).toThrow(/BACKEND_JWT_SECRET/);
+  it("requires an absolute backend URL", () => {
+    expect(() => httpBackendOptions({ ...BASE, BACKEND_URL: "" })).toThrow(/BACKEND_URL/);
+    expect(() => httpBackendOptions({ ...BASE, BACKEND_URL: "backend:8000" })).toThrow(/absolute/);
+  });
+
+  it("requires two distinct secrets of at least 32 characters", () => {
+    expect(() => httpBackendOptions({ ...BASE, BACKEND_JWT_SECRET: undefined })).toThrow(
+      /BACKEND_JWT_SECRET is required/,
+    );
+    const short = "short"; // pragma: allowlist secret
+    expect(() => httpBackendOptions({ ...BASE, AUTH_BRIDGE_SECRET: short })).toThrow(
+      /AUTH_BRIDGE_SECRET must be at least 32/,
+    );
+    expect(() => httpBackendOptions({ ...BASE, AUTH_BRIDGE_SECRET: JWT_SECRET })).toThrow(
+      /must differ/,
+    );
   });
 
   it("reads optional JWT claims and the TTL", () => {
     const options = httpBackendOptions({
-      BACKEND_URL: "http://b",
-      BACKEND_JWT_SECRET: "s", // pragma: allowlist secret
+      ...BASE,
       BACKEND_JWT_AUDIENCE: "api",
       BACKEND_JWT_TTL_SECONDS: "30",
     });
-    expect(options.jwt).toEqual({
-      secret: "s",
-      issuer: undefined,
-      audience: "api",
-      ttlSeconds: 30,
+    expect(options).toEqual({
+      baseUrl: "http://backend:8000",
+      bridgeSecret: BRIDGE_SECRET,
+      jwt: { secret: JWT_SECRET, issuer: undefined, audience: "api", ttlSeconds: 30 },
     });
-    expect(() =>
-      httpBackendOptions({
-        BACKEND_URL: "http://b",
-        BACKEND_JWT_SECRET: "s",
-        BACKEND_JWT_TTL_SECONDS: "-1",
-      }),
-    ).toThrow(BackendConfigError);
+    expect(httpBackendOptions(BASE).jwt.ttlSeconds).toBe(60);
+    expect(() => httpBackendOptions({ ...BASE, BACKEND_JWT_TTL_SECONDS: "-1" })).toThrow(
+      BackendConfigError,
+    );
   });
 });
