@@ -93,17 +93,35 @@ export class HttpBackend {
 
   /** Owner-scoped benchmark history. */
   async researchHistory(caller: Caller, sessionId: string) {
-    return this.json({ caller }, "get", "/api/v1/sessions/{session_id}/research", {path: {session_id: sessionId}});
+    return this.json({ caller }, "get", "/api/v1/sessions/{session_id}/research", {
+      path: { session_id: sessionId },
+    });
   }
 
   /** Stream the bounded asynchronous research operation. */
   async research(caller: Caller, sessionId: string, signal?: AbortSignal) {
-    return this.request({ caller }, "post", "/api/v1/sessions/{session_id}/research", {path: {session_id: sessionId}, signal});
+    return this.call({ caller }, "post", "/api/v1/sessions/{session_id}/research", {
+      path: { session_id: sessionId },
+      signal,
+    });
   }
 
   /** Save explicit feature selection. */
-  async selectResearch(caller: Caller, sessionId: string, benchmarkId: string, selectedIds: string[]) {
-    return this.json({ caller }, "patch", "/api/v1/sessions/{session_id}/research/{benchmark_id}/selection", {path: {session_id: sessionId, benchmark_id: benchmarkId}, body: {selected_ids: selectedIds}});
+  async selectResearch(
+    caller: Caller,
+    sessionId: string,
+    benchmarkId: string,
+    selectedIds: string[],
+  ) {
+    return this.json(
+      { caller },
+      "patch",
+      "/api/v1/sessions/{session_id}/research/{benchmark_id}/selection",
+      {
+        path: { session_id: sessionId, benchmark_id: benchmarkId },
+        body: { selected_ids: selectedIds },
+      },
+    );
   }
 
   /** Check a password; `null` when the backend rejects the credentials. */

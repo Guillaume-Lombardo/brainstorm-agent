@@ -5,7 +5,7 @@ from enum import StrEnum
 from typing import TYPE_CHECKING, Protocol
 
 import httpx
-from pydantic import ValidationError
+from pydantic import HttpUrl, ValidationError
 
 from brainstorm_agent.core.research import SearchResult
 
@@ -73,7 +73,12 @@ class FakeSearchProvider:
         """
         del query
         return [
-            SearchResult(title=name, url=f"https://example.com/{slug}", snippet=snippet, provider="fake")
+            SearchResult(
+                title=name,
+                url=HttpUrl(f"https://example.com/{slug}"),
+                snippet=snippet,
+                provider="fake",
+            )
             for name, slug, snippet in [
                 ("Frameboard", "frameboard", "Shared framing boards and prioritized story maps."),
                 ("Storyframe", "storyframe", "Collaborative story maps and Markdown exports."),

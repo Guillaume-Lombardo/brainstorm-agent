@@ -6,6 +6,7 @@ import json
 import httpx
 import pytest
 
+from brainstorm_agent.core.enums import LLMMode
 from brainstorm_agent.services.search import (
     FakeSearchProvider,
     SearchError,
@@ -17,12 +18,12 @@ from brainstorm_agent.settings import Settings
 
 def config(provider: str) -> Settings:
     return Settings(
-        llm_mode="fake",
-        search_provider=provider,
+        llm_mode=LLMMode.FAKE,
+        search_provider=SearchProviderName.from_string(provider),
         searxng_base_url="http://search.test",
-        tavily_api_key="fixture",
-        brave_api_key="fixture",
-        litellm_search_api_key="fixture",
+        tavily_api_key="fixture",  # pragma: allowlist secret
+        brave_api_key="fixture",  # pragma: allowlist secret
+        litellm_search_api_key="fixture",  # pragma: allowlist secret
         litellm_search_url="http://search.test/v1/search",
         search_tool_name="benchmark",
     )
@@ -68,7 +69,8 @@ def test_provider_failures(provider: str, failure: str) -> None:
     def respond(request: httpx.Request) -> httpx.Response:
         if failure == "timeout":
             raise httpx.ReadTimeout(  # noqa: TRY003 - Test failure
-                "fixture private body", request=request
+                "fixture private body",
+                request=request,
             )
         return httpx.Response(200 if failure == "json" else int(failure), content=b"invalid private body")
 
@@ -83,15 +85,15 @@ def test_fake_and_disabled() -> None:
         build_search_provider(config("fake")).search("b"),
     )
     with pytest.raises(SearchError):
-        build_search_provider(Settings(llm_mode="fake"))
+        build_search_provider(Settings(llm_mode=LLMMode.FAKE))
 
 
 @pytest.mark.parametrize("provider", ["searxng", "tavily", "brave", "litellm"])
 def test_missing_settings(provider: str) -> None:
     with pytest.raises(ValueError, match="requires"):
-        Settings(llm_mode="fake", search_provider=provider)
+        Settings(llm_mode=LLMMode.FAKE, search_provider=SearchProviderName.from_string(provider))
 
 
 def test_fake_requires_fake_llm() -> None:
     with pytest.raises(ValueError, match="requires LLM_MODE=fake"):
-        Settings(search_provider="fake")
+        Settings(search_provider=SearchProviderName.FAKE)

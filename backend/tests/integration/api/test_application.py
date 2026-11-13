@@ -111,6 +111,9 @@ def test_reopen_edits_versions_comments_and_exports(tmp_path: Path) -> None:
         ("get", f"/stages/{STAGE}/documents/diff?from_version=1&to_version=2", None),
         ("get", "/export/slice_specs", None),
         ("get", "/export/backlog_json", None),
+        ("get", "/research", None),
+        ("post", "/research", None),
+        ("patch", "/research/unknown/selection", {"selected_ids": []}),
     ],
 )
 def test_new_endpoints_hide_other_owners(tmp_path: Path, method: str, path: str, body: dict | None) -> None:

@@ -211,6 +211,7 @@ jobs:
       BRAINSTORM_AUTH_BRIDGE_SECRET: ci-placeholder # pragma: allowlist secret
       BRAINSTORM_AUTH_SECRET: ci-placeholder # pragma: allowlist secret
       BRAINSTORM_LLM_API_KEY: sk-ci-placeholder # pragma: allowlist secret
+      BRAINSTORM_SEARXNG_SECRET: ci-placeholder # pragma: allowlist secret
       BRAINSTORM_ADMIN_PASSWORD: ci-placeholder # pragma: allowlist secret
       BRAINSTORM_ADMIN_EMAIL: admin@example.com
       BRAINSTORM_PUBLIC_URL: http://localhost

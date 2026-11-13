@@ -2,27 +2,27 @@
 
 import json
 import os
-
-import pytest
-
-from brainstorm_agent.persistence.session import upgrade_database
 from pathlib import Path  # noqa: TC003
 
+import pytest
 from fastapi.testclient import TestClient
 
 from brainstorm_agent.api.main import create_app
+from brainstorm_agent.core.enums import LLMMode
+from brainstorm_agent.persistence.session import upgrade_database
+from brainstorm_agent.services.search import SearchProviderName
 from brainstorm_agent.settings import Settings
 
 
 @pytest.mark.parametrize("postgres", [False, True])
-def test_benchmark_flow(tmp_path: Path, postgres: bool) -> None:
+def test_benchmark_flow(tmp_path: Path, *, postgres: bool) -> None:
     if postgres and not os.environ.get("TEST_POSTGRES_URL"):
         pytest.skip("TEST_POSTGRES_URL is not configured")
     database_url = os.environ["TEST_POSTGRES_URL"] if postgres else f"sqlite:///{tmp_path / 'research.db'}"
     upgrade_database(database_url=database_url)
     settings = Settings(
-        llm_mode="fake",
-        search_provider="fake",
+        llm_mode=LLMMode.FAKE,
+        search_provider=SearchProviderName.FAKE,
         database_url=database_url,
         redis_url="redis://localhost:6399/0",
     )

@@ -202,7 +202,12 @@ function WorkspaceView({ initialSnapshot }: { initialSnapshot: SessionSnapshot }
           />
         </aside>
         <section className="flex min-h-[60vh] flex-col lg:min-h-0" aria-label="Conversation">
-          <ResearchPanel sessionId={sessionId} available={session.current_stage !== "stage_0_pitch"} disabled={busy || archived} onChanged={refresh} />
+          <ResearchPanel
+            sessionId={sessionId}
+            available={session.current_stage !== "stage_0_pitch"}
+            disabled={busy || archived}
+            onChanged={refresh}
+          />
           <ChatPanel
             messages={state.messages}
             streaming={state.streaming}

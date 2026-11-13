@@ -405,6 +405,73 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/sessions/{session_id}/research": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Research History
+     * @description Read owned benchmark history and configured availability.
+     *
+     *     Args:
+     *         session_id (str): Owned session.
+     *         service (Service): Application service.
+     *
+     *     Returns:
+     *         dict: Availability and versioned results.
+     */
+    get: operations["research_history_api_v1_sessions__session_id__research_get"];
+    put?: never;
+    /**
+     * Research Products
+     * @description Stream research completion while its async network calls execute.
+     *
+     *     Args:
+     *         session_id (str): Owned session.
+     *         service (Service): Application service.
+     *
+     *     Returns:
+     *         StreamingResponse: Start and terminal SSE events.
+     */
+    post: operations["research_products_api_v1_sessions__session_id__research_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/sessions/{session_id}/research/{benchmark_id}/selection": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Select Research Features
+     * @description Persist explicit owner selection.
+     *
+     *     Args:
+     *         session_id (str): Owned session.
+     *         benchmark_id (str): Execution id.
+     *         payload (FeatureSelection): Selected candidate ids.
+     *         service (Service): Application service.
+     *
+     *     Returns:
+     *         Benchmark: Updated execution.
+     */
+    patch: operations["select_research_features_api_v1_sessions__session_id__research__benchmark_id__selection_patch"];
+    trace?: never;
+  };
   "/api/v1/sessions/{session_id}/review": {
     parameters: {
       query?: never;
@@ -969,6 +1036,40 @@ export interface components {
       statement: string;
     };
     /**
+     * Benchmark
+     * @description Immutable execution result with separately editable owner selection.
+     */
+    Benchmark: {
+      /** Id */
+      id: string;
+      /** Queries */
+      queries: string[];
+      /** Results */
+      results: components["schemas"]["SearchResult"][];
+      /** Selected Ids */
+      selected_ids?: string[];
+      synthesis: components["schemas"]["ResearchSynthesis"];
+      /** Version */
+      version: number;
+    };
+    /**
+     * CandidateFeature
+     * @description An inferred recommendation requiring explicit owner selection.
+     */
+    CandidateFeature: {
+      /** Evidence Urls */
+      evidence_urls: string[];
+      /** Feature */
+      feature: string;
+      /** Id */
+      id?: string;
+      /** Justification */
+      justification: string;
+      /** Products */
+      products: string[];
+      recommendation: components["schemas"]["Recommendation"];
+    };
+    /**
      * Clarification
      * @description Explicit answer to an identified question.
      */
@@ -1295,6 +1396,14 @@ export interface components {
       source: string;
       /** Statement */
       statement: string;
+    };
+    /**
+     * FeatureSelection
+     * @description Replacement selection for a specific benchmark version.
+     */
+    FeatureSelection: {
+      /** Selected Ids */
+      selected_ids: string[];
     };
     /**
      * FieldPatch
@@ -1908,6 +2017,27 @@ export interface components {
       users_actors: string[] | null;
     };
     /**
+     * Product
+     * @description Sourced observations of an existing product.
+     */
+    Product: {
+      /** Evidence Urls */
+      evidence_urls: string[];
+      /** Key Features */
+      key_features: string[];
+      /** Name */
+      name: string;
+      /** Pricing */
+      pricing: string | null;
+      /** Summary */
+      summary: string;
+      /**
+       * Url
+       * Format: uri
+       */
+      url: string;
+    };
+    /**
      * QuestionPriority
      * @description Ordered elicitation topics.
      * @enum {string}
@@ -1924,6 +2054,26 @@ export interface components {
       message: string;
       /** Passed */
       passed: boolean;
+    };
+    /**
+     * Recommendation
+     * @description Owner-facing recommendation, never an automatic decision.
+     * @enum {string}
+     */
+    Recommendation: "adopt" | "adapt" | "skip";
+    /**
+     * ResearchSynthesis
+     * @description Untrusted model synthesis, checked against actual search evidence.
+     */
+    ResearchSynthesis: {
+      /** Assumptions */
+      assumptions: string[];
+      /** Features */
+      features: components["schemas"]["CandidateFeature"][];
+      /** Open Questions */
+      open_questions: string[];
+      /** Products */
+      products: components["schemas"]["Product"][];
     };
     /**
      * ReviewAction
@@ -2004,6 +2154,23 @@ export interface components {
       mitigation: string;
       /** Probability */
       probability: string;
+    };
+    /**
+     * SearchResult
+     * @description Normalized snippet; pages are never fetched.
+     */
+    SearchResult: {
+      /** Provider */
+      provider: string;
+      /** Snippet */
+      snippet: string;
+      /** Title */
+      title: string;
+      /**
+       * Url
+       * Format: uri
+       */
+      url: string;
     };
     /**
      * SectionComment
@@ -3026,6 +3193,115 @@ export interface operations {
         };
         content: {
           "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  research_history_api_v1_sessions__session_id__research_get: {
+    parameters: {
+      query?: never;
+      header?: {
+        "X-API-Key"?: string | null;
+        Authorization?: string | null;
+      };
+      path: {
+        session_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            [key: string]: unknown;
+          };
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  research_products_api_v1_sessions__session_id__research_post: {
+    parameters: {
+      query?: never;
+      header?: {
+        "X-API-Key"?: string | null;
+        Authorization?: string | null;
+      };
+      path: {
+        session_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  select_research_features_api_v1_sessions__session_id__research__benchmark_id__selection_patch: {
+    parameters: {
+      query?: never;
+      header?: {
+        "X-API-Key"?: string | null;
+        Authorization?: string | null;
+      };
+      path: {
+        session_id: string;
+        benchmark_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["FeatureSelection"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Benchmark"];
         };
       };
       /** @description Validation Error */
