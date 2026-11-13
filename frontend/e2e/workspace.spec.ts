@@ -257,13 +257,12 @@ test("research products and retain two benchmark features", async ({ page }) => 
   await panel.getByRole("checkbox").nth(0).check();
   await panel.getByRole("checkbox").nth(1).check();
   await panel.getByRole("button", { name: "Valider les fonctionnalités retenues" }).click();
-  await expect(
-    panel.getByRole("button", { name: "Valider les fonctionnalités retenues" }),
-  ).toBeEnabled();
+  await expect(panel.getByText(/2 fonctionnalités retenues/)).toBeVisible();
+  await expect(panel.getByRole("checkbox")).toHaveCount(0);
   await expect(page.getByTestId("stage-document")).toContainText("Benchmark");
   await page.screenshot({ path: `${SCREENSHOTS}/10-benchmark.png`, fullPage: true });
   await page.reload();
-  await expect(
-    page.getByRole("region", { name: "Benchmark" }).getByRole("checkbox").nth(0),
-  ).toBeChecked();
+  const reloaded = page.getByRole("region", { name: "Benchmark" });
+  await reloaded.getByRole("button", { name: "Afficher le benchmark" }).click();
+  await expect(reloaded.getByRole("checkbox").nth(0)).toBeChecked();
 });
