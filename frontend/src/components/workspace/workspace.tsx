@@ -208,6 +208,7 @@ function WorkspaceView({ initialSession }: { initialSession: SessionDetail }) {
             streaming={state.streaming}
             error={state.turnError}
             blockedReason={blockedReason}
+            pending={acting}
             draft={state.draft}
             onDraftChange={(draft) => dispatch({ type: "draft.changed", draft })}
             onSend={(message) => void sendMessage(message)}

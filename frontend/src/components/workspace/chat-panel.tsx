@@ -18,6 +18,7 @@ export function ChatPanel({
   streaming,
   error,
   blockedReason,
+  pending,
   draft,
   onDraftChange,
   onSend,
@@ -27,6 +28,8 @@ export function ChatPanel({
   error: TurnFailure | null;
   /** Why sending is disabled (pending review, archived session). */
   blockedReason: string | null;
+  /** Another workspace action is being saved: its snapshot must land first. */
+  pending: boolean;
   draft: string;
   onDraftChange: (draft: string) => void;
   onSend: (message: string) => void;
@@ -37,7 +40,7 @@ export function ChatPanel({
     endRef.current?.scrollIntoView?.({ block: "end" });
   }, [messages.length, streaming?.text]);
 
-  const busy = streaming !== null;
+  const busy = streaming !== null || pending;
   const canSend = !busy && blockedReason === null && draft.trim().length > 0;
 
   function submit() {

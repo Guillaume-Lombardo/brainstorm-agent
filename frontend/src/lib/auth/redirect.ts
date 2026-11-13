@@ -21,7 +21,13 @@ export function safeCallbackPath(value: unknown): string {
   } catch {
     return FALLBACK;
   }
-  if (url.origin !== ORIGIN || url.pathname === "/login" || url.pathname.startsWith("/login/")) {
+  // `/.//evil.example` normalizes to the protocol-relative `//evil.example`.
+  if (
+    url.origin !== ORIGIN ||
+    url.pathname.startsWith("//") ||
+    url.pathname === "/login" ||
+    url.pathname.startsWith("/login/")
+  ) {
     return FALLBACK;
   }
   return `${url.pathname}${url.search}${url.hash}`;

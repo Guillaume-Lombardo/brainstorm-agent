@@ -10,11 +10,13 @@ function Harness({
   streaming = null,
   error = null,
   blockedReason = null,
+  pending = false,
   onSend,
 }: {
   streaming?: StreamingTurn | null;
   error?: TurnFailure | null;
   blockedReason?: string | null;
+  pending?: boolean;
   onSend: (message: string) => void;
 }) {
   const [draft, setDraft] = useState("");
@@ -24,6 +26,7 @@ function Harness({
       streaming={streaming}
       error={error}
       blockedReason={blockedReason}
+      pending={pending}
       draft={draft}
       onDraftChange={setDraft}
       onSend={onSend}
@@ -37,6 +40,14 @@ describe("ChatPanel", () => {
     render(<Harness onSend={onSend} />);
     await userEvent.type(screen.getByRole("textbox", { name: "Message" }), "  Hello  {Enter}");
     expect(onSend).toHaveBeenCalledWith("Hello");
+  });
+
+  it("does not send while another workspace action is saving", async () => {
+    const onSend = vi.fn();
+    render(<Harness onSend={onSend} pending />);
+    await userEvent.type(screen.getByRole("textbox", { name: "Message" }), "Hello{Enter}");
+    expect(onSend).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
   });
 
   it("shows the streaming status and partial answer", () => {
