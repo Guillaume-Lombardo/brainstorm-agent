@@ -324,4 +324,4 @@ Markdown/JSON exports, French workspace panel and internal SearXNG deployment.
 - [x] Render Benchmark, export it, and supply selected candidates to stage 2.
 - [x] Deliver frontend panel and fake end-to-end coverage.
 - [x] Configure pinned internal SearXNG, document settings and run Docker smoke.
-- [ ] Complete checks, review loop, rebase and ready PR (no merge).
+- [x] Complete checks, review loop, rebase and ready PR (no merge).
