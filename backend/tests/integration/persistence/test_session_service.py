@@ -344,6 +344,8 @@ def test_stream_turn_logs_the_failure_it_hides_from_the_client(
     engine = create_engine_from_settings(settings)
     create_all(engine)
     mocker.patch.object(FakeBrainstormLLM, "analyze", side_effect=_llm_failure(cause))
+    # Alembic's `fileConfig` disables loggers created before a migration test ran.
+    mocker.patch.object(logging.getLogger(SessionService.__module__), "disabled", new=False)
     caplog.set_level(logging.ERROR)
 
     async def consume(service: SessionService, session_id: str) -> list[str]:
