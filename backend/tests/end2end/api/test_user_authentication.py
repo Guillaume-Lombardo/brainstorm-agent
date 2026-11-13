@@ -10,7 +10,7 @@ import jwt
 from fastapi.testclient import TestClient
 
 from brainstorm_agent.api.main import create_app
-from brainstorm_agent.core.enums import AuthMode
+from brainstorm_agent.core.enums import AuthMode, LLMMode
 from brainstorm_agent.services.auth import hash_api_key
 from brainstorm_agent.services.users import UserService
 from brainstorm_agent.settings import Settings
@@ -21,6 +21,7 @@ BRIDGE = {"X-Auth-Bridge": "test-bridge"}
 
 def test_login_ownership_and_revocation(tmp_path: Path) -> None:
     settings = Settings(
+        llm_mode=LLMMode.FAKE,
         database_url=f"sqlite:///{tmp_path / 'auth.db'}",
         redis_url="redis://localhost:6399",
         enable_auth=True,
@@ -124,6 +125,7 @@ def test_login_ownership_and_revocation(tmp_path: Path) -> None:
 def test_login_throttle_and_oidc(tmp_path: Path) -> None:
     app = create_app(
         Settings(
+            llm_mode=LLMMode.FAKE,
             database_url=f"sqlite:///{tmp_path / 'oidc.db'}",
             redis_url="redis://localhost:6399",
             auth_bridge_secret=BRIDGE["X-Auth-Bridge"],

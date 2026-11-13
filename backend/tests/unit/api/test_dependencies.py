@@ -21,6 +21,7 @@ def test_api_session_service_closes_owned_provider(mocker):
     adapter = OpenAICompatibleBrainstormLLM(client=client, settings=settings, prompt_loader=PromptLoader())
     mocker.patch("brainstorm_agent.services.session_service.build_llm", return_value=adapter)
     service = get_session_service(
+        request=mocker.Mock(state=mocker.Mock(principal=None)),
         db_session=mocker.Mock(),
         settings=settings,
         prompt_loader=PromptLoader(),

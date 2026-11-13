@@ -9,6 +9,8 @@ if TYPE_CHECKING:
 
 import pytest
 
+from brainstorm_agent.async_runner import run_async
+from brainstorm_agent.core.enums import LLMMode
 from brainstorm_agent.exceptions import NotFoundError
 from brainstorm_agent.persistence.session import (
     create_engine_from_settings,
@@ -21,7 +23,7 @@ from brainstorm_agent.settings import Settings
 
 
 def test_shared_service_requires_owner_on_every_operation(tmp_path: Path, mocker: MockerFixture) -> None:
-    settings = Settings(database_url=f"sqlite:///{tmp_path / 'owners.db'}")
+    settings = Settings(llm_mode=LLMMode.FAKE, database_url=f"sqlite:///{tmp_path / 'owners.db'}")
     upgrade_database(database_url=settings.database_url)
     engine = create_engine_from_settings(settings)
     with create_session_factory(engine)() as db:
@@ -33,7 +35,9 @@ def test_shared_service_requires_owner_on_every_operation(tmp_path: Path, mocker
         session_id = service.create_session().session_id
         other = SessionService(db_session=db, settings=settings, owner_id=second.id)
         mocker.patch.object(
-            other.lock_manager, "lock", side_effect=AssertionError("Unauthorized lock access")
+            other.lock_manager,
+            "lock",
+            side_effect=AssertionError("Unauthorized lock access"),
         )
         for operation in [
             other.get_session,
@@ -49,6 +53,8 @@ def test_shared_service_requires_owner_on_every_operation(tmp_path: Path, mocker
         with pytest.raises(NotFoundError):
             other.process_user_message(session_id=session_id, content="Unauthorized")
         with pytest.raises(NotFoundError):
+            run_async(other.aprocess_user_message(session_id=session_id, content="Unauthorized async"))
+        with pytest.raises(NotFoundError):
             other.review_pending_transition(session_id=session_id, approved=True)
         assert len(service.list_messages(session_id)) == 1
         first.active = False
@@ -59,7 +65,7 @@ def test_shared_service_requires_owner_on_every_operation(tmp_path: Path, mocker
 
 
 def test_oidc_conflicts_and_disabled_identity(tmp_path: Path) -> None:
-    settings = Settings(database_url=f"sqlite:///{tmp_path / 'oidc-users.db'}")
+    settings = Settings(llm_mode=LLMMode.FAKE, database_url=f"sqlite:///{tmp_path / 'oidc-users.db'}")
     upgrade_database(database_url=settings.database_url)
     engine = create_engine_from_settings(settings)
     with create_session_factory(engine)() as db:

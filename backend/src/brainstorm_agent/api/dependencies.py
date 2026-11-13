@@ -171,7 +171,7 @@ def enforce_api_security(
             )
 
 
-def get_session_service(  # noqa: PLR0913 - FastAPI dependency wiring
+def get_session_service(
     *,
     request: Request,
     db_session: Annotated[Session, Depends(get_db_session)],
