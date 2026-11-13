@@ -142,6 +142,24 @@ def test_reply_stream_accounts_usage():
     assert analysis.completion_tokens == 8
 
 
+def test_reply_keeps_the_analysis_as_internal_context():
+    llm = make_llm([payload()])
+    analysis = analyze(llm)
+
+    async def chunks() -> AsyncIterator[SimpleNamespace]:  # noqa: RUF029
+        yield SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content="Bonjour"))], usage=None)
+
+    create = cast("AsyncMock", llm.client.chat.completions.create)
+    create.side_effect = None
+    create.return_value = chunks()
+    run_async(llm.reply(stage=analysis.stage, analysis=analysis, user_message="Mon pitch"))
+    system, user = create.call_args.kwargs["messages"]
+    # The shared system prompt asks for JSON on structured tasks: the reply must not echo it.
+    assert "never output json" in system["content"].lower()
+    assert user["content"].startswith("User message:\nMon pitch\n\n")
+    assert analysis.model_dump_json() in user["content"].split("Internal analysis", 1)[1]
+
+
 def test_challenge_only_appends_findings():
     llm = make_llm([payload(), '{"findings":["Contradiction"]}'])
     analysis = analyze(llm)
