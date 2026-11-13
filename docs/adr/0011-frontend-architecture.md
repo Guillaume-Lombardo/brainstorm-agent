@@ -56,7 +56,9 @@ many sign-in attempts".
   field coverage, editable kinds, inline-edit drafts). It never re-validates a stage.
 
 **Turns.** `POST /api/backend/sessions/{id}/turns` relays the backend Server-Sent Events
-unchanged and unbuffered. The browser reducer applies `message.delta` as tentative text and
+unchanged and unbuffered, keepalive comments included (the parser ignores comments). The relay
+ends a stream that stays silent for 60 seconds (four backend keepalives) with a `turn_failed`
+`error` frame and cancels the backend request; the LLM timeout no longer bounds a turn there. The browser reducer applies `message.delta` as tentative text and
 `coverage.updated`, `stage.changed` and `review.required` as state patches. It reloads the stored
 session after `turn.completed`. A terminal `error`, or a refused request, restores the message in
 the composer.

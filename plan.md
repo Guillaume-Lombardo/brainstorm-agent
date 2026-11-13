@@ -277,7 +277,8 @@ Reuse lot 2 validators and elicitation metadata; exports delegate to lot 4 deliv
 
 ### Lot 9: Finishing touches
 
-- ADR impact: `none` (wording and configuration only; the gate decision is unchanged)
+- ADR impact: `none` for the wording and configuration; ADR 0010 and 0011 updated for the
+  turn stream keepalive
 
 #### Steps
 
@@ -290,6 +291,9 @@ Reuse lot 2 validators and elicitation metadata; exports delegate to lot 4 deliv
 - [x] `LLM_MAX_TOKENS` defaults to 32768.
 - [x] docker-box defaults to `claude-opus-5-5` with a 300-second LLM timeout and a 1800-second
       session lock.
+- [x] Turn streams send a `: keepalive` SSE comment every 15 seconds while the turn is silent;
+      the frontend proxy relays it and ends a stream only after 60 silent seconds, so slow
+      provider calls and their retries are no longer cut by the proxies.
 
 ### Later (not scheduled)
 

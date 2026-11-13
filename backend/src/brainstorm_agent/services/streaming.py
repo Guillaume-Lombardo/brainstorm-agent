@@ -15,26 +15,40 @@ if TYPE_CHECKING:
     from brainstorm_agent.core.application import TurnEvent
     from brainstorm_agent.services.session_service import SessionService
 
+# Longest silence on a turn stream before a keepalive goes out. It stays well under
+# the idle timeouts of the frontend proxy and the reverse proxies, so a long provider
+# call (retries included) never looks dead.
+TURN_KEEPALIVE_SECONDS = 15.0
+
+
+class Keepalive:
+    """Transport marker: the turn is still running but has nothing new to say."""
+
 
 async def stream_in_worker(
     service: SessionService,
     session_id: str,
     content: str,
-) -> AsyncGenerator[TurnEvent]:
+    keepalive_seconds: float | None = None,
+) -> AsyncGenerator[TurnEvent | Keepalive]:
     """Run a session turn on one dedicated worker, relaying events and cancellation.
 
     All synchronous SQL and Redis lock operations stay on that worker, while its
     own event loop drives the async provider. The request never uses its service
-    concurrently with the worker.
+    concurrently with the worker. While the worker stays silent, a ``Keepalive``
+    marker is yielded every ``keepalive_seconds`` until the turn ends.
 
     Args:
         service (SessionService): Authorized request-scoped service.
         session_id (str): Owned session id.
         content (str): User input.
+        keepalive_seconds (float | None): Silence before each keepalive; defaults
+            to ``TURN_KEEPALIVE_SECONDS``.
 
     Yields:
-        TurnEvent: Incremental worker events.
+        TurnEvent | Keepalive: Incremental worker events, or a keepalive marker.
     """
+    interval = TURN_KEEPALIVE_SECONDS if keepalive_seconds is None else keepalive_seconds
     main_loop = asyncio.get_running_loop()
     queue: asyncio.Queue[TurnEvent | None] = asyncio.Queue()
     ready: Future[tuple[asyncio.AbstractEventLoop, asyncio.Task[None]]] = Future()
@@ -57,7 +71,15 @@ async def stream_in_worker(
 
     worker = executor.submit(run)
     try:
-        while (event := await queue.get()) is not None:
+        while True:
+            try:
+                async with asyncio.timeout(interval):
+                    event = await queue.get()
+            except TimeoutError:
+                yield Keepalive()
+                continue
+            if event is None:
+                break
             yield event
         await asyncio.wrap_future(worker)
     finally:

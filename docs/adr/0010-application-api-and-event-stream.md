@@ -37,6 +37,9 @@ and remain tentative until commit. Cancellation of the stream generator cancels 
 best effort; a turn already entering persistence can commit in full after a disconnect. There is no event replay,
 Last-Event-ID recovery or automatic retry contract. HTTP authorization and pending-review errors
 occur before stream headers; runtime failures use the terminal error event.
+While the worker stays silent (a long provider call or its retries), the stream sends a
+`: keepalive` SSE comment every 15 seconds. It is transport only, outside the event union, and
+keeps the frontend proxy and the reverse proxies from closing a turn that is still running.
 
 Coverage, readiness, question priorities/options and clarifications reuse the lot 2 models.
 The OpenAPI SSE response references the discriminated event union. The generated snapshot and

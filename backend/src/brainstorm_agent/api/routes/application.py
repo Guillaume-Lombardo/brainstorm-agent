@@ -24,7 +24,7 @@ from brainstorm_agent.core.application import (
 from brainstorm_agent.core.enums import Stage  # noqa: TC001
 from brainstorm_agent.core.models import SessionOverview, StepDocument  # noqa: TC001
 from brainstorm_agent.services.session_service import SessionService
-from brainstorm_agent.services.streaming import stream_in_worker
+from brainstorm_agent.services.streaming import Keepalive, stream_in_worker
 
 router = APIRouter(prefix="/sessions", tags=["application"])
 Service = Annotated[SessionService, Depends(get_session_service)]
@@ -233,7 +233,8 @@ def export_specs(session_id: str, service: Service) -> SliceSpecsExport:
     responses={
         200: {
             "description": "SSE: event is the discriminant, data is JSON. Deltas are tentative until turn.completed. "
-            "Exactly one terminal event: turn.completed or error. No replay/resume support.",
+            "Exactly one terminal event: turn.completed or error. No replay/resume support. "
+            "While the turn is silent, a `: keepalive` SSE comment is sent every 15 s; clients ignore it.",
             "content": {"text/event-stream": {"schema": {"$ref": "#/components/schemas/TurnEvent"}}},
         },
     },
@@ -254,7 +255,10 @@ async def stream_turn(session_id: str, payload: PostMessageRequest, service: Ser
     async def events() -> AsyncIterator[str]:
         async with aclosing(stream_in_worker(service, session_id, payload.content)) as stream:
             async for event in stream:
-                yield f"event: {event.type}\ndata: {event.model_dump_json()}\n\n"
+                if isinstance(event, Keepalive):
+                    yield ": keepalive\n\n"
+                else:
+                    yield f"event: {event.type}\ndata: {event.model_dump_json()}\n\n"
 
     return StreamingResponse(
         events(),

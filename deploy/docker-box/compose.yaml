@@ -32,8 +32,8 @@ x-backend-env: &backend-env
   MODEL_NAME: ${BRAINSTORM_MODEL_NAME:-claude-opus-5-5}
   # A detailed stage analysis is a JSON document of several thousand tokens: 4096 truncates it.
   LLM_MAX_TOKENS: ${BRAINSTORM_LLM_MAX_TOKENS:-32768}
-  # Opus 5.5 can spend several minutes on a detailed analysis. The frontend proxy still drops
-  # a turn stream that stays silent for 300 s, so a retried analysis can fail there.
+  # Opus 5.5 can spend several minutes on a detailed analysis. Turn streams send a keepalive
+  # every 15 s meanwhile, so the frontend proxy and the reverse proxies keep them open.
   OPENAI_TIMEOUT_SECONDS: ${BRAINSTORM_LLM_TIMEOUT_SECONDS:-300}
   # Must exceed five LLM timeouts (1500 s with the 300 s default), or the backend refuses to start.
   REDIS_LOCK_TIMEOUT_SECONDS: ${BRAINSTORM_REDIS_LOCK_TIMEOUT_SECONDS:-1800}

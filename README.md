@@ -715,7 +715,8 @@ sessions return 404. `GET /api/v1/sessions?offset=0&limit=20&include_archived=fa
 `text/event-stream`. Named events carry JSON with a `type` discriminator: `turn.started`,
 `analysis.status`, live `message.delta`, committed `document.updated`, `coverage.updated`,
 optional `stage.changed`/`review.required`, then `turn.completed` or a sanitized `error`.
-Deltas are tentative until completion. Reconnect/replay is not supported. Legacy message endpoints
+Deltas are tentative until completion. While the turn is silent, the stream sends a
+`: keepalive` SSE comment every 15 seconds; clients ignore it. Reconnect/replay is not supported. Legacy message endpoints
 are unchanged. OpenAPI documents the full event union.
 
 - POST `/sessions/{id}/stages/{stage}/reopen`: earlier visited stage; downstream state becomes stale.

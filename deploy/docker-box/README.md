@@ -64,7 +64,7 @@ committed `.env`. A missing secret makes the deployment fail (`${VAR:?}`).
 | `BRAINSTORM_LLM_BASE_URL` | `http://10.16.0.117:4000/v1` | OpenAI-compatible gateway |
 | `BRAINSTORM_MODEL_NAME` | `claude-opus-5-5` | Default model: the Opus 5.5 alias of the docker-box gateway (model names are case-sensitive); `GLM-5.3-Flash` is the cheaper alternative |
 | `BRAINSTORM_LLM_MAX_TOKENS` | `32768` | Output budget per LLM call; a detailed stage analysis exceeds 4096 tokens and is then rejected as truncated |
-| `BRAINSTORM_LLM_TIMEOUT_SECONDS` | `300` | Per-call LLM timeout; Opus 5.5 can spend several minutes on one analysis. The frontend proxy drops a turn stream that stays silent for 300 seconds, so an analysis retry after a slow first attempt can still fail there |
+| `BRAINSTORM_LLM_TIMEOUT_SECONDS` | `300` | Per-call LLM timeout; Opus 5.5 can spend several minutes on one analysis. The turn stream sends a keepalive every 15 seconds meanwhile, so the frontend proxy and the reverse proxies keep a long turn open, retries included |
 | `BRAINSTORM_REDIS_LOCK_TIMEOUT_SECONDS` | `1800` | Must exceed the worst turn: five LLM timeouts when the challenge pass is `findings`, three otherwise (1500 s with the 300 s default; 900 s makes the backend refuse to start) |
 | `BRAINSTORM_LOG_LEVEL` | `INFO` | Backend log level |
 

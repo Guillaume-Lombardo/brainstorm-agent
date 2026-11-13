@@ -64,6 +64,23 @@ describe("parseTurnEvents", () => {
     expect(events).toEqual([started]);
   });
 
+  it("ignores the backend keepalive comments between deltas, even split across chunks", async () => {
+    const events = await collect(
+      streamOf([
+        frame({ type: "message.delta", delta: "Hel" }),
+        ": keepalive\n\n: keep",
+        "alive\n",
+        "\n",
+        frame({ type: "message.delta", delta: "lo" }),
+        ": keepalive\n\n",
+      ]),
+    );
+    expect(events).toEqual([
+      { type: "message.delta", delta: "Hel" },
+      { type: "message.delta", delta: "lo" },
+    ]);
+  });
+
   it("parses a final frame without the trailing blank line", async () => {
     const events = await collect(
       streamOf(['data: {"type":"error","code":"turn_failed","message":"x"}']),
