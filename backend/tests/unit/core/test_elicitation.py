@@ -70,3 +70,25 @@ def test_contradictions_block_even_with_complete_fields():
     )
     assert not result.stage_is_clear_enough
     assert "contradictions" in {item.id for item in result.readiness if not item.passed}
+
+
+@pytest.mark.parametrize(
+    ("fields", "partial_name"),
+    [
+        ({"event_storming_relevant": True, "domain_events": ["An event"]}, "domain_events"),
+        (
+            {"event_storming_relevant": False, "not_relevant_reason": "Static content only"},
+            "not_relevant_reason",
+        ),
+    ],
+)
+def test_conditional_required_fields_must_be_clear(fields, partial_name):
+    result = validate_stage(
+        stage=Stage.STAGE_3_EVENT_STORMING,
+        extracted_fields=fields,
+        open_questions=[],
+        partial_fields={partial_name: "Needs clarification"},
+    )
+    assert not result.stage_is_clear_enough
+    assert result.coverage[partial_name] == "partial"
+    assert any(item.id == f"field:{partial_name}" and not item.passed for item in result.readiness)

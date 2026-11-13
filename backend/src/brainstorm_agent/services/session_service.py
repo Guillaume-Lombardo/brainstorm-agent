@@ -190,7 +190,9 @@ class SessionService:
             processed_stage_state = StageState(
                 stage=output.processed_stage,
                 contradictions=graph_output["analysis"]["contradictions"],
-                partial_fields=graph_output["analysis"]["partial_fields"],
+                partial_fields={
+                    item["field"]: item["reason"] for item in graph_output["analysis"]["partial_fields"]
+                },
                 clarifications=graph_output["analysis"]["clarifications"],
                 summary=output.summary,
                 assistant_message=output.assistant_message,
@@ -292,7 +294,7 @@ class SessionService:
             self.open_questions.sync_stage_questions(
                 session_id=session_id,
                 stage=output.processed_stage,
-                questions=output.open_questions,
+                questions=processed_stage_state.open_questions,
             )
             validation = graph_output["validation"]
             self.transitions.add(
@@ -351,7 +353,16 @@ class SessionService:
 
         """
         record = self._require_owned(session_id)
-        return self.sessions.overview(record, self.open_questions.list_open(session_id))
+        state = self.sessions.to_state(record)
+        metadata = {
+            question.id: question
+            for stage_state in state.stage_states.values()
+            for question in stage_state.open_questions
+        }
+        questions = [
+            metadata.get(question.id, question) for question in self.open_questions.list_open(session_id)
+        ]
+        return self.sessions.overview(record, questions)
 
     def list_messages(self, session_id: str) -> list[ConversationTurn]:
         """Return ordered message history for a session.
@@ -496,7 +507,16 @@ class SessionService:
             state.pending_human_review = None
             self.sessions.save_state(session_id, state)
             self.db_session.commit()
-            return self.sessions.overview(record, self.open_questions.list_open(session_id))
+            state = self.sessions.to_state(record)
+        metadata = {
+            question.id: question
+            for stage_state in state.stage_states.values()
+            for question in stage_state.open_questions
+        }
+        questions = [
+            metadata.get(question.id, question) for question in self.open_questions.list_open(session_id)
+        ]
+        return self.sessions.overview(record, questions)
 
     def list_human_reviews(self, session_id: str) -> list[HumanReviewRecord]:
         """Return all human review decisions for a session.

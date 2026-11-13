@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from brainstorm_agent.core.enums import LLMMode, Stage
-from brainstorm_agent.core.models import AssistantAnalysis, OpenQuestionItem
+from brainstorm_agent.core.models import AssistantAnalysis, OpenQuestionItem, QuestionPriority
 from brainstorm_agent.exceptions import ConflictError, LLMResponseError
 from brainstorm_agent.persistence.session import (
     create_all,
@@ -58,7 +58,7 @@ def test_session_service_persists_versions_and_resolves_open_questions(tmp_path:
             content=(
                 "problem: Discovery is inconsistent across teams.\n"
                 "users: Product managers; founders\n"
-                "objectives: reduce ambiguity; speed up scoping\n"
+                "objectives: reduce ambiguity by 20 percent; scope in 2 days\n"
                 "constraints: must stay model-agnostic; keep Markdown artifacts\n"
                 "non_goals: building a general assistant\n"
                 "hypotheses: teams want structured guidance\n"
@@ -230,9 +230,8 @@ def test_reworded_question_keeps_id_in_persistence(tmp_path: Path) -> None:
         fake.scripted_responses[0].open_questions[0].id = question_id
         service.process_user_message(session_id=session_id, content="Please clarify your question")
         questions = service.get_session(session_id).open_questions
-        assert len(questions) == 1
-        assert questions[0].id == question_id
-        assert questions[0].question == "Which teams?"
+        question = next(q for q in questions if q.id == question_id)
+        assert question.question == "Which teams?"
 
 
 def test_provider_question_ids_cannot_collide_between_sessions(tmp_path: Path) -> None:
@@ -260,3 +259,49 @@ def test_provider_question_ids_cannot_collide_between_sessions(tmp_path: Path) -
             assert service.get_session(session_id).open_questions[0].id == ids[-1]
         assert ids[0] != ids[1]
         assert all(len(item) == 36 for item in ids)
+
+
+def test_budget_keeps_all_questions_and_metadata_in_overview(tmp_path: Path) -> None:
+    settings = _build_settings(tmp_path)
+    engine = create_engine_from_settings(settings)
+    create_all(engine)
+    fake = FakeBrainstormLLM(
+        prompt_loader=PromptLoader(),
+        scripted_responses=[
+            AssistantAnalysis(
+                summary="Questions",
+                assistant_message="Please clarify",
+                open_questions=[
+                    OpenQuestionItem(
+                        id=f"q{i}",
+                        question=f"Security question {i}?",
+                        priority=QuestionPriority.SECURITY,
+                        options=["Restrict", "Allow"],
+                        recommended_option="Restrict",
+                        why_it_matters="Protect user data",
+                    )
+                    for i in range(5)
+                ],
+            )
+        ],
+    )
+    with create_session_factory(engine)() as db:
+        service = SessionService(db_session=db, settings=settings, llm=fake)
+        session_id = service.create_session().session_id
+        output = service.process_user_message(session_id=session_id, content="A project")
+        assert len(output.open_questions) == 3
+        assert not output.stage_clear_enough
+        sql_questions = service.open_questions.list_open(session_id)
+        assert len(sql_questions) > 3
+    with create_session_factory(engine)() as db:
+        service = SessionService(db_session=db, settings=settings, llm=fake)
+        questions = service.get_session(session_id).open_questions
+        provider_questions = [q for q in questions if q.question.startswith("Security question")]
+        assert len(provider_questions) == 5
+        assert all(
+            q.priority == "security/compliance"
+            and q.options == ["Restrict", "Allow"]
+            and q.recommended_option == "Restrict"
+            and q.why_it_matters == "Protect user data"
+            for q in provider_questions
+        )

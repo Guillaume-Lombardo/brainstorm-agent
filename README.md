@@ -569,7 +569,7 @@ development uses a single bootstrap owner. See [ADR 0009](docs/adr/0009-user-aut
 Every turn returns authoritative `coverage` (`clear`, `partial`, `missing`) and a `readiness`
 checklist; the Markdown document renders its `passed/total` count. Blank values and explicit
 placeholders (such as `TBD`) are missing regardless of provider approval. The provider may
-propose `partial_fields` with a reason. Required partial fields, unresolved contradictions and
+propose `partial_fields` as a list of `{field, reason}` objects. Required partial fields, unresolved contradictions and
 blocking questions prevent advancement. A pitch needs at least five words; objectives need
 numeric targets. These deterministic checks are bounded structural checks, not semantic proof.
 

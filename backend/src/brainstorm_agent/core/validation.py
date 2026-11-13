@@ -44,7 +44,15 @@ def validate_stage(  # noqa: PLR0913 - independent gate inputs at the domain bou
         else (CoverageStatus.PARTIAL if partial.get(name, "").strip() else CoverageStatus.CLEAR)
         for name in STAGE_MODELS[stage].model_fields
     }
-    required = STAGE_CONTRACTS[stage].required_fields
+    required = (
+        *STAGE_CONTRACTS[stage].required_fields,
+        *(
+            name
+            for rule in STAGE_RULES.get(stage, ())
+            if rule.applies(extracted_fields)
+            for name in rule.required_fields
+        ),
+    )
     checklist = [
         ReadinessItem(
             id=f"field:{name}",

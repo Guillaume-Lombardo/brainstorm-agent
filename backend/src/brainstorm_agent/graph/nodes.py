@@ -14,6 +14,7 @@ from brainstorm_agent.core.models import (
     BrainstormSessionState,
     Clarification,
     OpenQuestionItem,
+    PartialField,
     StageState,
     StageValidationResult,
 )
@@ -98,7 +99,7 @@ def apply_stage_rules(state: TurnGraphState) -> dict[str, object]:
         stage=stage,
         extracted_fields=analysis.extracted_fields.model_dump(exclude_none=True),
         open_questions=analysis.open_questions,
-        partial_fields=analysis.partial_fields,
+        partial_fields={item.field: item.reason for item in analysis.partial_fields},
         contradictions=analysis.contradictions,
         previous_fields={
             key: item["extracted_fields"]
@@ -211,14 +212,15 @@ def merge_analysis(*, previous: StageState | None, patch: AssistantAnalysis) -> 
     if previous is None:
         return patch
     patch.clarifications = [*previous.clarifications, *patch.clarifications]
-    patch.partial_fields = {
+    partial_fields = {
         **{
             key: reason
             for key, reason in previous.partial_fields.items()
             if patch.extracted_fields.get(key) is None
         },
-        **patch.partial_fields,
+        **{item.field: item.reason for item in patch.partial_fields},
     }
+    patch.partial_fields = [PartialField(field=key, reason=value) for key, value in partial_fields.items()]
     fields = previous.extracted_fields.model_dump(exclude_none=True)
     updates = patch.extracted_fields.model_dump(exclude_none=True)
     for name, value in updates.items():

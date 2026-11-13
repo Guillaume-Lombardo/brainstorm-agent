@@ -26,7 +26,7 @@ Rules:
 - highlight the smallest next questions that would unblock the stage
 
 Quality coverage: the server is authoritative for missing fields. Propose partial_fields
-only as field-name -> concrete reason for ambiguity; never mark an absent field clear.
+only as a list of {field, reason} objects with a concrete reason for ambiguity; never mark an absent field clear.
 List unresolved contradictions in contradictions; return the complete remaining list each turn.
 Questions use priority scope, security/compliance, ux, technical in this order, with a concrete
 why_it_matters. Supply optional options and recommended_option (one of those options).

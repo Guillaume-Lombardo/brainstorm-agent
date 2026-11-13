@@ -44,6 +44,8 @@ class Rule:
     id: str
     condition: Callable[[dict[str, Any], dict[str, Any]], bool]
     message: str
+    required_fields: tuple[str, ...] = ()
+    applies: Callable[[dict[str, Any]], bool] = lambda _: True
 
 
 def _risks(fields: dict[str, Any], _: dict[str, Any]) -> bool:
@@ -127,11 +129,15 @@ STAGE_RULES: dict[Stage, tuple[Rule, ...]] = {
                 f.get("event_storming_relevant") is not False or concrete(f.get("not_relevant_reason"))
             ),
             "Event storming irrelevance must be justified explicitly.",
+            ("not_relevant_reason",),
+            lambda f: f.get("event_storming_relevant") is False,
         ),
         Rule(
             "relevant_events",
             lambda f, _: f.get("event_storming_relevant") is not True or concrete(f.get("domain_events")),
             "Relevant event storming requires domain events.",
+            ("domain_events",),
+            lambda f: f.get("event_storming_relevant") is True,
         ),
     ),
     Stage.STAGE_4_IMPACT_MAPPING: (

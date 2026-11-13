@@ -54,6 +54,14 @@ class Clarification(BaseModel):
     created_at: datetime = Field(default_factory=utc_now)
 
 
+class PartialField(BaseModel):
+    """Provider proposal with a strict object schema."""
+
+    model_config = ConfigDict(extra="forbid")
+    field: str
+    reason: str = Field(min_length=1)
+
+
 class ReadinessItem(BaseModel):
     """One deterministic checklist outcome."""
 
@@ -274,7 +282,7 @@ class AssistantAnalysis(BaseModel):
     prompt_tokens: int = 0
     completion_tokens: int = 0
     contradictions: list[str] = Field(default_factory=list)
-    partial_fields: dict[str, str] = Field(default_factory=dict)
+    partial_fields: list[PartialField] = Field(default_factory=list)
     clarifications: list[Clarification] = Field(default_factory=list)
     summary: str
     assistant_message: str

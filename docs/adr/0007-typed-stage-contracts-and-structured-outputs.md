@@ -51,7 +51,9 @@ with global SQL primary keys across sessions or stages. Updates reuse the curren
 Domain `Rule` records pair stable rule ids with predicates and rejection messages. A stage-keyed
 registry allows later stages to add rules without changing the validation engine. Field coverage
 is derived in code: empty values and explicit placeholders are missing; only present values may
-be partial, with a provider reason. Readiness combines required clear fields, registered rules,
+be partial, with a provider reason. Provider proposals use a closed-object list of field/reason
+records for strict JSON-schema compatibility; domain state converts them to a lookup. Conditional
+stage requirements also demand clear coverage. Readiness combines required clear fields, registered rules,
 all open blocking questions and explicit contradictions. Provider approval never overrides it.
 The optional contradiction challenge now supplies blocking findings rather than advisory uncertainty.
 

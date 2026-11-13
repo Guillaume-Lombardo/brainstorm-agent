@@ -4,6 +4,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
 
+from openai import pydantic_function_tool
+
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 from unittest.mock import AsyncMock
@@ -13,7 +15,7 @@ from openai import AsyncOpenAI
 
 from brainstorm_agent.async_runner import run_async
 from brainstorm_agent.core.enums import ChallengePass, LLMMode, Stage, StructuredOutputMode
-from brainstorm_agent.core.models import BrainstormSessionState
+from brainstorm_agent.core.models import AssistantAnalysis, BrainstormSessionState
 from brainstorm_agent.exceptions import LLMResponseError
 from brainstorm_agent.services.llm_client import OpenAICompatibleBrainstormLLM, build_llm
 from brainstorm_agent.services.prompt_loader import PromptLoader
@@ -155,3 +157,20 @@ def test_missing_provider_configuration_fails_before_client_creation(mocker):
     with pytest.raises(ValueError, match=r"OPENAI_BASE_URL.*OPENAI_API_KEY"):
         build_llm(settings=Settings(openai_api_key=None, openai_base_url=None), prompt_loader=PromptLoader())
     client.assert_not_called()
+
+
+def test_analysis_provider_schema_has_no_open_objects():
+
+    schema = pydantic_function_tool(AssistantAnalysis)["function"]["parameters"]
+
+    def check(node) -> None:
+        if isinstance(node, dict):
+            if node.get("type") == "object":
+                assert node.get("additionalProperties") is False
+            for child in node.values():
+                check(child)
+        elif isinstance(node, list):
+            for child in node:
+                check(child)
+
+    check(schema)
