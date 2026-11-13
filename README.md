@@ -491,6 +491,10 @@ OpenWebUI can use LiteLLM as an OpenAI-compatible backend. The Open WebUI docs f
 ## Workflow principles
 
 - Facts, assumptions, decisions, risks, and open questions stay separated.
+- A failed coded gate check becomes a question with answer options and a recommended one, worded
+  deterministically in the session language (French or English, detected from the user's
+  messages; English otherwise). The gate skips a field the model already asks about (`field` on
+  the question), and the workspace shows at most three questions.
 - Each turn creates a versioned Markdown document for the processed stage.
 - The current session state is persisted as structured JSON plus normalized history tables.
 - Redis is used only for non-critical session locking.
@@ -557,7 +561,8 @@ exposes reply deltas; current HTTP streams retain their final-result envelope un
 lot. Provider token counts are persisted per assistant turn in the session JSON and returned by
 the facade; fake mode reports zero. No word-count estimates are used.
 
-`LLM_MAX_TOKENS=4096` bounds each response. `LLM_CONTEXT_TURNS=8` bounds transcript context;
+`LLM_MAX_TOKENS=32768` bounds each response (a detailed stage analysis needs several thousand
+tokens). `LLM_CONTEXT_TURNS=8` bounds transcript context;
 previous stages contribute summaries only. Content follows the user's language, while headings
 and schema keys remain English. Prompt `v1` remains available; `v2` is the default.
 

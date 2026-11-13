@@ -30,6 +30,8 @@ only as a list of {field, reason} objects with a concrete reason for ambiguity; 
 List unresolved contradictions in contradictions; return the complete remaining list each turn.
 Questions use priority scope, security/compliance, ux, technical in this order, with a concrete
 why_it_matters. Supply optional options and recommended_option (one of those options).
+Set field to the stage field a question targets (null when it spans several fields); the server
+then skips its own question on that field.
 Resolve identified questions only after an explicit answer. Ask at most three selected questions.
 Default assumptions must carry default_field and to_confirm=true. Only functional_gaps,
 edge_cases (stage 2) and complexity_hotspots (stage 3) may default; never invent critical values.

@@ -113,7 +113,7 @@ class Settings(BaseSettings):
         validation_alias="LLM_CHALLENGE_PASS",
     )
     llm_context_turns: int = Field(default=8, ge=0, validation_alias="LLM_CONTEXT_TURNS")
-    llm_max_tokens: int = Field(default=4096, gt=0, validation_alias="LLM_MAX_TOKENS")
+    llm_max_tokens: int = Field(default=32768, gt=0, validation_alias="LLM_MAX_TOKENS")
     openai_base_url: str | None = Field(default=None, validation_alias="OPENAI_BASE_URL")
     openai_api_key: str | None = Field(default=None, validation_alias="OPENAI_API_KEY")
     model_name: str = Field(default="gpt-4.1-mini", validation_alias="MODEL_NAME")

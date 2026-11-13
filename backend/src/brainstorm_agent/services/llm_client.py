@@ -10,14 +10,15 @@ from typing import TYPE_CHECKING, Any, Protocol, cast, runtime_checkable
 from openai import AsyncOpenAI, pydantic_function_tool
 from pydantic import BaseModel, ConfigDict, ValidationError, create_model
 
-from brainstorm_agent.core.enums import ChallengePass, LLMMode, Stage, StructuredOutputMode
+from brainstorm_agent.core.enums import ChallengePass, Language, LLMMode, Stage, StructuredOutputMode
+from brainstorm_agent.core.gate_questions import field_question
+from brainstorm_agent.core.language import detect_language, session_language
 from brainstorm_agent.core.models import (
     AssistantAnalysis,
     AssumptionItem,
     BrainstormSessionState,
     DecisionItem,
     FactItem,
-    OpenQuestionItem,
     RiskItem,
     StageState,
 )
@@ -27,7 +28,7 @@ from brainstorm_agent.core.validation import validate_stage
 from brainstorm_agent.exceptions import LLMResponseError
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator, Iterable
+    from collections.abc import AsyncIterator
 
     from openai.types.chat import ChatCompletionMessageParam
 
@@ -36,6 +37,7 @@ if TYPE_CHECKING:
 
 
 RISK_PART_COUNT = 5
+RECOMMENDED_LABEL = {Language.EN: "recommended", Language.FR: "recommandé"}
 
 
 def _split_items(raw: str) -> list[str]:
@@ -49,26 +51,6 @@ def _split_items(raw: str) -> list[str]:
     """
     items = [part.strip() for chunk in raw.split(";") for part in chunk.split(",")]
     return [item for item in items if item]
-
-
-def _default_open_questions(stage: Stage, missing_fields: Iterable[str]) -> list[OpenQuestionItem]:
-    """Build generic blocking questions from missing fields.
-
-    Args:
-        stage: Active stage.
-        missing_fields: Missing required fields.
-
-    Returns:
-        list[OpenQuestionItem]: Blocking questions generated from missing fields.
-    """
-    return [
-        OpenQuestionItem(
-            question=f"Please clarify `{field_name}` for {stage.label}.",
-            why_it_matters="This field is required before the stage can be considered clear enough.",
-            blocking=True,
-        )
-        for field_name in missing_fields
-    ]
 
 
 def _risk_item_from_mapping(item: dict[str, object]) -> RiskItem:
@@ -178,7 +160,6 @@ class FakeBrainstormLLM:
         """
         if self.scripted_responses:
             return self.scripted_responses.pop(0)
-        del session_state
         previous = (
             current_stage_state.extracted_fields.model_dump(exclude_none=True) if current_stage_state else {}
         )
@@ -228,7 +209,10 @@ class FakeBrainstormLLM:
             for field_name in STAGE_CONTRACTS[stage].required_fields
             if field_name not in extracted_fields
         ]
-        open_questions = _default_open_questions(stage, missing_fields)
+        open_questions = [
+            field_question(name, language=session_language(user_message, session_state.transcript))
+            for name in missing_fields
+        ]
         uncertainties = []
         if "ambiguities" in extracted_fields:
             uncertainties.extend(self._as_list(extracted_fields["ambiguities"]))
@@ -362,18 +346,27 @@ class FakeBrainstormLLM:
 
     @staticmethod
     async def reply(*, stage: Stage, analysis: AssistantAnalysis, user_message: str) -> str:
-        """Return the scripted conversational reply.
+        """Return the scripted reply and the selected questions as a Markdown list.
 
         Args:
             stage (Stage): Processed stage.
-            analysis (AssistantAnalysis): Validated accumulated state.
-            user_message (str): Latest user text.
+            analysis (AssistantAnalysis): Validated state with the selected questions.
+            user_message (str): Latest user text, which sets the reply language.
 
         Returns:
-            str: Deterministic reply.
+            str: Deterministic Markdown reply.
         """
-        del stage, user_message
-        return analysis.assistant_message
+        del stage
+        recommended = RECOMMENDED_LABEL[detect_language([user_message])]
+        questions = [
+            f"- **{item.question}** "
+            + " / ".join(
+                f"{option} *({recommended})*" if option == item.recommended_option else option
+                for option in item.options
+            )
+            for item in analysis.open_questions
+        ]
+        return "\n\n".join([analysis.assistant_message, *(["\n".join(questions)] if questions else [])])
 
 
 @dataclass

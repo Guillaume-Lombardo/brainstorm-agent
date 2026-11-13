@@ -1,9 +1,10 @@
 "use client";
 
 import { LoaderCircleIcon, SendIcon } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { memo, useEffect, useRef } from "react";
 
 import { ErrorState } from "@/components/error-state";
+import { Markdown } from "@/components/markdown";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -112,16 +113,29 @@ export function ChatPanel({
   );
 }
 
-function MessageBubble({ role, content }: { role: ChatMessage["role"]; content: string }) {
+const MessageBubble = memo(function MessageBubble({
+  role,
+  content,
+}: {
+  role: ChatMessage["role"];
+  content: string;
+}) {
   return (
     <div
       data-role={role}
       className={cn(
-        "max-w-[85%] rounded-xl px-3 py-2 text-sm whitespace-pre-wrap",
-        role === "user" ? "self-end bg-primary text-primary-foreground" : "self-start bg-muted",
+        "max-w-[85%] rounded-xl px-3 py-2 text-sm",
+        role === "user"
+          ? "self-end bg-primary whitespace-pre-wrap text-primary-foreground"
+          : "self-start bg-muted",
       )}
     >
-      {content.replace(/\*\*(.+?)\*\*/g, "$1")}
+      {/* Assistant replies are Markdown; user input stays the literal text that was typed. */}
+      {role === "assistant" ? (
+        <Markdown className="[&>:first-child]:mt-0 [&>:last-child]:mb-0">{content}</Markdown>
+      ) : (
+        content
+      )}
     </div>
   );
-}
+});

@@ -62,10 +62,10 @@ committed `.env`. A missing secret makes the deployment fail (`${VAR:?}`).
 | `BRAINSTORM_ADMIN_DISPLAY_NAME` | `Administrator` | Bootstrap administrator display name |
 | `BRAINSTORM_LLM_MODE` | `openai` | `fake` runs the deterministic offline model (tests only) |
 | `BRAINSTORM_LLM_BASE_URL` | `http://10.16.0.117:4000/v1` | OpenAI-compatible gateway |
-| `BRAINSTORM_MODEL_NAME` | `GLM-5.3-Flash` | Default model, as named by the docker-box gateway (model names are case-sensitive: `glm-5.3-flash` is rejected); the gateway has no `claude-opus-5-5` alias yet |
-| `BRAINSTORM_LLM_MAX_TOKENS` | `12288` | Output budget per LLM call; a detailed stage analysis exceeds 4096 tokens and is then rejected as truncated |
-| `BRAINSTORM_LLM_TIMEOUT_SECONDS` | `120` | Per-call LLM timeout; two analysis attempts stream nothing, so keep twice this value under the frontend proxy's 300-second body timeout |
-| `BRAINSTORM_REDIS_LOCK_TIMEOUT_SECONDS` | `480` | Must exceed three LLM timeouts (five with the challenge pass) |
+| `BRAINSTORM_MODEL_NAME` | `claude-opus-5-5` | Default model: the Opus 5.5 alias of the docker-box gateway (model names are case-sensitive); `GLM-5.3-Flash` is the cheaper alternative |
+| `BRAINSTORM_LLM_MAX_TOKENS` | `32768` | Output budget per LLM call; a detailed stage analysis exceeds 4096 tokens and is then rejected as truncated |
+| `BRAINSTORM_LLM_TIMEOUT_SECONDS` | `300` | Per-call LLM timeout; Opus 5.5 can spend several minutes on one analysis. The frontend proxy drops a turn stream that stays silent for 300 seconds, so an analysis retry after a slow first attempt can still fail there |
+| `BRAINSTORM_REDIS_LOCK_TIMEOUT_SECONDS` | `1800` | Must exceed the worst turn: five LLM timeouts when the challenge pass is `findings`, three otherwise (1500 s with the 300 s default; 900 s makes the backend refuse to start) |
 | `BRAINSTORM_LOG_LEVEL` | `INFO` | Backend log level |
 
 The administrator is created only when its email does not exist yet: setting

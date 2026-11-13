@@ -275,6 +275,22 @@ Reuse lot 2 validators and elicitation metadata; exports delegate to lot 4 deliv
       `deploy/smoke.sh` end-to-end check and a CI job building the images.
   The frontend login and pages use the real backend since lot 7b.
 
+### Lot 9: Finishing touches
+
+- ADR impact: `none` (wording and configuration only; the gate decision is unchanged)
+
+#### Steps
+
+- [x] Gate questions phrased per field and rule in the session language (French or English),
+      with 2 to 4 options, a recommended option and a readable reason; `gate:` ids kept within 36
+      characters; no gate question on a field the model already asks about. The fake model uses
+      the same wording.
+- [x] Assistant messages rendered as Markdown in the chat (raw HTML never interpreted); user
+      messages stay plain text.
+- [x] `LLM_MAX_TOKENS` defaults to 32768.
+- [x] docker-box defaults to `claude-opus-5-5` with a 300-second LLM timeout and a 1800-second
+      session lock.
+
 ### Later (not scheduled)
 
 - [ ] MCP server exposing session tools (start, answer, document, approve, export slices).

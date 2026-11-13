@@ -1897,6 +1897,18 @@
             "title": "Blocking",
             "type": "boolean"
           },
+          "field": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Field"
+          },
           "id": {
             "title": "Id",
             "type": "string"

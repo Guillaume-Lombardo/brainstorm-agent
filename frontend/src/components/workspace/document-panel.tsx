@@ -2,10 +2,9 @@
 
 import { MessageSquarePlusIcon } from "lucide-react";
 import { useEffect, useState } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 
 import { ErrorState } from "@/components/error-state";
+import { Markdown } from "@/components/markdown";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
@@ -162,9 +161,7 @@ function DocumentSection({
 
   return (
     <section className="group relative">
-      <div className="prose-document text-sm">
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>{markdown}</ReactMarkdown>
-      </div>
+      <Markdown className="text-sm">{markdown}</Markdown>
       {heading ? (
         <div className="flex flex-col gap-2">
           {comments.map((comment, index) => (

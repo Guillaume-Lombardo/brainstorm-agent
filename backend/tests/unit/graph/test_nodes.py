@@ -7,6 +7,7 @@ import pytest
 from pytest_mock import MockerFixture  # noqa: TC002
 from sqlalchemy import String
 
+from brainstorm_agent.core.elicitation import selected_questions
 from brainstorm_agent.core.enums import Stage
 from brainstorm_agent.core.models import (
     AssistantAnalysis,
@@ -97,6 +98,52 @@ def test_gate_questions_fit_the_persisted_open_question_id():
     assert gate_ids
     assert all(item.startswith("gate:") and len(item) <= max_length for item in gate_ids)
     assert len(set(gate_ids)) == len(gate_ids)
+
+
+def _gate_run(user_message: str, questions: list[OpenQuestionItem] | None = None) -> AssistantAnalysis:
+    analysis = AssistantAnalysis(
+        stage=Stage.STAGE_1_PROBLEM_FRAMING,
+        summary="",
+        assistant_message="",
+        open_questions=questions or [],
+    )
+    result = apply_stage_rules({
+        "session_id": "s",
+        "current_stage": Stage.STAGE_1_PROBLEM_FRAMING.value,
+        "user_message": user_message,
+        "session_state": {},
+        "analysis": analysis.model_dump(mode="json"),
+    })
+    return AssistantAnalysis.model_validate(result["analysis"])
+
+
+@pytest.mark.parametrize(
+    ("message", "expected"),
+    [
+        ("Nous voulons réduire le temps de qualification des prospects.", "Quel problème"),
+        ("We want to cut the time spent qualifying leads.", "What problem"),
+    ],
+)
+def test_failed_gate_asks_readable_questions_in_the_session_language(message: str, expected: str):
+    gate = [q for q in _gate_run(message).open_questions if q.id.startswith("gate:")]
+    assert gate
+    assert any(q.question.startswith(expected) for q in gate)
+    assert not any("Please clarify" in q.question or "Required field" in q.question for q in gate)
+    assert all(2 <= len(q.options) <= 4 and q.recommended_option in q.options for q in gate)
+    assert all(q.why_it_matters and q.field for q in gate)
+
+
+def test_gate_and_model_questions_share_the_three_question_budget():
+    model = [
+        OpenQuestionItem(question="Qui utilise le service ?", field="users_actors"),
+        OpenQuestionItem(question="Quelles contraintes ?", field="constraints"),
+    ]
+    analysis = _gate_run("Nous voulons un outil de cadrage pour les équipes.", model)
+    shown = selected_questions(analysis.open_questions)
+    assert len(shown) == 3
+    assert [q.field for q in shown][:2] == ["users_actors", "constraints"]
+    fields = [q.field for q in analysis.open_questions]
+    assert len(fields) == len(set(fields))
 
 
 def test_clarified_uncertainty_disappears_from_current_state():

@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from brainstorm_agent.core.enums import AuthMode
+from brainstorm_agent.core.enums import AuthMode, ChallengePass
 from brainstorm_agent.settings import Settings, get_settings
 
 if TYPE_CHECKING:
@@ -68,6 +68,23 @@ def test_session_lock_exceeds_all_call_timeouts(challenge, calls):
         openai_timeout_seconds=10,
         redis_lock_timeout_seconds=calls * 10 + 1,
     )
+
+
+def test_output_budget_defaults_to_32k() -> None:
+    assert Settings().llm_max_tokens == 32768
+
+
+def test_deployment_lock_covers_five_slow_calls() -> None:
+    def slow(lock: int) -> Settings:
+        return Settings(
+            llm_challenge_pass=ChallengePass.FINDINGS,
+            openai_timeout_seconds=300,
+            redis_lock_timeout_seconds=lock,
+        )
+
+    assert slow(1800).redis_lock_timeout_seconds == 1800
+    with pytest.raises(ValueError, match="worst-case"):
+        slow(900)
 
 
 @pytest.mark.parametrize(

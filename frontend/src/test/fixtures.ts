@@ -99,6 +99,7 @@ export function questionFixture(overrides: Partial<OpenQuestionItem> = {}): Open
     why_it_matters: "It changes the data model.",
     options: ["Yes", "No"],
     recommended_option: "Yes",
+    field: null,
     blocking: true,
     priority: "scope",
     status: "open",
