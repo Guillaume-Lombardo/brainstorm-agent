@@ -141,10 +141,26 @@ export function valueFromDraft(kind: StageFieldKind, draft: string): unknown {
   }
 }
 
-/** Open questions of the current stage, as the analysis left them. */
+/** Question budget and topic order of the backend (`core/elicitation.py`, ADR 0007). */
+const QUESTION_BUDGET = 3;
+const QUESTION_PRIORITIES: OpenQuestionItem["priority"][] = [
+  "scope",
+  "security/compliance",
+  "ux",
+  "technical",
+];
+
+/**
+ * Open questions of the current stage as the backend presents them: every question persists,
+ * but only the first three by topic priority are asked.
+ */
 export function currentQuestions(session: SessionOverview): OpenQuestionItem[] {
   const state = stageState(session, session.current_stage);
-  return (state?.open_questions ?? []).filter((question) => question.status !== "resolved");
+  const rank = (question: OpenQuestionItem) => QUESTION_PRIORITIES.indexOf(question.priority);
+  return (state?.open_questions ?? [])
+    .filter((question) => question.status !== "resolved")
+    .sort((left, right) => rank(left) - rank(right))
+    .slice(0, QUESTION_BUDGET);
 }
 
 /** The message sent when the user picks an answer option. */

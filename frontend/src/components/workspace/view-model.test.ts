@@ -112,6 +112,24 @@ describe("currentQuestions", () => {
     expect(currentQuestions(session)).toEqual([open]);
     expect(answerMessage(open, "Yes")).toBe("Must the plan handle a household budget?\nYes");
   });
+
+  it("shows the backend selection: at most three, by scope, security, UX, technical", () => {
+    const technical = questionFixture({ id: "technical", priority: "technical" });
+    const ux = questionFixture({ id: "ux", priority: "ux" });
+    const scope = questionFixture({ id: "scope", priority: "scope" });
+    const security = questionFixture({ id: "security", priority: "security/compliance" });
+    const gate = questionFixture({ id: "gate", priority: "scope" });
+    const session = stage2Session();
+    session.stage_states!.stage_2_user_story_mapping = stageStateFixture(
+      "stage_2_user_story_mapping",
+      { open_questions: [technical, ux, scope, security, gate] },
+    );
+    expect(currentQuestions(session).map((question) => question.id)).toEqual([
+      "scope",
+      "gate",
+      "security",
+    ]);
+  });
 });
 
 describe("delivery slicing", () => {
