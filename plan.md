@@ -134,14 +134,14 @@
 
 #### Steps
 
-- [ ] Golden scenarios in YAML: persona, hidden project facts, scripted or simulated answers, and
+- [x] Golden scenarios in YAML: persona, hidden project facts, scripted or simulated answers, and
       expectations (must block at stage X, must flag contradiction Y, must reach the last stage).
-- [ ] Simulated user driven by an LLM playing the persona with only its hidden facts.
-- [ ] Rubric-based LLM judge for document quality (specificity, traceability, no invented facts).
-- [ ] `brainstorm-agent eval` CLI with a report per model (D6): transition precision/recall, turns
+- [x] Simulated user driven by an LLM playing the persona with only its hidden facts.
+- [x] Rubric-based LLM judge for document quality (specificity, traceability, no invented facts).
+- [x] `brainstorm-agent eval` CLI with a report per model (D6): transition precision/recall, turns
       per stage, schema failures, latency, token cost.
-- [ ] Default runs on `glm-5.3-flash`; `claude-opus-5-5` for the strong reference and the judge.
-- [ ] CI runs the recorded-fixture subset only; full evaluation runs on demand.
+- [x] Default runs on `glm-5.3-flash`; `claude-opus-5-5` for the strong reference and the judge.
+- [x] CI runs the recorded-fixture subset only; full evaluation runs on demand.
 
 ### Lot 4: Stage 7, Delivery slicing
 
@@ -174,7 +174,7 @@
 - [x] Rendering: slice table, waves, contract matrix, one spec section per slice.
 - [x] Export: one Markdown spec per slice and a backlog JSON with dependencies and waves (usable as
       parallel work lots).
-- [ ] Evaluation scenarios extended to stage 7 (deferred to lot 3: evaluation harness not yet created).
+- [x] Evaluation scenarios extended to stage 7 (golden evaluation corpus delivered in lot 3).
 
 ### Lot 5: Users, authentication and ownership
 
