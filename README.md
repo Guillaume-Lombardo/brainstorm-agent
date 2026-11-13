@@ -96,15 +96,18 @@ uv run brainstorm-agent hash-api-key "replace-me" --pepper "server-side-secret"
 configured), sessions list and the framing workspace (streamed chat, versioned stage documents
 with diff, 8-stage stepper with readiness and coverage, open questions, review bar, delivery
 slicing view, exports). The browser only calls the Next.js server, which proxies to the backend
-with a short-lived signed JWT. Until the application API lands, `BACKEND_MODE=mock` serves an
-in-memory demo backend.
+with a short-lived signed JWT per call; passwords are checked through the backend login bridge.
+Every screen uses the generated OpenAPI types of the application API (ADR 0011).
 
 ```bash
 cd frontend
 pnpm install
 cp .env.template .env.local   # set AUTH_SECRET
-pnpm dev
+pnpm dev:backend              # real backend, fake LLM, throwaway SQLite (needs uv)
+pnpm dev                      # second terminal, http://localhost:3000
 ```
+
+`pnpm e2e` runs the Playwright journeys against the production build and the same fake backend.
 
 See [frontend/README.md](frontend/README.md) for the architecture, checks and container image.
 
@@ -133,8 +136,8 @@ Development services (host ports bound to `127.0.0.1`, overridable with `BACKEND
   model to `LLM_UPSTREAM_BASE_URL` with `LLM_UPSTREAM_API_KEY`; run with `LLM_MODE=openai` to use it
 - `postgres`, `redis`
 
-The frontend runs `BACKEND_MODE=http` against the backend (complete from lot 7b); set
-`FRONTEND_BACKEND_MODE=mock` to work on the UI with the in-memory demo backend.
+The frontend talks to the backend over the internal network (`BACKEND_URL`), with the shared
+`BRAINSTORM_JWT_SECRET` and `BRAINSTORM_AUTH_BRIDGE_SECRET`.
 
 `deploy/smoke.sh` checks a running stack end to end (login page, Auth.js, `/readyz`, bridge login of
 the administrator, session creation, JSON and SSE turns):
@@ -726,7 +729,7 @@ are unchanged. OpenAPI documents the full event union.
 Session snapshots expose stage coverage, readiness, prioritized question options, clarifications
 and stale markers. `CORS_ORIGINS` is an explicit JSON allowlist, empty by default.
 Run `cd frontend && pnpm generate:api` to regenerate the committed OpenAPI and TypeScript in
-`src/lib/backend/generated/`. Full UI adaptation to the real contract remains lot 7b.
+`src/lib/backend/generated/` (including the stage field specs used by the coverage panel).
 
 The CI quality job also runs the application persistence regression on an isolated PostgreSQL 17
 database: Alembic upgrades, bounded question/review identifiers, streamed turns, review persistence

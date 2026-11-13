@@ -229,18 +229,19 @@ Reuse lot 2 validators and elicitation metadata; exports delegate to lot 4 deliv
 
 - Objective: a workspace where the user converses with the agent and sees the framing document,
   stage progress, open questions and delivery slices evolve live.
-- ADR impact: covered by ADR 0009 and ADR 0010
+- ADR impact: ADR 0011 (frontend architecture), on top of ADR 0009 and ADR 0010
 
 #### Steps
 
 - [x] Scaffold `frontend/`: Next.js App Router, TypeScript strict, Tailwind, shadcn/ui, pnpm,
-      ESLint, Prettier (provisional hand-written API types; generated types in 7b).
-- [x] Auth.js: login/password page, "Sign in with SSO" shown only when OIDC is configured, sign-out,
-      protected routes.
-- [x] Server-side proxy (route handlers) to the backend: credentials stay server-side, SSE relayed
-      (wired to the mock backend; real API in 7b).
+      ESLint, Prettier; every backend shape comes from the generated OpenAPI types.
+- [x] Auth.js: login/password page through the backend login bridge, "Sign in with SSO" shown only
+      when OIDC is configured (verified e-mail required), sign-out, protected routes; the backend
+      login limit is shown as "too many attempts".
+- [x] Server-side proxy (route handlers) to the backend: credentials stay server-side, one short
+      signed JWT per call, same-origin JSON mutations only, SSE relayed unchanged; CSP headers.
 - [x] Sessions page: list, create, rename, archive.
-- [x] Session workspace (on the mock backend):
+- [x] Session workspace on the lot 6 application API:
   - [x] chat panel with token streaming and status events;
   - [x] document panel: rendered Markdown per stage, version history, diff view;
   - [x] stage stepper (8 stages) with readiness checklist, coverage per field and `stale` markers;
@@ -250,13 +251,12 @@ Reuse lot 2 validators and elicitation metadata; exports delegate to lot 4 deliv
   - [x] delivery slicing view: slice cards, dependency graph, waves, contract matrix;
   - [x] export menu (Markdown, JSON, slice specs, backlog JSON).
 - [x] Loading, empty and error states (LLM error, 401/403, 409 pending review, 429 rate limit).
-- [ ] Tests: Vitest + Testing Library for components; Playwright end-to-end against the backend in
-      `fake` LLM mode, including login.
-  Done in 7a: Vitest + Testing Library suite and Playwright end-to-end tests against the mock
-  backend, including login.
-- [ ] 7b: wire the real API (generated OpenAPI types, `BACKEND_MODE=http` endpoints and SSE
-      contract from lot 6), Playwright end-to-end against the backend `fake` mode.
-- [x] Frontend lint, type check, tests and build in CI and pre-commit.
+- [x] Tests: Vitest + Testing Library for components; Playwright end-to-end against the real backend
+      in `fake` LLM mode on SQLite (login, session, streamed turn, document, review, approval).
+- [x] 7b: wire the real API (generated OpenAPI types, endpoints and SSE contract from lot 6); the
+      in-memory mock backend is removed.
+- [x] Frontend lint, type check, tests, build and end-to-end tests in CI and pre-commit; GitHub
+      actions pinned by commit SHA.
 
 ### Lot 8: Packaging and deployment
 
@@ -273,8 +273,7 @@ Reuse lot 2 validators and elicitation metadata; exports delegate to lot 4 deliv
       LiteLLM, secrets as stack variables, one-shot migrations and idempotent admin bootstrap).
 - [x] Root `README.md`, backend and frontend `.env.template`, validation commands updated;
       `deploy/smoke.sh` end-to-end check and a CI job building the images.
-  The frontend `BACKEND_MODE=http` login and pages become complete with lot 7b; the backend API
-  is fully usable through the stacks.
+  The frontend login and pages use the real backend since lot 7b.
 
 ### Later (not scheduled)
 

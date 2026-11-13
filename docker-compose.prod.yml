@@ -71,7 +71,6 @@ services:
     environment:
       AUTH_URL: ${BRAINSTORM_PUBLIC_URL:?BRAINSTORM_PUBLIC_URL is required}
       AUTH_SECRET: ${BRAINSTORM_AUTH_SECRET:?BRAINSTORM_AUTH_SECRET is required}
-      BACKEND_MODE: http
       BACKEND_URL: http://backend:8000
       BACKEND_JWT_SECRET: ${BRAINSTORM_JWT_SECRET:?BRAINSTORM_JWT_SECRET is required}
       BACKEND_JWT_ISSUER: brainstorm-frontend
