@@ -21,6 +21,7 @@ export function ResearchPanel({
   const [selected, setSelected] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [collapsed, setCollapsed] = useState(false);
   const base = `/api/backend/sessions/${encodeURIComponent(sessionId)}/research`;
   async function load() {
     const response = await fetch(base);
@@ -41,6 +42,7 @@ export function ResearchPanel({
             setEnabled(data.enabled);
             setHistory(data.benchmarks);
             setSelected(data.benchmarks.at(-1)?.selected_ids ?? []);
+            setCollapsed(Boolean(data.benchmarks.at(-1)?.selected_ids?.length));
           }
         })
         .catch(() => {
@@ -52,6 +54,25 @@ export function ResearchPanel({
   }, [base, available]);
   if (!available || (!enabled && !error)) return null;
   const latest = history.at(-1);
+  if (latest && collapsed) {
+    const count = latest.selected_ids?.length ?? 0;
+    return (
+      <section
+        className="flex shrink-0 items-center justify-between gap-3 border-b p-3"
+        aria-label="Benchmark"
+      >
+        <p className="text-sm">
+          Benchmark — version {latest.version} ·{" "}
+          {count === 0
+            ? "aucune fonctionnalité retenue"
+            : `${count} fonctionnalité${count > 1 ? "s retenues" : " retenue"}`}
+        </p>
+        <Button variant="outline" aria-expanded={false} onClick={() => setCollapsed(false)}>
+          Afficher le benchmark
+        </Button>
+      </section>
+    );
+  }
   async function run() {
     setBusy(true);
     setError("");
@@ -62,6 +83,7 @@ export function ResearchPanel({
       if (!events.includes("event: research.completed"))
         throw new Error("La recherche a échoué. Réessayez.");
       await load();
+      setCollapsed(false);
       await onChanged();
     } catch (error) {
       setError(error instanceof Error ? error.message : "Recherche indisponible.");
@@ -81,6 +103,7 @@ export function ResearchPanel({
       });
       if (!response.ok) throw new Error("Impossible d’enregistrer la sélection.");
       await load();
+      setCollapsed(true);
       await onChanged();
     } catch (error) {
       setError(error instanceof Error ? error.message : "Erreur de sélection.");
@@ -93,9 +116,16 @@ export function ResearchPanel({
       className="max-h-[45vh] shrink-0 space-y-3 overflow-y-auto border-b p-3"
       aria-label="Benchmark"
     >
-      <Button disabled={disabled || busy || !enabled} onClick={() => void run()}>
-        Rechercher des produits similaires
-      </Button>
+      <div className="flex flex-wrap gap-2">
+        <Button disabled={disabled || busy || !enabled} onClick={() => void run()}>
+          Rechercher des produits similaires
+        </Button>
+        {latest && (
+          <Button variant="outline" aria-expanded onClick={() => setCollapsed(true)}>
+            Replier le benchmark
+          </Button>
+        )}
+      </div>
       {busy && <p role="status">Recherche ou enregistrement en cours…</p>}
       {error && <p role="alert">{error}</p>}
       {!latest && <p>Aucune recherche effectuée.</p>}
