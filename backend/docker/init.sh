@@ -10,8 +10,6 @@ if [ -z "${BOOTSTRAP_ADMIN_EMAIL:-}" ]; then
   echo "init: BOOTSTRAP_ADMIN_EMAIL is empty, no administrator bootstrap."
   exit 0
 fi
-: "${BOOTSTRAP_ADMIN_PASSWORD:?BOOTSTRAP_ADMIN_PASSWORD is required with BOOTSTRAP_ADMIN_EMAIL}"
-
 # Exit status: 0 when the account exists, 3 when it is absent, anything else is an error.
 set +e
 python - "$BOOTSTRAP_ADMIN_EMAIL" <<'PY'
@@ -39,6 +37,7 @@ case "$status" in
     echo "init: administrator already exists, nothing to do."
     ;;
   3)
+    : "${BOOTSTRAP_ADMIN_PASSWORD:?BOOTSTRAP_ADMIN_PASSWORD is required to create the administrator}"
     # `user create` reads the password from stdin when no terminal is attached.
     printf '%s\n' "$BOOTSTRAP_ADMIN_PASSWORD" \
       | brainstorm-agent user create "$BOOTSTRAP_ADMIN_EMAIL" --display-name "${BOOTSTRAP_ADMIN_DISPLAY_NAME:-Administrator}" >/dev/null

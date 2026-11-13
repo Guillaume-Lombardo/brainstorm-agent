@@ -48,6 +48,10 @@ services:
     volumes:
       - caddy-data:/data
       - caddy-config:/config
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
     security_opt:
       - no-new-privileges:true
 
@@ -67,6 +71,8 @@ services:
       BACKEND_JWT_AUDIENCE: brainstorm-backend
       # Server-to-server login bridge, consumed by the frontend from lot 7b.
       AUTH_BRIDGE_SECRET: ${BRAINSTORM_AUTH_BRIDGE_SECRET:?set BRAINSTORM_AUTH_BRIDGE_SECRET as a Dockhand secret variable}
+    cap_drop:
+      - ALL
     security_opt:
       - no-new-privileges:true
 
@@ -83,6 +89,8 @@ services:
       redis:
         condition: service_healthy
     environment: *backend-env
+    cap_drop:
+      - ALL
     security_opt:
       - no-new-privileges:true
 
@@ -100,9 +108,12 @@ services:
       <<: *backend-env
       BOOTSTRAP_ADMIN_EMAIL: ${BRAINSTORM_ADMIN_EMAIL:-admin@brainstorm.g1lom.xyz}
       BOOTSTRAP_ADMIN_DISPLAY_NAME: ${BRAINSTORM_ADMIN_DISPLAY_NAME:-Administrator}
-      BOOTSTRAP_ADMIN_PASSWORD: ${BRAINSTORM_ADMIN_PASSWORD:?set BRAINSTORM_ADMIN_PASSWORD as a Dockhand secret variable}
+      # Needed only while the administrator does not exist; can be removed afterwards.
+      BOOTSTRAP_ADMIN_PASSWORD: ${BRAINSTORM_ADMIN_PASSWORD:-}
     healthcheck:
       disable: true
+    cap_drop:
+      - ALL
     security_opt:
       - no-new-privileges:true
 

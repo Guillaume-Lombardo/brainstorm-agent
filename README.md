@@ -453,7 +453,9 @@ uv run brainstorm-agent hash-api-key "replace-me" --pepper "server-side-secret"
 `docker-compose.prod.yml` runs the whole stack behind Caddy
 ([deploy/caddy/Caddyfile](deploy/caddy/Caddyfile)):
 
-- `/api/v1/*`, `/v1/*` and the probes (`/healthz`, `/readyz`, `/livez`) go to the backend;
+- `/api/v1/*`, `/v1/*` and the probes (`/healthz`, `/readyz`, `/livez`) go to the backend, except
+  the server-to-server login bridge `/api/v1/auth/*`, which answers 404 (the frontend reaches it on
+  the internal network);
 - everything else, including Auth.js `/api/auth/*` and the Next.js route handlers, goes to the
   frontend;
 - responses are flushed immediately so server-sent events are never buffered;
@@ -524,7 +526,8 @@ docker compose --env-file .env.test -f docker-compose.prod.yml config -q
 docker compose --env-file .env.test -f deploy/docker-box/compose.yaml config -q
 docker compose --env-file .env.test -f deploy/docker-box/compose.yaml build
 docker compose --env-file .env.test -f deploy/docker-box/compose.yaml up -d --wait
-deploy/smoke.sh http://127.0.0.1:47280   # with the .env.test secrets exported
+BRAINSTORM_COMPOSE="docker compose --env-file .env.test -f deploy/docker-box/compose.yaml" \
+  deploy/smoke.sh http://127.0.0.1:47280   # with the .env.test secrets exported
 docker compose --env-file .env.test -f deploy/docker-box/compose.yaml down -v
 ```
 

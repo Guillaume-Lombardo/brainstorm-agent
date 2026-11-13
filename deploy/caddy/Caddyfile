@@ -7,10 +7,17 @@
 	servers {
 		# Keep X-Forwarded-Proto/For from the TLS proxy in front (Auth.js needs https).
 		trusted_proxies static private_ranges
+		trusted_proxies_strict
 	}
 }
 
 {$BRAINSTORM_SITE_ADDRESS::80} {
+	# Server-to-server login bridge (Auth.js -> backend): internal network only.
+	@bridge path /api/v1/auth /api/v1/auth/*
+	handle @bridge {
+		respond 404
+	}
+
 	# Backend: application API, OpenAI-compatible facade and probes.
 	@backend path /api/v1 /api/v1/* /v1 /v1/* /healthz /readyz /livez
 	handle @backend {
