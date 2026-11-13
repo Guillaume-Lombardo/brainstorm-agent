@@ -72,7 +72,13 @@ def test_session_lock_exceeds_all_call_timeouts(challenge, calls):
 
 @pytest.mark.parametrize(
     "origin",
-    ["*", "null", "https://example.com/path", "https://user:pass@example.com", "https://example.com?query=1"],
+    [
+        "*",
+        "null",
+        "https://example.com/path",
+        "https://user:pass@example.com",  # pragma: allowlist secret
+        "https://example.com?query=1",
+    ],  # pragma: allowlist secret
 )
 def test_cors_rejects_non_origin_allowlist_entries(origin: str) -> None:
     with pytest.raises(ValueError, match="CORS origins"):
