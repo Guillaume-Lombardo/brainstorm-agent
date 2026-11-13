@@ -10,12 +10,12 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/api/client";
-import type { DocumentVersion, SectionComment, StageId } from "@/lib/backend/types";
+import type { DocumentDiff, SectionComment, Stage, StepDocument } from "@/lib/backend/types";
 
 import { DiffView } from "./diff-view";
 import { splitSections } from "./markdown-sections";
 
-type Loaded = { key: string; versions: DocumentVersion[] } | { key: string; error: unknown };
+type Loaded = { key: string; versions: StepDocument[] } | { key: string; error: unknown };
 
 /** Versioned stage document with diff view and section comments. */
 export function DocumentPanel({
@@ -27,7 +27,7 @@ export function DocumentPanel({
   onComment,
 }: {
   sessionId: string;
-  stage: StageId;
+  stage: Stage;
   revision: number;
   comments: SectionComment[];
   /** Comments are disabled (turn or action in progress, archived session). */
@@ -42,7 +42,7 @@ export function DocumentPanel({
   useEffect(() => {
     let active = true;
     api
-      .listDocumentVersions(sessionId, stage)
+      .listDocuments(sessionId, stage)
       .then((versions) => active && setLoaded({ key, versions }))
       .catch((error: unknown) => active && setLoaded({ key, error }));
     return () => {
@@ -111,7 +111,12 @@ export function DocumentPanel({
         </Button>
       </div>
       {showDiff && previous ? (
-        <DiffView before={previous.markdown} after={selectedVersion.markdown} />
+        <BackendDiff
+          sessionId={sessionId}
+          stage={stage}
+          from={previous.version}
+          to={selectedVersion.version}
+        />
       ) : (
         <article className="flex flex-col gap-2" data-testid="stage-document">
           {sections.map((section, index) => (
@@ -129,10 +134,8 @@ export function DocumentPanel({
           {otherComments.length > 0 ? (
             <section aria-label="Review notes" className="flex flex-col gap-2 border-t pt-2">
               <h3 className="text-xs font-medium text-muted-foreground uppercase">Review notes</h3>
-              {otherComments.map((comment) => (
-                <p key={comment.id} className="rounded-lg bg-amber-500/10 px-3 py-2 text-xs">
-                  {comment.body}
-                </p>
+              {otherComments.map((comment, index) => (
+                <CommentNote key={comment.id ?? index} comment={comment} />
               ))}
             </section>
           ) : null}
@@ -164,10 +167,8 @@ function DocumentSection({
       </div>
       {heading ? (
         <div className="flex flex-col gap-2">
-          {comments.map((comment) => (
-            <p key={comment.id} className="rounded-lg bg-amber-500/10 px-3 py-2 text-xs">
-              {comment.body}
-            </p>
+          {comments.map((comment, index) => (
+            <CommentNote key={comment.id ?? index} comment={comment} />
           ))}
           {readOnly && draft === null ? null : draft === null ? (
             <Button
@@ -209,4 +210,54 @@ function DocumentSection({
       ) : null}
     </section>
   );
+}
+
+function CommentNote({ comment }: { comment: SectionComment }) {
+  return (
+    <p className="rounded-lg bg-amber-500/10 px-3 py-2 text-xs">
+      {comment.body}
+      {comment.consumed ? (
+        <span className="ml-1 text-muted-foreground">(taken into account)</span>
+      ) : (
+        <span className="ml-1 text-muted-foreground">(used by the next answer)</span>
+      )}
+    </p>
+  );
+}
+
+type LoadedDiff = { key: string; diff: DocumentDiff } | { key: string; error: unknown };
+
+/** Fetches the unified diff of two versions from the backend. */
+function BackendDiff({
+  sessionId,
+  stage,
+  from,
+  to,
+}: {
+  sessionId: string;
+  stage: Stage;
+  from: number;
+  to: number;
+}) {
+  const key = `${stage}:${from}:${to}`;
+  const [loaded, setLoaded] = useState<LoadedDiff | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    api
+      .documentDiff(sessionId, stage, from, to)
+      .then((diff) => active && setLoaded({ key, diff }))
+      .catch((error: unknown) => active && setLoaded({ key, error }));
+    return () => {
+      active = false;
+    };
+  }, [sessionId, stage, from, to, key]);
+
+  if (!loaded || loaded.key !== key) {
+    return <Skeleton className="h-24 w-full" aria-label="Loading diff" />;
+  }
+  if ("error" in loaded) {
+    return <ErrorState error={loaded.error} />;
+  }
+  return <DiffView diff={loaded.diff.diff} />;
 }

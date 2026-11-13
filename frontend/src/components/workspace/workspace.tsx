@@ -10,12 +10,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api } from "@/lib/api/client";
 import {
   STAGE_LABELS,
-  earlierStagesValidated,
-  type AnswerOption,
-  type OpenQuestion,
+  type OpenQuestionItem,
   type ReviewAction,
-  type SessionDetail,
-  type StageId,
+  type SessionOverview,
+  type SessionSnapshot,
+  type Stage,
 } from "@/lib/backend/types";
 
 import { ChatPanel } from "./chat-panel";
@@ -28,8 +27,10 @@ import { StageDetails } from "./stage-details";
 import { StageStepper } from "./stage-stepper";
 import { initialWorkspaceState, workspaceReducer } from "./state";
 import { errorToFailure } from "./turn";
+import { answerMessage, currentQuestions } from "./view-model";
 
-type Loaded = { sessionId: string; session: SessionDetail } | { sessionId: string; error: unknown };
+type Loaded =
+  { sessionId: string; snapshot: SessionSnapshot } | { sessionId: string; error: unknown };
 
 /** Loads a session, then renders the workspace. */
 export function Workspace({ sessionId }: { sessionId: string }) {
@@ -39,7 +40,7 @@ export function Workspace({ sessionId }: { sessionId: string }) {
     let active = true;
     api
       .getSession(sessionId)
-      .then((session) => active && setLoaded({ sessionId, session }))
+      .then((snapshot) => active && setLoaded({ sessionId, snapshot }))
       .catch((error: unknown) => active && setLoaded({ sessionId, error }));
     return () => {
       active = false;
@@ -68,24 +69,24 @@ export function Workspace({ sessionId }: { sessionId: string }) {
       </div>
     );
   }
-  return <WorkspaceView initialSession={loaded.session} />;
+  return <WorkspaceView initialSnapshot={loaded.snapshot} />;
 }
 
-function WorkspaceView({ initialSession }: { initialSession: SessionDetail }) {
-  const [state, dispatch] = useReducer(workspaceReducer, initialSession, initialWorkspaceState);
-  const [selectedStage, setSelectedStage] = useState<StageId | null>(null);
+function WorkspaceView({ initialSnapshot }: { initialSnapshot: SessionSnapshot }) {
+  const [state, dispatch] = useReducer(workspaceReducer, initialSnapshot, initialWorkspaceState);
+  const [selectedStage, setSelectedStage] = useState<Stage | null>(null);
   const [actionError, setActionError] = useState<unknown>(null);
   const [acting, setActing] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const { session } = state;
-  const stage = selectedStage ?? session.currentStage;
-  const stageState = session.stages.find((candidate) => candidate.stage === stage)!;
+  const sessionId = session.session_id;
+  const stage = selectedStage ?? session.current_stage;
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
   async function refresh() {
     try {
-      dispatch({ type: "session.replaced", session: await api.getSession(session.id) });
+      dispatch({ type: "snapshot.loaded", snapshot: await api.getSession(sessionId) });
     } catch (error) {
       setActionError(error);
     }
@@ -95,26 +96,26 @@ function WorkspaceView({ initialSession }: { initialSession: SessionDetail }) {
     const controller = new AbortController();
     abortRef.current = controller;
     setSelectedStage(null);
+    setActionError(null);
     dispatch({
       type: "turn.submitted",
-      message: {
-        id: `local-${crypto.randomUUID()}`,
-        role: "user",
-        content: message,
-        stage: session.currentStage,
-        createdAt: new Date().toISOString(),
-      },
+      message: { id: `local-${crypto.randomUUID()}`, role: "user", content: message },
     });
-    let completed = false;
+    let terminal: "completed" | "failed" | null = null;
     try {
-      for await (const event of api.sendMessage(session.id, message, controller.signal)) {
+      for await (const event of api.sendMessage(sessionId, message, controller.signal)) {
         dispatch({ type: "turn.event", event });
-        if (event.type === "turn.completed" || event.type === "error") {
-          completed = true;
+        if (event.type === "turn.completed") {
+          terminal = "completed";
+        } else if (event.type === "error") {
+          terminal = "failed";
         }
       }
-      if (!completed) {
+      if (terminal === null) {
         dispatch({ type: "turn.closed" });
+      }
+      if (terminal !== "failed") {
+        // Questions, completed stages and message ids are only final in the stored state.
         await refresh();
       }
     } catch (error) {
@@ -124,10 +125,10 @@ function WorkspaceView({ initialSession }: { initialSession: SessionDetail }) {
     }
   }
 
-  async function act(run: () => Promise<SessionDetail>, resetSelection = false): Promise<boolean> {
+  async function act(run: () => Promise<SessionOverview>, resetSelection = false) {
     setActing(true);
     try {
-      dispatch({ type: "session.replaced", session: await run() });
+      dispatch({ type: "session.updated", session: await run() });
       setActionError(null);
       if (resetSelection) {
         setSelectedStage(null);
@@ -142,21 +143,21 @@ function WorkspaceView({ initialSession }: { initialSession: SessionDetail }) {
   }
 
   const busy = state.streaming !== null || acting;
-  const blockedReason = session.archived
+  const pendingReview = session.pending_human_review ?? null;
+  const archived = session.archived === true;
+  const blockedReason = archived
     ? "This session is archived and read-only."
-    : session.pendingReview
-      ? `${STAGE_LABELS[session.pendingReview.stage]} is waiting for your review. Approve it or request changes first.`
+    : pendingReview
+      ? `${STAGE_LABELS[pendingReview.from_stage]} is waiting for your review. Approve it or request changes first.`
       : null;
-  const questions = session.openQuestions.filter(
-    (question) => question.stage === session.currentStage,
-  );
+  const questions = currentQuestions(session);
 
-  function answer(question: OpenQuestion, option: AnswerOption) {
-    void sendMessage(`${question.question} ${option.label}.`);
+  function answer(question: OpenQuestionItem, option: string) {
+    void sendMessage(answerMessage(question, option));
   }
 
-  async function review(target: StageId, action: ReviewAction, note?: string) {
-    await act(() => api.submitReview(session.id, { stage: target, action, note }), true);
+  async function review(target: Stage, action: ReviewAction, note?: string) {
+    await act(() => api.submitReview(sessionId, { stage: target, action, note }), true);
   }
 
   return (
@@ -167,18 +168,17 @@ function WorkspaceView({ initialSession }: { initialSession: SessionDetail }) {
         </Link>
         <span className="text-muted-foreground">/</span>
         <h1 className="flex-1 truncate font-semibold">{session.title}</h1>
-        {session.archived ? <Badge variant="outline">Archived</Badge> : null}
-        <Badge variant="secondary">Current: {STAGE_LABELS[session.currentStage]}</Badge>
-        <ExportMenu sessionId={session.id} />
+        {archived ? <Badge variant="outline">Archived</Badge> : null}
+        <Badge variant="secondary">Current: {STAGE_LABELS[session.current_stage]}</Badge>
+        <ExportMenu sessionId={sessionId} />
       </div>
       <ReviewBar
-        pendingReview={session.pendingReview}
-        selected={stageState}
-        earlierValidated={earlierStagesValidated(session.stages, stage)}
-        disabled={busy || session.archived}
+        session={session}
+        selected={stage}
+        disabled={busy || archived}
         onReview={review}
         onReopen={async (target) => {
-          await act(() => api.reopenStage(session.id, target), true);
+          await act(() => api.reopenStage(sessionId, target), true);
         }}
       />
       {actionError ? (
@@ -189,22 +189,20 @@ function WorkspaceView({ initialSession }: { initialSession: SessionDetail }) {
       <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)_440px]">
         <aside className="flex flex-col gap-4 overflow-y-auto border-r p-3">
           <StageStepper
-            stages={session.stages}
-            currentStage={session.currentStage}
+            session={session}
             selected={stage}
-            onSelect={(next) => setSelectedStage(next === session.currentStage ? null : next)}
+            onSelect={(next) => setSelectedStage(next === session.current_stage ? null : next)}
           />
           <StageDetails
-            stage={stageState}
-            readOnly={busy || session.archived}
-            onEditField={(field, value) =>
-              act(() => api.updateField(session.id, stage, field, value))
-            }
+            session={session}
+            stage={stage}
+            readOnly={busy || archived}
+            onEditField={(field, value) => act(() => api.editField(sessionId, stage, field, value))}
           />
         </aside>
         <section className="flex min-h-[60vh] flex-col" aria-label="Conversation">
           <ChatPanel
-            messages={session.messages}
+            messages={state.messages}
             streaming={state.streaming}
             error={state.turnError}
             blockedReason={blockedReason}
@@ -226,13 +224,13 @@ function WorkspaceView({ initialSession }: { initialSession: SessionDetail }) {
             </TabsList>
             <TabsContent value="document">
               <DocumentPanel
-                sessionId={session.id}
+                sessionId={sessionId}
                 stage={stage}
                 revision={state.documentRevision}
-                comments={session.comments}
-                readOnly={busy || session.archived}
+                comments={session.comments ?? []}
+                readOnly={busy || archived}
                 onComment={(section, body) =>
-                  act(() => api.addComment(session.id, { stage, section, body }))
+                  act(() => api.addComment(sessionId, { stage, section, body }))
                 }
               />
             </TabsContent>
@@ -244,7 +242,7 @@ function WorkspaceView({ initialSession }: { initialSession: SessionDetail }) {
               />
             </TabsContent>
             <TabsContent value="delivery">
-              <DeliveryView sessionId={session.id} revision={state.documentRevision} />
+              <DeliveryView session={session} revision={state.documentRevision} />
             </TabsContent>
           </Tabs>
         </aside>

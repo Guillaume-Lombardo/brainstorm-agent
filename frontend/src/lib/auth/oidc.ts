@@ -1,3 +1,5 @@
+import type { OidcRequest } from "@/lib/backend/types";
+
 type Env = Record<string, string | undefined>;
 
 export interface OidcSettings {
@@ -22,4 +24,28 @@ export function readOidcSettings(env: Env): OidcSettings | null {
     return null;
   }
   return { issuer, clientId, clientSecret, name: env.AUTH_OIDC_NAME?.trim() || "SSO" };
+}
+
+/** Claims of an OIDC profile used to resolve the backend user. */
+export interface OidcProfileClaims {
+  sub?: string | null;
+  email?: string | null;
+  email_verified?: boolean | null;
+  name?: string | null;
+}
+
+/**
+ * Backend identity of a verified OIDC profile, or `null` when the profile has no
+ * subject or no e-mail address the provider verified (`email_verified` must be `true`).
+ */
+export function oidcIdentity(
+  issuer: string,
+  profile: OidcProfileClaims | undefined,
+): OidcRequest | null {
+  const subject = profile?.sub?.trim();
+  const email = profile?.email?.trim();
+  if (!issuer || !subject || !email || profile?.email_verified !== true) {
+    return null;
+  }
+  return { issuer, subject, email, display_name: profile?.name?.trim() || email };
 }

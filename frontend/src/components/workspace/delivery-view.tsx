@@ -1,67 +1,122 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { ErrorState } from "@/components/error-state";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api/client";
-import type { DeliverySlicing, Slice, Wave } from "@/lib/backend/types";
+import { ApiError } from "@/lib/api/errors";
+import type {
+  BacklogExport,
+  DeliverySlice,
+  IntegrationScenario,
+  SessionOverview,
+} from "@/lib/backend/types";
 
-type Loaded = { key: string; slicing: DeliverySlicing } | { key: string; error: unknown };
+import { contractMatrix, deliverySlices, stageState } from "./view-model";
 
-/** Loads and shows the stage 7 delivery slicing of a session. */
-export function DeliveryView({ sessionId, revision }: { sessionId: string; revision: number }) {
-  const key = `${sessionId}:${revision}`;
-  const [loaded, setLoaded] = useState<Loaded | null>(null);
+type Plan =
+  | { key: string; plan: BacklogExport }
+  | { key: string; pending: true }
+  | { key: string; error: unknown };
+
+/**
+ * Stage 7 delivery slicing: slices from the session state, waves from the validated
+ * plan (`backlog_json` export), which the backend refuses (409) until the plan passes.
+ */
+export function DeliveryView({
+  session,
+  revision,
+}: {
+  session: SessionOverview;
+  revision: number;
+}) {
+  const slices = deliverySlices(session);
+  const state = stageState(session, "stage_7_delivery_slicing");
+  const ready = state !== undefined && !state.stale && slices.length > 0;
+  const key = `${session.session_id}:${revision}`;
+  const [loaded, setLoaded] = useState<Plan | null>(null);
 
   useEffect(() => {
+    if (!ready) {
+      return;
+    }
     let active = true;
     api
-      .getDeliverySlicing(sessionId)
-      .then((slicing) => active && setLoaded({ key, slicing }))
-      .catch((error: unknown) => active && setLoaded({ key, error }));
+      .getDeliveryPlan(session.session_id)
+      .then((plan) => active && setLoaded({ key, plan }))
+      .catch((error: unknown) => {
+        if (!active) {
+          return;
+        }
+        setLoaded(
+          error instanceof ApiError && error.code === "conflict"
+            ? { key, pending: true }
+            : { key, error },
+        );
+      });
     return () => {
       active = false;
     };
-  }, [sessionId, key]);
+  }, [session.session_id, key, ready]);
 
-  if (!loaded || loaded.key !== key) {
-    return (
-      <div className="p-4" aria-label="Loading delivery slicing">
-        <Skeleton className="h-32 w-full" />
-      </div>
-    );
-  }
-  if ("error" in loaded) {
-    return <ErrorState error={loaded.error} className="m-4" />;
-  }
-  return <DeliverySlicingView slicing={loaded.slicing} />;
-}
-
-export function DeliverySlicingView({ slicing }: { slicing: DeliverySlicing }) {
-  if (slicing.slices.length === 0) {
+  if (slices.length === 0) {
     return (
       <p className="p-4 text-sm text-muted-foreground">
         Delivery slices appear once the delivery slicing stage starts.
       </p>
     );
   }
+  // The validated plan carries the dependencies the backend resolved (implicit ones on
+  // the first slice and on contract providers); the draft slices only list explicit ones.
+  let shown = slices;
+  let waves: string[][] | null = null;
+  let notice: ReactNode = null;
+  if (!ready) {
+    notice = "The delivery plan is stale: revalidate the delivery slicing stage.";
+  } else if (!loaded || loaded.key !== key) {
+    notice = <Skeleton className="h-16 w-full" aria-label="Loading delivery plan" />;
+  } else if ("error" in loaded) {
+    notice = <ErrorState error={loaded.error} />;
+  } else if ("pending" in loaded) {
+    notice = "Waves appear once the delivery plan passes its deterministic checks.";
+  } else {
+    shown = loaded.plan.slices;
+    waves = loaded.plan.waves;
+  }
+  return <DeliverySlicingView slices={shown} waves={waves} notice={notice} />;
+}
+
+export function DeliverySlicingView({
+  slices,
+  waves,
+  notice,
+}: {
+  slices: DeliverySlice[];
+  /** Validated waves of slice ids; `null` while the plan is not validated. */
+  waves: string[][] | null;
+  notice?: ReactNode;
+}) {
   return (
     <div className="flex flex-col gap-6 p-4">
       <section aria-labelledby="waves-title" className="flex flex-col gap-2">
         <h3 id="waves-title" className="text-sm font-semibold">
           Waves and dependencies
         </h3>
-        <DependencyGraph slices={slicing.slices} waves={slicing.waves} />
+        {waves ? (
+          <DependencyGraph slices={slices} waves={waves} />
+        ) : (
+          <div className="text-xs text-muted-foreground">{notice}</div>
+        )}
       </section>
       <section aria-labelledby="slices-title" className="flex flex-col gap-2">
         <h3 id="slices-title" className="text-sm font-semibold">
           Slices
         </h3>
         <div className="grid gap-3">
-          {slicing.slices.map((slice) => (
+          {slices.map((slice) => (
             <SliceCard key={slice.id} slice={slice} />
           ))}
         </div>
@@ -70,25 +125,42 @@ export function DeliverySlicingView({ slicing }: { slicing: DeliverySlicing }) {
         <h3 id="contracts-title" className="text-sm font-semibold">
           Contract matrix
         </h3>
-        <ContractMatrix slicing={slicing} />
+        <ContractMatrix slices={slices} />
       </section>
     </div>
   );
 }
 
-function SliceCard({ slice }: { slice: Slice }) {
+function scenarioText(scenario: IntegrationScenario): string {
+  if (scenario.ears) {
+    return scenario.ears;
+  }
+  return [
+    scenario.given && `Given ${scenario.given}`,
+    scenario.when && `when ${scenario.when}`,
+    scenario.then && `then ${scenario.then}`,
+  ]
+    .filter(Boolean)
+    .join(", ");
+}
+
+function SliceCard({ slice }: { slice: DeliverySlice }) {
+  const dependencies = slice.dependencies ?? [];
+  const stubs = slice.stubs ?? [];
   return (
     <Card size="sm" data-testid={`slice-${slice.id}`}>
       <CardHeader>
-        <CardTitle>
-          {slice.id} · {slice.name}
-        </CardTitle>
+        <CardTitle>{slice.id}</CardTitle>
         <CardDescription>{slice.goal}</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-2 text-xs">
         <div className="flex flex-wrap gap-1">
-          <Badge variant="secondary">{slice.ownedDomain}</Badge>
-          {slice.backlogItemIds.map((item) => (
+          {(slice.owned_domain ?? []).map((domain) => (
+            <Badge key={domain} variant="secondary">
+              {domain}
+            </Badge>
+          ))}
+          {(slice.backlog_item_ids ?? []).map((item) => (
             <Badge key={item} variant="outline">
               {item}
             </Badge>
@@ -96,16 +168,16 @@ function SliceCard({ slice }: { slice: Slice }) {
         </div>
         <p>
           <span className="text-muted-foreground">Depends on:</span>{" "}
-          {slice.dependsOn.join(", ") || "none"}
+          {dependencies.join(", ") || "none"}
         </p>
         <ul className="list-disc pl-4">
-          {slice.integrationScenarios.map((scenario) => (
-            <li key={scenario}>{scenario}</li>
+          {(slice.integration_scenarios ?? []).map((scenario, index) => (
+            <li key={index}>{scenarioText(scenario)}</li>
           ))}
         </ul>
-        {slice.stubs.length > 0 ? (
+        {stubs.length > 0 ? (
           <p>
-            <span className="text-muted-foreground">Stubs:</span> {slice.stubs.join(", ")}
+            <span className="text-muted-foreground">Stubs:</span> {stubs.join(", ")}
           </p>
         ) : null}
       </CardContent>
@@ -119,9 +191,9 @@ const COLUMN_GAP = 48;
 const ROW_GAP = 16;
 
 /** Layered SVG graph: one column per wave, arrows from dependency to dependent. */
-function DependencyGraph({ slices, waves }: { slices: Slice[]; waves: Wave[] }) {
+function DependencyGraph({ slices, waves }: { slices: DeliverySlice[]; waves: string[][] }) {
   const position = new Map<string, { x: number; y: number }>();
-  const ordered = [...waves].sort((left, right) => left.index - right.index);
+  const ordered = waves.map((sliceIds, index) => ({ index, sliceIds }));
   ordered.forEach((wave, column) => {
     wave.sliceIds.forEach((sliceId, row) => {
       position.set(sliceId, {
@@ -133,7 +205,7 @@ function DependencyGraph({ slices, waves }: { slices: Slice[]; waves: Wave[] }) 
   const rows = Math.max(1, ...ordered.map((wave) => wave.sliceIds.length));
   const width = Math.max(1, ordered.length) * (NODE_WIDTH + COLUMN_GAP) - COLUMN_GAP;
   const height = 20 + rows * (NODE_HEIGHT + ROW_GAP);
-  const names = new Map(slices.map((slice) => [slice.id, slice.name]));
+  const names = new Map(slices.map((slice) => [slice.id, slice.goal]));
 
   return (
     <svg
@@ -167,7 +239,7 @@ function DependencyGraph({ slices, waves }: { slices: Slice[]; waves: Wave[] }) 
         </text>
       ))}
       {slices.flatMap((slice) =>
-        slice.dependsOn.map((dependency) => {
+        (slice.dependencies ?? []).map((dependency) => {
           const from = position.get(dependency);
           const to = position.get(slice.id);
           if (!from || !to) {
@@ -210,7 +282,11 @@ function DependencyGraph({ slices, waves }: { slices: Slice[]; waves: Wave[] }) 
 }
 
 /** Contracts × slices: O = owner/provider, C = consumer. */
-function ContractMatrix({ slicing }: { slicing: DeliverySlicing }) {
+function ContractMatrix({ slices }: { slices: DeliverySlice[] }) {
+  const rows = contractMatrix(slices);
+  if (rows.length === 0) {
+    return <p className="text-xs text-muted-foreground">No contract declared yet.</p>;
+  }
   return (
     <div className="overflow-x-auto">
       <table className="w-full border-collapse text-xs" aria-label="Contract matrix">
@@ -219,7 +295,7 @@ function ContractMatrix({ slicing }: { slicing: DeliverySlicing }) {
             <th scope="col" className="border px-2 py-1 text-left">
               Contract
             </th>
-            {slicing.slices.map((slice) => (
+            {slices.map((slice) => (
               <th key={slice.id} scope="col" className="border px-2 py-1">
                 {slice.id}
               </th>
@@ -227,19 +303,14 @@ function ContractMatrix({ slicing }: { slicing: DeliverySlicing }) {
           </tr>
         </thead>
         <tbody>
-          {slicing.contracts.map((contract) => (
-            <tr key={contract.id}>
+          {rows.map((row) => (
+            <tr key={`${row.owner}-${row.id}`}>
               <th scope="row" className="border px-2 py-1 text-left font-normal">
-                <span className="font-medium">{contract.id}</span> {contract.name}{" "}
-                <Badge variant="outline">{contract.kind}</Badge>
+                <span className="font-medium">{row.id}</span> {row.specification}
               </th>
-              {slicing.slices.map((slice) => {
+              {slices.map((slice) => {
                 const role =
-                  contract.ownerSliceId === slice.id
-                    ? "O"
-                    : slice.consumes.includes(contract.id)
-                      ? "C"
-                      : "";
+                  row.owner === slice.id ? "O" : row.consumers.includes(slice.id) ? "C" : "";
                 return (
                   <td
                     key={slice.id}

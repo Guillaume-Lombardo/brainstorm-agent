@@ -7,6 +7,7 @@ const KNOWN_CODES: readonly ErrorCode[] = [
   "unauthorized",
   "forbidden",
   "not_found",
+  "conflict",
   "review_pending",
   "rate_limited",
   "llm_error",

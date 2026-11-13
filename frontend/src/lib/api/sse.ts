@@ -3,7 +3,7 @@ import { TURN_EVENT_TYPES, type TurnEvent } from "@/lib/backend/types";
 /**
  * Parse a Server-Sent Events byte stream into typed turn events.
  * Frames are separated by a blank line; only `data:` lines carry the JSON
- * payload, whose `type` must be a known turn event.
+ * payload, whose `type` must be a known turn event (the SSE `event:` line repeats it).
  */
 export async function* parseTurnEvents(
   stream: ReadableStream<Uint8Array>,
@@ -60,7 +60,7 @@ function parseFrame(frame: string): TurnEvent | null {
   if (
     typeof payload === "object" &&
     payload !== null &&
-    TURN_EVENT_TYPES.includes((payload as { type?: TurnEvent["type"] }).type as TurnEvent["type"])
+    (TURN_EVENT_TYPES as readonly string[]).includes(String((payload as { type?: unknown }).type))
   ) {
     return payload as TurnEvent;
   }

@@ -7,11 +7,11 @@ import { ErrorState } from "@/components/error-state";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import type { ChatMessage } from "@/lib/backend/types";
 import { cn } from "@/lib/utils";
 
 import type { StreamingTurn, TurnFailure } from "./state";
 import { failureToError } from "./turn";
+import type { ChatMessage } from "./view-model";
 
 export function ChatPanel({
   messages,

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { LoginForm } from "@/components/auth/login-form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { signInErrorMessage } from "@/lib/auth/messages";
 import { readOidcSettings } from "@/lib/auth/oidc";
 import { safeCallbackPath } from "@/lib/auth/redirect";
 
@@ -12,7 +13,7 @@ import { loginWithPassword, loginWithSso } from "./actions";
 export const metadata: Metadata = { title: "Sign in · Brainstorm Agent" };
 
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
-  const { callbackUrl } = await searchParams;
+  const { callbackUrl, error } = await searchParams;
   const target = safeCallbackPath(Array.isArray(callbackUrl) ? callbackUrl[0] : callbackUrl);
   const session = await auth();
   if (session?.user?.id) {
@@ -30,6 +31,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
         <CardContent>
           <LoginForm
             callbackUrl={target}
+            initialError={signInErrorMessage(Array.isArray(error) ? error[0] : error)}
             passwordAction={loginWithPassword}
             sso={oidc ? { label: oidc.name, action: loginWithSso } : null}
           />

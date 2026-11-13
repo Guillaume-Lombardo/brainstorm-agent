@@ -9,6 +9,8 @@ import { Separator } from "@/components/ui/separator";
 
 export interface LoginFormProps {
   callbackUrl: string;
+  /** Error carried by an Auth.js redirect (`/login?error=`). */
+  initialError?: string | null;
   passwordAction: (
     previous: { error: string | null },
     formData: FormData,
@@ -17,8 +19,13 @@ export interface LoginFormProps {
   sso: { label: string; action: (formData: FormData) => Promise<void> } | null;
 }
 
-export function LoginForm({ callbackUrl, passwordAction, sso }: LoginFormProps) {
-  const [state, formAction, pending] = useActionState(passwordAction, { error: null });
+export function LoginForm({
+  callbackUrl,
+  initialError = null,
+  passwordAction,
+  sso,
+}: LoginFormProps) {
+  const [state, formAction, pending] = useActionState(passwordAction, { error: initialError });
 
   return (
     <div className="flex flex-col gap-6">
