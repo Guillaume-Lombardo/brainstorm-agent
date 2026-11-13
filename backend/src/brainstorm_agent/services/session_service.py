@@ -52,6 +52,7 @@ from brainstorm_agent.core.stage_contracts import DeliveryFields
 from brainstorm_agent.exceptions import ConflictError, NotFoundError
 from brainstorm_agent.graph.builder import build_turn_graph
 from brainstorm_agent.graph.nodes import apply_stage_rules
+from brainstorm_agent.logging import get_logger
 from brainstorm_agent.persistence.models import BOOTSTRAP_USER_ID, SessionRecord
 from brainstorm_agent.persistence.repositories import (
     DocumentRepository,
@@ -1004,6 +1005,8 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
             yield TurnCompleted(turn_id=turn_id, output=output)
         except Exception:
             self.db_session.rollback()
+            # The client only gets a generic error: keep the cause in the server logs.
+            get_logger(__name__).exception("turn_failed", session_id=session_id, turn_id=turn_id)
             yield TurnError()
         finally:
             if waiter is not None and not waiter.done():

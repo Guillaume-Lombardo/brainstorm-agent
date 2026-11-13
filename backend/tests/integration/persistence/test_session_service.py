@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import logging
 from typing import TYPE_CHECKING
 
 import pytest
@@ -19,6 +21,8 @@ from brainstorm_agent.settings import Settings
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from pytest_mock import MockerFixture
 
 
 def _build_settings(tmp_path: Path) -> Settings:
@@ -305,3 +309,32 @@ def test_budget_keeps_all_questions_and_metadata_in_overview(tmp_path: Path) -> 
             and q.why_it_matters == "Protect user data"
             for q in provider_questions
         )
+
+
+def test_stream_turn_logs_the_failure_it_hides_from_the_client(
+    tmp_path: Path,
+    mocker: MockerFixture,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    settings = _build_settings(tmp_path)
+    engine = create_engine_from_settings(settings)
+    create_all(engine)
+    mocker.patch.object(
+        FakeBrainstormLLM,
+        "analyze",
+        side_effect=LLMResponseError(stage="stage_0_pitch", message="Response truncated or refused"),
+    )
+    caplog.set_level(logging.ERROR)
+
+    async def consume(service: SessionService, session_id: str) -> list[str]:
+        return [event.type async for event in service.stream_turn(session_id, "hello")]
+
+    with create_session_factory(engine)() as db_session:
+        service = SessionService(db_session=db_session, settings=settings)
+        session_id = service.create_session().session_id
+        events = asyncio.run(consume(service, session_id))
+
+    assert events == ["turn.started", "analysis.status", "error"]
+    failure = next(record for record in caplog.records if "turn_failed" in record.getMessage())
+    assert session_id in failure.getMessage()
+    assert "LLMResponseError" in failure.getMessage()
