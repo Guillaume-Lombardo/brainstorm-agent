@@ -156,8 +156,7 @@ const QUESTION_PRIORITIES: OpenQuestionItem["priority"][] = [
  */
 export function currentQuestions(session: SessionOverview): OpenQuestionItem[] {
   const state = stageState(session, session.current_stage);
-  const rank = (question: OpenQuestionItem) =>
-    QUESTION_PRIORITIES.indexOf(question.priority ?? "scope");
+  const rank = (question: OpenQuestionItem) => QUESTION_PRIORITIES.indexOf(question.priority);
   return (state?.open_questions ?? [])
     .filter((question) => question.status !== "resolved")
     .sort((left, right) => rank(left) - rank(right))
