@@ -109,7 +109,8 @@ def apply_stage_rules(state: TurnGraphState) -> dict[str, object]:
     )
     analysis.open_questions.extend(
         OpenQuestionItem(
-            id=f"gate:{uuid4()}:{item.id}",
+            # Globally unique and within the 36-character `open_questions.id` column.
+            id=f"gate:{uuid4().hex[:31]}",
             question=f"Please clarify: {item.message}",
             why_it_matters="This coded requirement must pass before advancing.",
         )

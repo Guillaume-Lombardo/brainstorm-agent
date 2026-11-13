@@ -62,7 +62,7 @@ committed `.env`. A missing secret makes the deployment fail (`${VAR:?}`).
 | `BRAINSTORM_ADMIN_DISPLAY_NAME` | `Administrator` | Bootstrap administrator display name |
 | `BRAINSTORM_LLM_MODE` | `openai` | `fake` runs the deterministic offline model (tests only) |
 | `BRAINSTORM_LLM_BASE_URL` | `http://10.16.0.117:4000/v1` | OpenAI-compatible gateway |
-| `BRAINSTORM_MODEL_NAME` | `glm-5.3-flash` | Default model; `claude-opus-5-5` is the strong model |
+| `BRAINSTORM_MODEL_NAME` | `GLM-5.3-Flash` | Default model, as named by the docker-box gateway (model names are case-sensitive: `glm-5.3-flash` is rejected); the gateway has no `claude-opus-5-5` alias yet |
 | `BRAINSTORM_LLM_TIMEOUT_SECONDS` | `60` | Per-call LLM timeout |
 | `BRAINSTORM_REDIS_LOCK_TIMEOUT_SECONDS` | `300` | Must exceed three LLM timeouts (five with the challenge pass) |
 | `BRAINSTORM_LOG_LEVEL` | `INFO` | Backend log level |
