@@ -1,34 +1,29 @@
-:80 {
-  handle /api/* {
-    reverse_proxy app:8000
-  }
+# Reverse proxy shared by docker-compose.prod.yml and deploy/docker-box/compose.yaml.
+#
+# BRAINSTORM_SITE_ADDRESS defaults to ":80" (plain HTTP behind a TLS-terminating
+# proxy such as Nginx Proxy Manager). Set it to a domain name to let Caddy
+# obtain certificates itself.
+{
+	servers {
+		# Keep X-Forwarded-Proto/For from the TLS proxy in front (Auth.js needs https).
+		trusted_proxies static private_ranges
+	}
+}
 
-  handle /v1/* {
-    reverse_proxy app:8000
-  }
+{$BRAINSTORM_SITE_ADDRESS::80} {
+	# Backend: application API, OpenAI-compatible facade and probes.
+	@backend path /api/v1 /api/v1/* /v1 /v1/* /healthz /readyz /livez
+	handle @backend {
+		reverse_proxy backend:8000 {
+			# Server-sent events are relayed immediately, never buffered.
+			flush_interval -1
+		}
+	}
 
-  handle /metrics {
-    reverse_proxy app:8000
-  }
-
-  handle /healthz {
-    reverse_proxy app:8000
-  }
-
-  handle /readyz {
-    reverse_proxy app:8000
-  }
-
-  handle /livez {
-    reverse_proxy app:8000
-  }
-
-  handle /litellm/* {
-    uri strip_prefix /litellm
-    reverse_proxy litellm:4000
-  }
-
-  handle {
-    reverse_proxy openwebui:8080
-  }
+	# Frontend: pages, Auth.js (/api/auth/*) and Next.js route handlers (SSE relay).
+	handle {
+		reverse_proxy frontend:3000 {
+			flush_interval -1
+		}
+	}
 }
