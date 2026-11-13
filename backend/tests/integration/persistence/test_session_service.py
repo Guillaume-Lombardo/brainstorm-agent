@@ -5,6 +5,7 @@ import logging
 from typing import TYPE_CHECKING
 
 import pytest
+from pydantic import ValidationError
 
 from brainstorm_agent.core.enums import LLMMode, Stage
 from brainstorm_agent.core.models import AssistantAnalysis, OpenQuestionItem, QuestionPriority
@@ -311,19 +312,38 @@ def test_budget_keeps_all_questions_and_metadata_in_overview(tmp_path: Path) -> 
         )
 
 
+def _llm_failure(cause: Exception) -> LLMResponseError:
+    error = LLMResponseError(stage="stage_0_pitch", message="Invalid structured output.")
+    error.__cause__ = cause
+    return error
+
+
+def _validation_error(value: str) -> ValidationError:
+    try:
+        AssistantAnalysis.model_validate({"stage": value})
+    except ValidationError as exc:
+        return exc
+    raise AssertionError
+
+
+@pytest.mark.parametrize(
+    ("cause", "expected"),
+    [
+        (ValueError("Response truncated or refused"), "Response truncated or refused"),
+        (_validation_error("SECRET-USER-CONTENT"), "ValidationError"),
+    ],
+)
 def test_stream_turn_logs_the_failure_it_hides_from_the_client(
     tmp_path: Path,
     mocker: MockerFixture,
     caplog: pytest.LogCaptureFixture,
+    cause: Exception,
+    expected: str,
 ) -> None:
     settings = _build_settings(tmp_path)
     engine = create_engine_from_settings(settings)
     create_all(engine)
-    mocker.patch.object(
-        FakeBrainstormLLM,
-        "analyze",
-        side_effect=LLMResponseError(stage="stage_0_pitch", message="Response truncated or refused"),
-    )
+    mocker.patch.object(FakeBrainstormLLM, "analyze", side_effect=_llm_failure(cause))
     caplog.set_level(logging.ERROR)
 
     async def consume(service: SessionService, session_id: str) -> list[str]:
@@ -338,3 +358,6 @@ def test_stream_turn_logs_the_failure_it_hides_from_the_client(
     failure = next(record for record in caplog.records if "turn_failed" in record.getMessage())
     assert session_id in failure.getMessage()
     assert "LLMResponseError" in failure.getMessage()
+    assert expected in failure.getMessage()
+    # Model output may quote the user: it never reaches the logs.
+    assert "SECRET-USER-CONTENT" not in caplog.text

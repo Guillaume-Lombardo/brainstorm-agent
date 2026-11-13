@@ -49,7 +49,7 @@ from brainstorm_agent.core.models import (
     StepDocument,
 )
 from brainstorm_agent.core.stage_contracts import DeliveryFields
-from brainstorm_agent.exceptions import ConflictError, NotFoundError
+from brainstorm_agent.exceptions import ConflictError, LLMResponseError, NotFoundError
 from brainstorm_agent.graph.builder import build_turn_graph
 from brainstorm_agent.graph.nodes import apply_stage_rules
 from brainstorm_agent.logging import get_logger
@@ -1003,10 +1003,26 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
             if output.pending_review:
                 yield ReviewRequired(review=output.pending_review)
             yield TurnCompleted(turn_id=turn_id, output=output)
-        except Exception:
+        except Exception as exc:
             self.db_session.rollback()
             # The client only gets a generic error: keep the cause in the server logs.
-            get_logger(__name__).exception("turn_failed", session_id=session_id, turn_id=turn_id)
+            logger = get_logger(__name__)
+            if isinstance(exc, LLMResponseError):
+                # The chained validation error quotes model output, hence user content: log
+                # controlled fields only (the plain ValueError messages are the adapter's own).
+                cause = exc.__cause__
+                logger.error(  # noqa: TRY400 - the traceback would quote model output
+                    "turn_failed",
+                    session_id=session_id,
+                    turn_id=turn_id,
+                    error="LLMResponseError",
+                    stage=exc.stage,
+                    reason=exc.message,
+                    cause=type(cause).__name__ if cause else None,
+                    cause_message=str(cause) if type(cause) is ValueError else None,
+                )
+            else:
+                logger.exception("turn_failed", session_id=session_id, turn_id=turn_id)
             yield TurnError()
         finally:
             if waiter is not None and not waiter.done():
