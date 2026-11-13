@@ -211,3 +211,28 @@ test("a long conversation scrolls inside its panel, not the page", async ({ page
   await expect(page.getByRole("tab", { name: "Document" })).toBeInViewport();
   await expect(page.getByLabel("Message")).toBeInViewport();
 });
+
+test("a French pitch gets readable gate questions and a formatted reply", async ({ page }) => {
+  await signIn(page, "francais@example.com");
+  await createSession(page, `Cadrage ${Date.now()}`);
+  const turn = page.waitForResponse((response) => response.url().endsWith("/turns"));
+  await send(page, "pitch: Un planificateur de repas pour les familles pressées");
+  await (await turn).text();
+  await expect(page.getByTestId("streaming-turn")).toHaveCount(0);
+
+  // The reply is rendered Markdown: list items and emphasis, no literal asterisks.
+  const reply = page.locator('[data-role="assistant"]').last();
+  await expect(reply.locator("li")).toHaveCount(3);
+  await expect(reply.locator("em").first()).toHaveText("(recommandé)");
+  await expect(reply).not.toContainText("*");
+  await page.screenshot({ path: `${SCREENSHOTS}/06-markdown-reply.png` });
+
+  // Questions are phrased in the session language, with options and a recommendation.
+  await page.getByRole("tab", { name: /Questions/ }).click();
+  const panel = page.getByRole("tabpanel");
+  await expect(panel.getByRole("listitem")).toHaveCount(3);
+  await expect(panel).toContainText("Quels points de l'idée sont déjà clairs et arrêtés ?");
+  await expect(panel).not.toContainText("Please clarify");
+  await expect(panel.locator('[data-recommended="true"]')).toHaveCount(3);
+  await page.screenshot({ path: `${SCREENSHOTS}/07-questions-fr.png` });
+});

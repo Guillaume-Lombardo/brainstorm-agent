@@ -52,7 +52,8 @@ def test_application_migrations_ids_and_reviews_on_postgres() -> None:
     )
     sid = client.post("/api/v1/sessions", json={"title": "PostgreSQL framing"}).json()["session_id"]
     base = f"/api/v1/sessions/{sid}"
-    incomplete = client.post(base + "/turns", json={"content": "pitch: A framing service for product teams."})
+    # A pitch under five words fails the coded `specific_pitch` rule, which the fake model never asks.
+    incomplete = client.post(base + "/turns", json={"content": "pitch: Framing service."})
     assert incomplete.status_code == 200
     assert "event: turn.completed" in incomplete.text
     questions = client.get(base).json()["open_questions"]

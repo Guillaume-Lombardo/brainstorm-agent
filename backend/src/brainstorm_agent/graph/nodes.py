@@ -8,12 +8,13 @@ from uuid import uuid4
 
 from brainstorm_agent.core.elicitation import filter_defaults, selected_questions
 from brainstorm_agent.core.enums import Stage
+from brainstorm_agent.core.gate_questions import GATE_ID_PREFIX, gate_questions
+from brainstorm_agent.core.language import session_language
 from brainstorm_agent.core.models import (
     AssistantAnalysis,
     AssistantTurnOutput,
     BrainstormSessionState,
     Clarification,
-    OpenQuestionItem,
     PartialField,
     StageState,
     StageValidationResult,
@@ -95,28 +96,29 @@ def apply_stage_rules(state: TurnGraphState) -> dict[str, object]:
     """
     stage = Stage(state["current_stage"])
     analysis = AssistantAnalysis.model_validate(state["analysis"])
-    analysis.open_questions = [q for q in analysis.open_questions if not q.id.startswith("gate:")]
+    analysis.open_questions = [q for q in analysis.open_questions if not q.id.startswith(GATE_ID_PREFIX)]
+    partial_fields = {item.field: item.reason for item in analysis.partial_fields}
+    session_state = state["session_state"]
     validation = validate_stage(
         stage=stage,
         extracted_fields=analysis.extracted_fields.model_dump(exclude_none=True),
         open_questions=analysis.open_questions,
-        partial_fields={item.field: item.reason for item in analysis.partial_fields},
+        partial_fields=partial_fields,
         contradictions=analysis.contradictions,
         previous_fields={
             key: item["extracted_fields"]
-            for key, item in state["session_state"].get("stage_states", {}).items()
+            for key, item in session_state.get("stage_states", {}).items()
             if key != stage.value
         },
     )
     analysis.open_questions.extend(
-        OpenQuestionItem(
-            # Globally unique and within the 36-character `open_questions.id` column.
-            id=f"gate:{uuid4().hex[:31]}",
-            question=f"Please clarify: {item.message}",
-            why_it_matters="This coded requirement must pass before advancing.",
-        )
-        for item in validation.readiness
-        if not item.passed and item.id != "blocking_questions"
+        gate_questions(
+            validation,
+            language=session_language(state["user_message"], session_state.get("transcript", [])),
+            partial_fields=partial_fields,
+            contradictions=analysis.contradictions,
+            model_questions=analysis.open_questions,
+        ),
     )
     analysis.stage_is_clear_enough = validation.stage_is_clear_enough
     analysis.transition_decision_reason = validation.transition_decision_reason

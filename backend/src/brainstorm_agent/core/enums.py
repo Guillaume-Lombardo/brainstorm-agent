@@ -125,3 +125,23 @@ class ChallengePass(StrEnum):
 
     OFF = "off"
     FINDINGS = "findings"
+
+
+class Language(StrEnum):
+    """Languages with deterministic gate wording; other languages fall back to English."""
+
+    EN = "en"
+    FR = "fr"
+
+    @classmethod
+    def from_string(cls, value: str) -> Language:
+        """Parse a language tag such as `fr` or `fr-FR`.
+
+        Args:
+            value (str): Language tag.
+
+        Returns:
+            Language: Matching language, English when unsupported.
+        """
+        primary = value.strip().lower().replace("_", "-").split("-", maxsplit=1)[0]
+        return cls(primary) if primary in cls._value2member_map_ else cls.EN

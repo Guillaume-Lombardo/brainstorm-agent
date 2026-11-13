@@ -113,6 +113,8 @@ class OpenQuestionItem(BaseModel):
     priority: QuestionPriority = QuestionPriority.SCOPE
     options: list[str] = Field(default_factory=list)
     recommended_option: str | None = None
+    # Stage field the question targets, so the gate does not ask the same thing twice.
+    field: str | None = None
     blocking: bool = True
     status: OpenQuestionStatus = OpenQuestionStatus.OPEN
 
