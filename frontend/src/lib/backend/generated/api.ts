@@ -3354,7 +3354,7 @@ export interface operations {
       };
     };
     responses: {
-      /** @description SSE: event is the discriminant, data is JSON. Deltas are tentative until turn.completed. Exactly one terminal event: turn.completed or error. No replay/resume support. */
+      /** @description SSE: event is the discriminant, data is JSON. Deltas are tentative until turn.completed. Exactly one terminal event: turn.completed or error. No replay/resume support. While the turn is silent, a `: keepalive` SSE comment is sent every 15 s; clients ignore it. */
       200: {
         headers: {
           [name: string]: unknown;

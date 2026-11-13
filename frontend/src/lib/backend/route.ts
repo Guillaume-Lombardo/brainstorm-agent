@@ -129,9 +129,63 @@ export function requireStage(value: string): Stage {
   return value;
 }
 
-/** Relay a turn event stream to the browser without buffering. */
-export function sseResponse(stream: ReadableStream<Uint8Array>): Response {
-  return new Response(stream, {
+/**
+ * Longest silence accepted from the backend on a turn stream: four of its
+ * 15 s keepalive comments. It no longer depends on the LLM timeout, since the
+ * backend speaks during every long provider call and its retries.
+ */
+const TURN_STREAM_IDLE_MS = 60_000;
+
+/** Terminal frame sent when the backend stops speaking; the blank line first ends any partial frame. */
+const IDLE_ERROR_FRAME = `\n\nevent: error\ndata: ${JSON.stringify({
+  type: "error",
+  code: "turn_failed",
+  message: "The turn stopped responding; retry the request.",
+})}\n\n`;
+
+/** Relay `upstream` chunk by chunk; past `idleMs` of silence, end it with an error and cancel it. */
+function withIdleTimeout(
+  upstream: ReadableStream<Uint8Array>,
+  idleMs: number,
+): ReadableStream<Uint8Array> {
+  const reader = upstream.getReader();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  return new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      const idle = new Promise<"idle">((resolve) => {
+        timer = setTimeout(() => resolve("idle"), idleMs);
+      });
+      try {
+        const result = await Promise.race([reader.read(), idle]);
+        if (result === "idle") {
+          controller.enqueue(new TextEncoder().encode(IDLE_ERROR_FRAME));
+          controller.close();
+          await reader.cancel("The backend turn stream went silent.").catch(() => undefined);
+        } else if (result.done) {
+          controller.close();
+        } else {
+          controller.enqueue(result.value);
+        }
+      } finally {
+        clearTimeout(timer);
+      }
+    },
+    async cancel(reason) {
+      clearTimeout(timer);
+      await reader.cancel(reason);
+    },
+  });
+}
+
+/**
+ * Relay a turn event stream to the browser without buffering. Keepalive
+ * comments pass through unchanged, so the reverse proxies see traffic too.
+ */
+export function sseResponse(
+  stream: ReadableStream<Uint8Array>,
+  { idleMs = TURN_STREAM_IDLE_MS }: { idleMs?: number } = {},
+): Response {
+  return new Response(withIdleTimeout(stream, idleMs), {
     headers: {
       "content-type": "text/event-stream; charset=utf-8",
       "cache-control": "no-cache, no-transform",

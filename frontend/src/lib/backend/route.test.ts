@@ -6,7 +6,7 @@ vi.mock("@/auth", () => ({ auth: authMock }));
 vi.mock("./index", () => ({ getBackend: () => ({}) }));
 
 import { BackendError } from "./errors";
-import { checkMutation, readJsonObject, requireStage, withCaller } from "./route";
+import { checkMutation, readJsonObject, requireStage, sseResponse, withCaller } from "./route";
 
 const get = () => new Request("http://app.test/api/backend/sessions");
 
@@ -132,5 +132,75 @@ describe("request validation", () => {
     ).rejects.toMatchObject({ status: 422 });
     expect(() => requireStage("stage_9")).toThrow(BackendError);
     expect(requireStage("stage_7_delivery_slicing")).toBe("stage_7_delivery_slicing");
+  });
+});
+
+/** Upstream SSE body that writes each chunk after its delay, then closes. */
+function timedStream(chunks: Array<[delayMs: number, text: string]>, onCancel = vi.fn()) {
+  const encoder = new TextEncoder();
+  return new ReadableStream<Uint8Array>({
+    async start(controller) {
+      for (const [delayMs, text] of chunks) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        controller.enqueue(encoder.encode(text));
+      }
+      controller.close();
+    },
+    cancel: onCancel,
+  });
+}
+
+describe("sseResponse", () => {
+  const completed = 'event: turn.completed\ndata: {"type":"turn.completed"}\n\n';
+
+  it("relays keepalive comments and frames unchanged", async () => {
+    const response = sseResponse(
+      timedStream([
+        [0, 'event: turn.started\ndata: {"type":"turn.started"}\n\n'],
+        [10, ": keepalive\n\n"],
+        [10, ": keepalive\n\n"],
+        [10, completed],
+      ]),
+      { idleMs: 1_000 },
+    );
+    expect(response.headers.get("content-type")).toBe("text/event-stream; charset=utf-8");
+    expect(response.headers.get("x-accel-buffering")).toBe("no");
+    expect(await response.text()).toBe(
+      'event: turn.started\ndata: {"type":"turn.started"}\n\n: keepalive\n\n: keepalive\n\n' +
+        completed,
+    );
+  });
+
+  it("keeps a long turn open while keepalives arrive within the idle delay", async () => {
+    const keepalives = Array.from({ length: 6 }, (): [number, string] => [15, ": keepalive\n\n"]);
+    const response = sseResponse(timedStream([...keepalives, [15, completed]]), { idleMs: 60 });
+    const text = await response.text();
+    expect(text.endsWith(completed)).toBe(true);
+    expect(text).not.toContain("event: error");
+  });
+
+  it("ends a silent stream with a turn_failed error and cancels the backend request", async () => {
+    const onCancel = vi.fn();
+    const response = sseResponse(
+      timedStream(
+        [
+          [0, ": keepalive\n\n"],
+          [500, completed],
+        ],
+        onCancel,
+      ),
+      { idleMs: 30 },
+    );
+    const text = await response.text();
+    expect(text.startsWith(": keepalive\n\n")).toBe(true);
+    expect(text).not.toContain("turn.completed");
+    const frames = text.split("\n\n").filter((frame) => frame.startsWith("event: error"));
+    expect(frames).toHaveLength(1);
+    expect(JSON.parse(frames[0].split("\ndata: ")[1])).toEqual({
+      type: "error",
+      code: "turn_failed",
+      message: "The turn stopped responding; retry the request.",
+    });
+    expect(onCancel).toHaveBeenCalledTimes(1);
   });
 });

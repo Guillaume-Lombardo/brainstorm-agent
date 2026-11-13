@@ -1,14 +1,20 @@
 """Full fake-provider application stream with committed persistence."""
 
+import asyncio
 import json
 from pathlib import Path  # noqa: TC003
+from typing import TYPE_CHECKING
 
 from fastapi.testclient import TestClient
 from pytest_mock import MockerFixture  # noqa: TC002
 
 from brainstorm_agent.api.main import create_app
-from brainstorm_agent.core.enums import LLMMode
+from brainstorm_agent.core.enums import LLMMode, Stage
+from brainstorm_agent.services.llm_client import FakeBrainstormLLM
 from brainstorm_agent.settings import Settings
+
+if TYPE_CHECKING:
+    from brainstorm_agent.core.models import AssistantAnalysis, BrainstormSessionState, StageState
 
 
 def test_typed_stream_orders_deltas_and_committed_events(tmp_path: Path) -> None:
@@ -69,6 +75,47 @@ def test_stream_error_is_terminal_sanitized_and_rolls_back(tmp_path: Path, mocke
     assert "private provider detail" not in response.text
     assert len(client.get(base + "/messages").json()["items"]) == 1
     assert client.get(base + "/documents").json()["items"] == []
+
+
+def test_slow_turn_streams_keepalive_comments_until_completion(tmp_path: Path, mocker: MockerFixture) -> None:
+    client = TestClient(
+        create_app(
+            Settings(
+                database_url=f"sqlite+pysqlite:///{tmp_path / 'keepalive.db'}",
+                llm_mode=LLMMode.FAKE,
+                redis_url="redis://localhost:6399/0",
+            ),
+        ),
+    )
+    sid = client.post("/api/v1/sessions").json()["session_id"]
+    mocker.patch("brainstorm_agent.services.streaming.TURN_KEEPALIVE_SECONDS", 0.05)
+    analyze = FakeBrainstormLLM.analyze
+
+    async def slow_analyze(
+        self: FakeBrainstormLLM,
+        *,
+        stage: Stage,
+        user_message: str,
+        session_state: BrainstormSessionState,
+        current_stage_state: StageState | None,
+    ) -> AssistantAnalysis:
+        await asyncio.sleep(0.3)
+        return await analyze(
+            self,
+            stage=stage,
+            user_message=user_message,
+            session_state=session_state,
+            current_stage_state=current_stage_state,
+        )
+
+    mocker.patch.object(FakeBrainstormLLM, "analyze", slow_analyze)
+    response = client.post(f"/api/v1/sessions/{sid}/turns", json={"content": "pitch: A framing tool."})
+    assert response.status_code == 200
+    frames = response.text.split("\n\n")
+    assert frames.count(": keepalive") >= 2
+    # Comments come only while the turn runs: the terminal event closes the stream.
+    assert frames.index(": keepalive") > 0
+    assert [frame for frame in frames if frame][-1].startswith("event: turn.completed")
 
 
 def test_openapi_exposes_concrete_stage_fields(tmp_path: Path) -> None:

@@ -29,7 +29,7 @@ x-backend-env: &backend-env
   MODEL_NAME: ${BRAINSTORM_MODEL_NAME:-glm-5.3-flash}
   # A detailed stage analysis is a JSON document of several thousand tokens: 4096 truncates it.
   LLM_MAX_TOKENS: ${BRAINSTORM_LLM_MAX_TOKENS:-32768}
-  # Two silent analysis attempts must stay under the frontend proxy's 300-second body timeout.
+  # Per-call provider timeout. Turn streams send a keepalive every 15 s, so slow calls stay open.
   OPENAI_TIMEOUT_SECONDS: ${BRAINSTORM_LLM_TIMEOUT_SECONDS:-120}
   REDIS_LOCK_TIMEOUT_SECONDS: ${BRAINSTORM_REDIS_LOCK_TIMEOUT_SECONDS:-480}
 
