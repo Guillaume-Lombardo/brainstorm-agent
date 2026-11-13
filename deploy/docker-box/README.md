@@ -24,7 +24,10 @@ caddy: /api/v1/auth/* (server-to-server login bridge) -> 404, internal network o
 | `redis` | Session locks and rate limits, named volume `redis-data` |
 
 Backend, frontend and `init` run without root and without any Linux capability; every service has
-`no-new-privileges`. LiteLLM is not part of the stack: the backend calls the existing gateway on docker-box
+`no-new-privileges`. Caddy trusts `X-Forwarded-*` from private ranges (Docker's proxy can present the bridge gateway as
+the source): a LAN host reaching `10.16.0.117:47280` directly could forge them. Nothing relies on
+them for security (uvicorn ignores them, login limits are per identity, `AUTH_URL` is fixed);
+restrict `trusted_proxies` to the NPM address before using client IPs. LiteLLM is not part of the stack: the backend calls the existing gateway on docker-box
 (`http://10.16.0.117:4000/v1`).
 
 ## Variables
