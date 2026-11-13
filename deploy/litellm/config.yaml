@@ -1,0 +1,10 @@
+# LiteLLM gateway used by the development compose (docker-compose.yml).
+# The backend calls it with LLM_MODE=openai; every model name is forwarded to the
+# OpenAI-compatible upstream set by LLM_UPSTREAM_BASE_URL / LLM_UPSTREAM_API_KEY
+# (for example glm-5.3-flash by default, claude-opus-5-5 for the strong model).
+model_list:
+  - model_name: "*"
+    litellm_params:
+      model: openai/*
+      api_base: os.environ/LLM_UPSTREAM_BASE_URL
+      api_key: os.environ/LLM_UPSTREAM_API_KEY # pragma: allowlist secret

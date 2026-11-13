@@ -15,6 +15,7 @@ jobs:
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
       frontend: ${{ steps.filter.outputs.frontend }}
+      containers: ${{ steps.filter.outputs.containers }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -30,6 +31,19 @@ jobs:
               - 'examples/**'
             frontend:
               - 'frontend/**'
+              - '.github/workflows/**'
+            containers:
+              - 'backend/Dockerfile'
+              - 'backend/docker/**'
+              - 'backend/pyproject.toml'
+              - 'backend/uv.lock'
+              - 'frontend/Dockerfile'
+              - 'frontend/package.json'
+              - 'frontend/pnpm-lock.yaml'
+              - 'frontend/next.config.ts'
+              - 'docker-compose*.yml'
+              - 'deploy/**'
+              - '.dockerignore'
               - '.github/workflows/**'
 
   quality:
@@ -115,6 +129,33 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+  containers:
+    needs: changes
+    if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.containers == 'true'
+    runs-on: ubuntu-latest
+    env:
+      # Throwaway values: only interpolation and the image builds are exercised.
+      BRAINSTORM_POSTGRES_PASSWORD: ci-placeholder # pragma: allowlist secret
+      BRAINSTORM_JWT_SECRET: ci-placeholder # pragma: allowlist secret
+      BRAINSTORM_AUTH_BRIDGE_SECRET: ci-placeholder # pragma: allowlist secret
+      BRAINSTORM_AUTH_SECRET: ci-placeholder # pragma: allowlist secret
+      BRAINSTORM_LLM_API_KEY: sk-ci-placeholder # pragma: allowlist secret
+      BRAINSTORM_ADMIN_PASSWORD: ci-placeholder # pragma: allowlist secret
+      BRAINSTORM_ADMIN_EMAIL: admin@example.com
+      BRAINSTORM_PUBLIC_URL: http://localhost
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate Compose files
+        run: |
+          docker compose -f docker-compose.yml config -q
+          docker compose -f docker-compose.prod.yml config -q
+          docker compose -f deploy/docker-box/compose.yaml config -q
+
+      - name: Build the docker-box stack images
+        run: docker compose -f deploy/docker-box/compose.yaml build
 
   repository-hooks:
     runs-on: ubuntu-latest

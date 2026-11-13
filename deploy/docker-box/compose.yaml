@@ -1,0 +1,155 @@
+# Production stack for https://brainstorm.g1lom.xyz on docker-box.
+#
+# Deployed by a Dockhand git stack (compose path deploy/docker-box/compose.yaml,
+# context directory ".") that clones this repository and builds the images.
+# Secrets are Dockhand stack variables only; nothing secret belongs in this file.
+# Every variable is listed in deploy/docker-box/README.md. Build paths are
+# relative to this file.
+#
+# Request path: client -> Nginx Proxy Manager (TLS) -> caddy:80 -> backend | frontend.
+# LiteLLM is not part of this stack: the backend calls the existing gateway.
+name: brainstorm-agent
+
+x-backend-env: &backend-env
+  APP_ENV: prod
+  LOG_LEVEL: ${BRAINSTORM_LOG_LEVEL:-INFO}
+  LOG_JSON: "true"
+  DATABASE_URL: postgresql+psycopg://brainstorm:${BRAINSTORM_POSTGRES_PASSWORD:?set BRAINSTORM_POSTGRES_PASSWORD as a Dockhand secret variable}@postgres:5432/brainstorm
+  REDIS_URL: redis://redis:6379/0
+  AUTO_CREATE_SCHEMA: "false"
+  # The one-shot `init` service applies migrations before the API starts.
+  RUN_DB_MIGRATIONS_ON_STARTUP: "false"
+  ENABLE_AUTH: "true"
+  AUTH_MODE: jwt
+  JWT_SECRET_KEY: ${BRAINSTORM_JWT_SECRET:?set BRAINSTORM_JWT_SECRET as a Dockhand secret variable}
+  JWT_ISSUER: brainstorm-frontend
+  JWT_AUDIENCE: brainstorm-backend
+  AUTH_BRIDGE_SECRET: ${BRAINSTORM_AUTH_BRIDGE_SECRET:?set BRAINSTORM_AUTH_BRIDGE_SECRET as a Dockhand secret variable}
+  RATE_LIMIT_ENABLED: "true"
+  LLM_MODE: ${BRAINSTORM_LLM_MODE:-openai}
+  OPENAI_BASE_URL: ${BRAINSTORM_LLM_BASE_URL:-http://10.16.0.117:4000/v1}
+  OPENAI_API_KEY: ${BRAINSTORM_LLM_API_KEY:?set BRAINSTORM_LLM_API_KEY as a Dockhand secret variable}
+  MODEL_NAME: ${BRAINSTORM_MODEL_NAME:-glm-5.3-flash}
+  OPENAI_TIMEOUT_SECONDS: ${BRAINSTORM_LLM_TIMEOUT_SECONDS:-60}
+  REDIS_LOCK_TIMEOUT_SECONDS: ${BRAINSTORM_REDIS_LOCK_TIMEOUT_SECONDS:-300}
+
+services:
+  caddy:
+    build: ../caddy
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    # The only published port: LAN address, public access goes through Nginx Proxy Manager.
+    ports:
+      - "${BRAINSTORM_BIND_ADDRESS:-10.16.0.117}:47280:80"
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    security_opt:
+      - no-new-privileges:true
+
+  frontend:
+    build: ../../frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      AUTH_URL: ${BRAINSTORM_PUBLIC_URL:-https://brainstorm.g1lom.xyz}
+      AUTH_SECRET: ${BRAINSTORM_AUTH_SECRET:?set BRAINSTORM_AUTH_SECRET as a Dockhand secret variable}
+      BACKEND_MODE: http
+      BACKEND_URL: http://backend:8000
+      BACKEND_JWT_SECRET: ${BRAINSTORM_JWT_SECRET:?set BRAINSTORM_JWT_SECRET as a Dockhand secret variable}
+      BACKEND_JWT_ISSUER: brainstorm-frontend
+      BACKEND_JWT_AUDIENCE: brainstorm-backend
+      # Server-to-server login bridge, consumed by the frontend from lot 7b.
+      AUTH_BRIDGE_SECRET: ${BRAINSTORM_AUTH_BRIDGE_SECRET:?set BRAINSTORM_AUTH_BRIDGE_SECRET as a Dockhand secret variable}
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+  backend:
+    build:
+      context: ../..
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment: *backend-env
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+  # Migrations and idempotent administrator bootstrap, then exit.
+  init:
+    build:
+      context: ../..
+      dockerfile: backend/Dockerfile
+    command: ["/app/docker/init.sh"]
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      <<: *backend-env
+      BOOTSTRAP_ADMIN_EMAIL: ${BRAINSTORM_ADMIN_EMAIL:-admin@brainstorm.g1lom.xyz}
+      BOOTSTRAP_ADMIN_DISPLAY_NAME: ${BRAINSTORM_ADMIN_DISPLAY_NAME:-Administrator}
+      # Needed only while the administrator does not exist; can be removed afterwards.
+      BOOTSTRAP_ADMIN_PASSWORD: ${BRAINSTORM_ADMIN_PASSWORD:-}
+    healthcheck:
+      disable: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: brainstorm
+      POSTGRES_USER: brainstorm
+      POSTGRES_PASSWORD: ${BRAINSTORM_POSTGRES_PASSWORD:?set BRAINSTORM_POSTGRES_PASSWORD as a Dockhand secret variable}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U brainstorm -d brainstorm"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    security_opt:
+      - no-new-privileges:true
+
+  redis:
+    image: redis:8
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - redis-data:/data
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  postgres-data:
+  redis-data:
+  caddy-data:
+  caddy-config:

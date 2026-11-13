@@ -44,7 +44,7 @@ repos:
     rev: v2.15.1
     hooks:
       - id: hadolint
-        files: ^frontend/Dockerfile$
+        files: (^|/)Dockerfile$
 
   - repo: local
     hooks:

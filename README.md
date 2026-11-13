@@ -110,19 +110,49 @@ See [frontend/README.md](frontend/README.md) for the architecture, checks and co
 
 ## Docker Compose
 
-Run Compose commands from the repository root. Development uses
-`backend/.env.template`; production loads `backend/.env`.
+Run Compose commands from the repository root. Docker work for this project runs on a Linux host
+with Docker (BuildKit is required).
 
+| File | Purpose |
+|---|---|
+| `docker-compose.yml` | Development: backend, frontend, Postgres, Redis, LiteLLM; development defaults only |
+| `docker-compose.prod.yml` | Self-hosted production: Caddy, frontend, backend, Postgres, Redis, bundled LiteLLM; secrets required |
+| `deploy/docker-box/compose.yaml` | The `brainstorm.g1lom.xyz` Dockhand stack, external LiteLLM (see [its README](deploy/docker-box/README.md)) |
 
 ```bash
 docker compose up --build
 ```
 
-Services started:
+Development services (host ports bound to `127.0.0.1`, overridable with `BACKEND_PORT`,
+`FRONTEND_PORT`, `LITELLM_PORT`, `POSTGRES_PORT`, `REDIS_PORT`):
 
-- `app`: FastAPI backend on `http://localhost:8000`
-- `postgres`: durable session/document store
-- `redis`: optional session locking and coordination
+- `frontend`: Next.js on `http://localhost:3000`
+- `backend`: FastAPI on `http://localhost:8000`, JWT authentication, `LLM_MODE=fake` by default
+- `init`: one-shot migrations and bootstrap of `admin@example.com` / `brainstorm-admin`
+- `litellm`: gateway on `http://localhost:4000` (master key `sk-dev-brainstorm`) forwarding every
+  model to `LLM_UPSTREAM_BASE_URL` with `LLM_UPSTREAM_API_KEY`; run with `LLM_MODE=openai` to use it
+- `postgres`, `redis`
+
+The frontend runs `BACKEND_MODE=http` against the backend (complete from lot 7b); set
+`FRONTEND_BACKEND_MODE=mock` to work on the UI with the in-memory demo backend.
+
+`deploy/smoke.sh` checks a running stack end to end (login page, Auth.js, `/readyz`, bridge login of
+the administrator, session creation, JSON and SSE turns):
+
+```bash
+BRAINSTORM_JWT_SECRET=dev-only-jwt-secret-0123456789abcdef \
+BRAINSTORM_AUTH_BRIDGE_SECRET=dev-only-bridge-secret-0123456789abcdef \
+BRAINSTORM_ADMIN_EMAIL=admin@example.com BRAINSTORM_ADMIN_PASSWORD=brainstorm-admin \
+  deploy/smoke.sh http://127.0.0.1:3000 http://127.0.0.1:8000
+```
+
+Images:
+
+- `backend/Dockerfile` (root context): multi-stage `uv` build, runs as uid 10001, healthcheck on
+  `/readyz`; the entrypoint serves the API or runs the command it is given (`docker/init.sh`).
+- `frontend/Dockerfile` (`frontend/` context): Next.js standalone output, uid 1000, healthcheck on
+  `/api/health`.
+- `deploy/caddy/Dockerfile`: Caddy with `deploy/caddy/Caddyfile` baked in.
 
 Formal schema upgrades now use Alembic. For local development you can still rely on auto-creation, but for persistent environments prefer:
 
@@ -394,7 +424,7 @@ model_list:
   - model_name: brainstorm-agent
     litellm_params:
       model: openai/brainstorm-agent
-      api_base: http://app:8000/v1
+      api_base: http://backend:8000/v1
       api_key: not-used
 ```
 
@@ -419,46 +449,39 @@ uv run brainstorm-agent hash-api-key "replace-me" --pepper "server-side-secret"
 - `GET /metrics` exposes Prometheus-style counters for requests, auth failures, and rate-limit rejections.
 - `GET /readyz` fails with `503` when the database check does not pass.
 
-### Local LiteLLM wiring
-
-To run LiteLLM next to the backend locally:
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.litellm.yml up --build
-```
-
-Then call LiteLLM on `http://localhost:4000` with the registered model name `brainstorm-agent`.
-
 ## Production deployment
 
-Production-oriented compose assets are available in:
+`docker-compose.prod.yml` runs the whole stack behind Caddy
+([deploy/caddy/Caddyfile](deploy/caddy/Caddyfile)):
 
-- [docker-compose.prod.yml](docker-compose.prod.yml)
-- [deploy/caddy/Caddyfile](deploy/caddy/Caddyfile)
-- [examples/litellm/config.openwebui.yaml](examples/litellm/config.openwebui.yaml)
-- [examples/openwebui/.env.example](examples/openwebui/.env.example)
+- `/api/v1/*`, `/v1/*` and the probes (`/healthz`, `/readyz`, `/livez`) go to the backend, except
+  the server-to-server login bridge `/api/v1/auth/*`, which answers 404 (the frontend reaches it on
+  the internal network);
+- everything else, including Auth.js `/api/auth/*` and the Next.js route handlers, goes to the
+  frontend;
+- responses are flushed immediately so server-sent events are never buffered;
+- `BRAINSTORM_SITE_ADDRESS` defaults to `:80` (behind a TLS proxy); a domain name makes Caddy
+  obtain certificates itself.
 
-The production overlay includes:
-
-- the brainstorming backend
-- Postgres
-- Redis
-- LiteLLM
-- OpenWebUI
-- Caddy as a reverse proxy
-
-Example startup:
+Secrets are required variables (`${VAR:?}`) with the names listed in
+[deploy/docker-box/README.md](deploy/docker-box/README.md), plus `BRAINSTORM_PUBLIC_URL`,
+`BRAINSTORM_ADMIN_EMAIL` and the LiteLLM upstream (`LLM_UPSTREAM_BASE_URL`,
+`LLM_UPSTREAM_API_KEY`). `BRAINSTORM_LLM_API_KEY` is also the bundled LiteLLM master key and must
+start with `sk-`. Optional backend and frontend tuning goes in `backend/.env` and `frontend/.env`.
 
 ```bash
-cp backend/.env.template backend/.env
-docker compose --env-file backend/.env -f docker-compose.prod.yml up --build -d
+docker compose --env-file .env.prod -f docker-compose.prod.yml up --build -d
 ```
 
-By default the app entrypoint can run `alembic upgrade head` on startup when `RUN_DB_MIGRATIONS_ON_STARTUP=true`.
+The one-shot `init` service applies Alembic migrations and creates the administrator before the
+backend starts, so `RUN_DB_MIGRATIONS_ON_STARTUP` stays `false` in containers.
 
 ## LiteLLM and OpenWebUI
 
-LiteLLM should point to the backend facade at `http://app:8000/v1`.
+LiteLLM can also sit in front of this backend: register the facade `http://backend:8000/v1` as
+shown in [examples/litellm/config.yaml](examples/litellm/config.yaml) and
+[examples/litellm/config.openwebui.yaml](examples/litellm/config.openwebui.yaml). With
+authentication enabled, give LiteLLM an API key accepted by the backend (`AUTH_MODE=hybrid`).
 
 OpenWebUI can use LiteLLM as an OpenAI-compatible backend. The Open WebUI docs for OpenAI-compatible providers document `OPENAI_API_BASE_URL` and `OPENAI_API_KEY`; the example in [examples/openwebui/.env.example](examples/openwebui/.env.example) uses that contract with LiteLLM in front of this backend.
 
@@ -495,6 +518,22 @@ pnpm test
 pnpm build
 pnpm e2e
 ```
+
+Validate the containers from the repository root (on a Docker host):
+
+```bash
+docker compose config -q
+docker compose --env-file .env.test -f docker-compose.prod.yml config -q
+docker compose --env-file .env.test -f deploy/docker-box/compose.yaml config -q
+docker compose --env-file .env.test -f deploy/docker-box/compose.yaml build
+docker compose --env-file .env.test -f deploy/docker-box/compose.yaml up -d --wait
+BRAINSTORM_COMPOSE="docker compose --env-file .env.test -f deploy/docker-box/compose.yaml" \
+  deploy/smoke.sh http://127.0.0.1:47280   # with the .env.test secrets exported
+docker compose --env-file .env.test -f deploy/docker-box/compose.yaml down -v
+```
+
+`.env.test` holds throwaway secrets, `BRAINSTORM_BIND_ADDRESS=127.0.0.1` and
+`BRAINSTORM_LLM_MODE=fake`; never commit it. CI builds the three images on every change to them.
 
 ### Typed stage contracts (prompt v2)
 

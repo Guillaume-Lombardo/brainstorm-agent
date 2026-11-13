@@ -52,3 +52,19 @@ Rejected because the service still needs a sane default security posture when de
 ### Add full OpenTelemetry plus external collectors immediately
 
 Rejected for this iteration because Prometheus-style metrics and readiness checks provide enough operational value for the current deployment scope.
+
+## Amendment: packaging and deployment (lot 8)
+
+The deployment assets now serve the Next.js frontend instead of OpenWebUI:
+
+- Caddy routes `/api/v1/*`, `/v1/*` and the probes to the backend and everything else (Auth.js
+  `/api/auth/*`, Next.js route handlers) to the frontend, flushing responses immediately for SSE.
+  Its Caddyfile is baked into a small image so git-based deployers need no bind mount.
+- A one-shot `init` service applies Alembic migrations and bootstraps the administrator with the
+  `user create` CLI before the API starts; it is idempotent.
+- Images run as non-root users with healthchecks. Production compose files take every secret as a
+  required variable without default.
+- `deploy/docker-box/compose.yaml` is the concrete Dockhand stack; it uses an external LiteLLM
+  gateway, while `docker-compose.prod.yml` bundles one.
+- OpenWebUI remains supported through LiteLLM and the facade (`examples/`), but is no longer part
+  of the production compose.
