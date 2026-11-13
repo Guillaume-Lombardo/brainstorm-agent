@@ -19,7 +19,13 @@ export const authConfig = {
       if (pathname.startsWith("/api/")) {
         return true;
       }
-      return Boolean(auth?.user?.id);
+      if (auth?.user?.id) {
+        return true;
+      }
+      // Relative callback: the login page only accepts same-origin paths.
+      const login = new URL("/login", request.nextUrl);
+      login.searchParams.set("callbackUrl", `${pathname}${request.nextUrl.search}`);
+      return Response.redirect(login);
     },
     session({ session, token }) {
       if (typeof token.uid === "string") {

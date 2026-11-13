@@ -28,12 +28,15 @@ type NoteAction = Exclude<ReviewAction, "approve">;
 export function ReviewBar({
   pendingReview,
   selected,
+  earlierValidated,
   disabled,
   onReview,
   onReopen,
 }: {
   pendingReview: PendingReview | null;
   selected: StageState;
+  /** Every stage before `selected` is validated (reopening is ordered). */
+  earlierValidated: boolean;
   disabled: boolean;
   onReview: (stage: StageId, action: ReviewAction, note?: string) => Promise<void>;
   onReopen: (stage: StageId) => Promise<void>;
@@ -42,6 +45,7 @@ export function ReviewBar({
   const [note, setNote] = useState("");
   const reopenable =
     (selected.status === "validated" || selected.status === "stale") &&
+    earlierValidated &&
     pendingReview?.stage !== selected.stage;
 
   if (!pendingReview && !reopenable) {

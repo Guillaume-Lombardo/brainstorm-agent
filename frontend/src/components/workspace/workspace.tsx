@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api } from "@/lib/api/client";
 import {
   STAGE_LABELS,
+  earlierStagesValidated,
   type AnswerOption,
   type OpenQuestion,
   type ReviewAction,
@@ -173,6 +174,7 @@ function WorkspaceView({ initialSession }: { initialSession: SessionDetail }) {
       <ReviewBar
         pendingReview={session.pendingReview}
         selected={stageState}
+        earlierValidated={earlierStagesValidated(session.stages, stage)}
         disabled={busy || session.archived}
         onReview={review}
         onReopen={async (target) => {
@@ -194,6 +196,7 @@ function WorkspaceView({ initialSession }: { initialSession: SessionDetail }) {
           />
           <StageDetails
             stage={stageState}
+            readOnly={busy || session.archived}
             onEditField={(field, value) =>
               act(() => api.updateField(session.id, stage, field, value))
             }
@@ -226,6 +229,7 @@ function WorkspaceView({ initialSession }: { initialSession: SessionDetail }) {
                 stage={stage}
                 revision={state.documentRevision}
                 comments={session.comments}
+                readOnly={busy || session.archived}
                 onComment={(section, body) =>
                   act(() => api.addComment(session.id, { stage, section, body }))
                 }

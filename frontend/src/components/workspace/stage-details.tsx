@@ -24,9 +24,12 @@ const COVERAGE_CLASS: Record<Coverage, string> = {
 /** Readiness checklist and per-field coverage of one stage, with inline edit. */
 export function StageDetails({
   stage,
+  readOnly,
   onEditField,
 }: {
   stage: StageState;
+  /** Edits are disabled (turn or action in progress, archived session). */
+  readOnly: boolean;
   onEditField: (field: string, value: string) => Promise<boolean>;
 }) {
   const passed = stage.readiness.filter((check) => check.passed).length;
@@ -70,7 +73,13 @@ export function StageDetails({
         </h3>
         <ul className="flex flex-col gap-2">
           {stage.fields.map((field) => (
-            <FieldRow key={field.field} field={field} editable={editable} onSave={onEditField} />
+            <FieldRow
+              key={field.field}
+              field={field}
+              editable={editable}
+              readOnly={readOnly}
+              onSave={onEditField}
+            />
           ))}
         </ul>
       </section>
@@ -81,10 +90,12 @@ export function StageDetails({
 function FieldRow({
   field,
   editable,
+  readOnly,
   onSave,
 }: {
   field: FieldCoverage;
   editable: boolean;
+  readOnly: boolean;
   onSave: (field: string, value: string) => Promise<boolean>;
 }) {
   const [draft, setDraft] = useState<string | null>(null);
@@ -117,7 +128,7 @@ function FieldRow({
         <Badge variant="outline" className={COVERAGE_CLASS[field.coverage]}>
           {field.coverage}
         </Badge>
-        {editable && draft === null ? (
+        {editable && !readOnly && draft === null ? (
           <Button
             variant="ghost"
             size="icon-xs"
@@ -147,7 +158,7 @@ function FieldRow({
             <Button variant="ghost" size="sm" onClick={() => setDraft(null)}>
               Cancel
             </Button>
-            <Button size="sm" disabled={pending} onClick={() => void save()}>
+            <Button size="sm" disabled={pending || readOnly} onClick={() => void save()}>
               Save
             </Button>
           </div>

@@ -142,6 +142,23 @@ describe("MockBackend", () => {
       "stale",
       "stale",
     ]);
+    await expect(
+      mock.reopenStage(bob, fieldService.id, "stage_7_delivery_slicing"),
+    ).rejects.toMatchObject({ code: "validation_error" });
+  });
+
+  it("keeps archived sessions read-only", async () => {
+    const { id } = await mock.createSession(alice, { title: "Planner" });
+    await mock.updateSession(alice, id, { archived: true });
+    await expect(
+      mock.updateField(alice, id, "stage_0_pitch", "product_idea", "Planner"),
+    ).rejects.toMatchObject({ code: "validation_error" });
+    await expect(
+      mock.addComment(alice, id, { stage: "stage_0_pitch", section: "Facts", body: "x" }),
+    ).rejects.toMatchObject({ code: "validation_error" });
+    await expect(mock.streamTurn(alice, id, { message: "hi" })).rejects.toMatchObject({
+      code: "validation_error",
+    });
   });
 
   it("only edits fields of an active or stale stage", async () => {

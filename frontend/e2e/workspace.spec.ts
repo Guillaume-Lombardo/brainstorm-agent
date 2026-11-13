@@ -5,7 +5,7 @@ const DEMO_PASSWORD = "brainstorm-demo"; // pragma: allowlist secret
 
 async function signIn(page: Page, email: string) {
   await page.goto("/sessions");
-  await expect(page).toHaveURL(/\/login/);
+  await expect(page).toHaveURL(/\/login\?callbackUrl=%2Fsessions$/);
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill(DEMO_PASSWORD);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();

@@ -40,6 +40,16 @@ describe("parseTurnEvents", () => {
     ]);
   });
 
+  it("keeps a multi-line frame whose CRLF is split between chunks", async () => {
+    const events = await collect(
+      streamOf([
+        'data: {"type":"message.delta",\r',
+        '\ndata: "messageId":"m","delta":"ok"}\r\n\r\n',
+      ]),
+    );
+    expect(events).toEqual([{ type: "message.delta", messageId: "m", delta: "ok" }]);
+  });
+
   it("round-trips encoded events and skips comments, unknown types and bad JSON", async () => {
     const decoder = new TextDecoder();
     const started = decoder.decode(

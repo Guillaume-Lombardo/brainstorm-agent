@@ -15,7 +15,10 @@ export async function* parseTurnEvents(
     while (true) {
       const { value, done } = await reader.read();
       buffer += decoder.decode(value, { stream: !done });
-      buffer = buffer.replace(/\r\n?/g, "\n");
+      // A chunk may end between the `\r` and `\n` of a CRLF: keep that `\r`
+      // for the next chunk instead of reading it as a line break now.
+      const carry = !done && buffer.endsWith("\r") ? "\r" : "";
+      buffer = buffer.slice(0, buffer.length - carry.length).replace(/\r\n?/g, "\n");
       let boundary = buffer.indexOf("\n\n");
       while (boundary !== -1) {
         const event = parseFrame(buffer.slice(0, boundary));
@@ -25,6 +28,7 @@ export async function* parseTurnEvents(
         }
         boundary = buffer.indexOf("\n\n");
       }
+      buffer += carry;
       if (done) {
         const event = parseFrame(buffer);
         if (event) {

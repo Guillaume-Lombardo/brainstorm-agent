@@ -5,6 +5,7 @@ import { encodeSseEvent } from "./sse";
 import {
   STAGES,
   STAGE_LABELS,
+  earlierStagesValidated,
   type AuthenticatedUser,
   type ChatMessage,
   type DeliverySlicing,
@@ -259,13 +260,10 @@ export class MockBackend implements BackendClient {
     sessionId: string,
     input: { message: string },
   ): Promise<ReadableStream<Uint8Array>> {
-    const record = this.record(caller, sessionId);
+    const record = this.writable(caller, sessionId);
     const message = input.message.trim();
     if (message.length === 0) {
       throw new BackendError("validation_error", "The message is empty.");
-    }
-    if (record.detail.archived) {
-      throw new BackendError("validation_error", "Archived sessions are read-only.");
     }
     if (message === `${SIMULATE_PREFIX}rate_limited`) {
       throw new BackendError("rate_limited", "Too many requests. Try again later.", {
@@ -301,7 +299,7 @@ export class MockBackend implements BackendClient {
     sessionId: string,
     input: { stage: StageId; action: ReviewAction; note?: string },
   ): Promise<SessionDetail> {
-    const record = this.record(caller, sessionId);
+    const record = this.writable(caller, sessionId);
     const { detail } = record;
     if (detail.pendingReview?.stage !== input.stage) {
       throw new BackendError(
@@ -349,13 +347,19 @@ export class MockBackend implements BackendClient {
   }
 
   async reopenStage(caller: Caller, sessionId: string, stage: StageId): Promise<SessionDetail> {
-    const record = this.record(caller, sessionId);
+    const record = this.writable(caller, sessionId);
     const { detail } = record;
     const state = this.stage(detail, stage);
     if (state.status !== "validated" && state.status !== "stale") {
       throw new BackendError(
         "validation_error",
         `${STAGE_LABELS[stage]} cannot be reopened while it is ${state.status.replace("_", " ")}.`,
+      );
+    }
+    if (!earlierStagesValidated(detail.stages, stage)) {
+      throw new BackendError(
+        "validation_error",
+        `Revalidate the stages before ${STAGE_LABELS[stage]} first.`,
       );
     }
     state.status = "active";
@@ -382,7 +386,7 @@ export class MockBackend implements BackendClient {
     field: string,
     value: string,
   ): Promise<SessionDetail> {
-    const record = this.record(caller, sessionId);
+    const record = this.writable(caller, sessionId);
     const state = this.stage(record.detail, stage);
     if (state.status !== "active" && state.status !== "stale") {
       throw new BackendError(
@@ -409,7 +413,7 @@ export class MockBackend implements BackendClient {
     sessionId: string,
     input: { stage: StageId; section: string; body: string },
   ): Promise<SessionDetail> {
-    const record = this.record(caller, sessionId);
+    const record = this.writable(caller, sessionId);
     const body = input.body.trim();
     if (body.length === 0) {
       throw new BackendError("validation_error", "A comment cannot be empty.");
@@ -508,6 +512,14 @@ export class MockBackend implements BackendClient {
     // Another owner's session is reported as missing, like the backend does.
     if (!record || record.ownerId !== caller.userId) {
       throw new BackendError("not_found", "Session not found.");
+    }
+    return record;
+  }
+
+  private writable(caller: Caller, sessionId: string): SessionRecord {
+    const record = this.record(caller, sessionId);
+    if (record.detail.archived) {
+      throw new BackendError("validation_error", "Archived sessions are read-only.");
     }
     return record;
   }

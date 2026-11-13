@@ -37,6 +37,17 @@ export function isStageId(value: string): value is StageId {
 
 export type StageStatus = "locked" | "active" | "awaiting_review" | "validated" | "stale";
 
+/** A stage can only be reopened once every stage before it is validated. */
+export function earlierStagesValidated(
+  stages: readonly { stage: StageId; status: StageStatus }[],
+  stage: StageId,
+): boolean {
+  const index = STAGES.indexOf(stage);
+  return stages.every(
+    (state) => STAGES.indexOf(state.stage) >= index || state.status === "validated",
+  );
+}
+
 export type Coverage = "clear" | "partial" | "missing";
 
 export interface AuthenticatedUser {

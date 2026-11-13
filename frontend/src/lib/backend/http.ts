@@ -25,6 +25,17 @@ export interface HttpBackendOptions {
 type Auth = { caller: Caller } | { service: true };
 
 /**
+ * Validate a caller-supplied identifier before it becomes a URL segment:
+ * `.` or `..` would be normalized by `new URL` and reach other endpoints.
+ */
+function pathSegment(value: string): string {
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(value)) {
+    throw new BackendError("validation_error", "Invalid identifier.");
+  }
+  return value;
+}
+
+/**
  * Backend client over HTTP. Endpoint paths follow the planned lot 6 API and
  * are provisional until the generated OpenAPI types land (lot 7b).
  */
@@ -49,20 +60,23 @@ export class HttpBackend implements BackendClient {
     }
   }
 
-  resolveOidcUser(identity: OidcIdentity): Promise<AuthenticatedUser> {
+  async resolveOidcUser(identity: OidcIdentity): Promise<AuthenticatedUser> {
     return this.json({ service: true }, "POST", "/api/v1/auth/oidc", identity);
   }
 
-  listSessions(caller: Caller, options: { includeArchived: boolean }): Promise<SessionSummary[]> {
+  async listSessions(
+    caller: Caller,
+    options: { includeArchived: boolean },
+  ): Promise<SessionSummary[]> {
     const query = options.includeArchived ? "?include_archived=true" : "";
     return this.json({ caller }, "GET", `/api/v1/sessions${query}`);
   }
 
-  createSession(caller: Caller, input: { title: string }): Promise<SessionSummary> {
+  async createSession(caller: Caller, input: { title: string }): Promise<SessionSummary> {
     return this.json({ caller }, "POST", "/api/v1/sessions", input);
   }
 
-  updateSession(
+  async updateSession(
     caller: Caller,
     sessionId: string,
     patch: { title?: string; archived?: boolean },
@@ -70,7 +84,7 @@ export class HttpBackend implements BackendClient {
     return this.json({ caller }, "PATCH", this.sessionPath(sessionId), patch);
   }
 
-  getSession(caller: Caller, sessionId: string): Promise<SessionDetail> {
+  async getSession(caller: Caller, sessionId: string): Promise<SessionDetail> {
     return this.json({ caller }, "GET", this.sessionPath(sessionId));
   }
 
@@ -93,7 +107,7 @@ export class HttpBackend implements BackendClient {
     return response.body;
   }
 
-  listDocumentVersions(
+  async listDocumentVersions(
     caller: Caller,
     sessionId: string,
     stage: StageId,
@@ -101,7 +115,7 @@ export class HttpBackend implements BackendClient {
     return this.json({ caller }, "GET", `${this.sessionPath(sessionId)}/stages/${stage}/documents`);
   }
 
-  submitReview(
+  async submitReview(
     caller: Caller,
     sessionId: string,
     input: { stage: StageId; action: ReviewAction; note?: string },
@@ -109,11 +123,11 @@ export class HttpBackend implements BackendClient {
     return this.json({ caller }, "POST", `${this.sessionPath(sessionId)}/reviews`, input);
   }
 
-  reopenStage(caller: Caller, sessionId: string, stage: StageId): Promise<SessionDetail> {
+  async reopenStage(caller: Caller, sessionId: string, stage: StageId): Promise<SessionDetail> {
     return this.json({ caller }, "POST", `${this.sessionPath(sessionId)}/stages/${stage}/reopen`);
   }
 
-  updateField(
+  async updateField(
     caller: Caller,
     sessionId: string,
     stage: StageId,
@@ -123,12 +137,12 @@ export class HttpBackend implements BackendClient {
     return this.json(
       { caller },
       "PATCH",
-      `${this.sessionPath(sessionId)}/stages/${stage}/fields/${encodeURIComponent(field)}`,
+      `${this.sessionPath(sessionId)}/stages/${stage}/fields/${pathSegment(field)}`,
       { value },
     );
   }
 
-  addComment(
+  async addComment(
     caller: Caller,
     sessionId: string,
     input: { stage: StageId; section: string; body: string },
@@ -136,7 +150,7 @@ export class HttpBackend implements BackendClient {
     return this.json({ caller }, "POST", `${this.sessionPath(sessionId)}/comments`, input);
   }
 
-  getDeliverySlicing(caller: Caller, sessionId: string): Promise<DeliverySlicing> {
+  async getDeliverySlicing(caller: Caller, sessionId: string): Promise<DeliverySlicing> {
     return this.json({ caller }, "GET", `${this.sessionPath(sessionId)}/delivery-slicing`);
   }
 
@@ -160,7 +174,7 @@ export class HttpBackend implements BackendClient {
   }
 
   private sessionPath(sessionId: string): string {
-    return `/api/v1/sessions/${encodeURIComponent(sessionId)}`;
+    return `/api/v1/sessions/${pathSegment(sessionId)}`;
   }
 
   private async json<T>(auth: Auth, method: string, path: string, body?: unknown): Promise<T> {
@@ -214,7 +228,8 @@ export class HttpBackend implements BackendClient {
         error?: { message?: unknown };
       };
       const detail = payload.error?.message ?? payload.detail;
-      if (typeof detail === "string" && detail.length > 0) {
+      // Server errors keep the generic message: their detail may be internal.
+      if (response.status < 500 && typeof detail === "string" && detail.length > 0) {
         message = detail;
       }
     } catch {

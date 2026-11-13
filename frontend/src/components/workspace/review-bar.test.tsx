@@ -20,6 +20,7 @@ describe("ReviewBar", () => {
       <ReviewBar
         pendingReview={session.pendingReview}
         selected={session.stages[7]}
+        earlierValidated
         disabled={false}
         onReview={onReview}
         onReopen={vi.fn()}
@@ -35,6 +36,7 @@ describe("ReviewBar", () => {
       <ReviewBar
         pendingReview={session.pendingReview}
         selected={session.stages[7]}
+        earlierValidated
         disabled={false}
         onReview={onReview}
         onReopen={vi.fn()}
@@ -56,6 +58,7 @@ describe("ReviewBar", () => {
       <ReviewBar
         pendingReview={null}
         selected={session.stages[1]}
+        earlierValidated
         disabled={false}
         onReview={vi.fn()}
         onReopen={onReopen}
@@ -63,5 +66,19 @@ describe("ReviewBar", () => {
     );
     await userEvent.click(screen.getByRole("button", { name: "Reopen Problem framing" }));
     expect(onReopen).toHaveBeenCalledWith("stage_1_problem_framing");
+  });
+
+  it("does not offer to reopen a stage while an earlier one is not validated", () => {
+    render(
+      <ReviewBar
+        pendingReview={null}
+        selected={{ ...session.stages[1], status: "stale" }}
+        earlierValidated={false}
+        disabled={false}
+        onReview={vi.fn()}
+        onReopen={vi.fn()}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: /^Reopen/ })).not.toBeInTheDocument();
   });
 });

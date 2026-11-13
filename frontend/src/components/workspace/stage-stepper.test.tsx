@@ -43,7 +43,7 @@ describe("StageDetails", () => {
   it("shows readiness, coverage per field and saves an inline edit", async () => {
     const stage = session.stages[2];
     const onEditField = vi.fn(async () => true);
-    render(<StageDetails stage={stage} onEditField={onEditField} />);
+    render(<StageDetails stage={stage} readOnly={false} onEditField={onEditField} />);
     expect(screen.getByText("Readiness 0/3")).toBeInTheDocument();
     expect(screen.getByText("partial")).toBeInTheDocument();
     expect(screen.getByText("missing")).toBeInTheDocument();
@@ -56,7 +56,12 @@ describe("StageDetails", () => {
   });
 
   it("does not offer edits on a validated stage", () => {
-    render(<StageDetails stage={session.stages[0]} onEditField={vi.fn()} />);
+    render(<StageDetails stage={session.stages[0]} readOnly={false} onEditField={vi.fn()} />);
+    expect(screen.queryByRole("button", { name: /^Edit/ })).not.toBeInTheDocument();
+  });
+
+  it("does not offer edits while the workspace is read-only", () => {
+    render(<StageDetails stage={session.stages[2]} readOnly onEditField={vi.fn()} />);
     expect(screen.queryByRole("button", { name: /^Edit/ })).not.toBeInTheDocument();
   });
 });

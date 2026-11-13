@@ -64,6 +64,31 @@ describe("HttpBackend", () => {
     });
   });
 
+  it("hides the detail of backend server errors", async () => {
+    const fetchImpl = vi.fn<typeof fetch>(async () =>
+      Response.json({ detail: "Traceback: db password rejected" }, { status: 500 }),
+    );
+    await expect(client(fetchImpl).getSession({ userId: "u" }, "s1")).rejects.toMatchObject({
+      message: "Backend request failed (500).",
+    });
+  });
+
+  it.each([".", "..", "a/b", "%2e%2e", ""])(
+    "rejects the identifier %j before calling the backend",
+    async (id) => {
+      const fetchImpl = vi.fn<typeof fetch>();
+      const backend = client(fetchImpl);
+      await expect(backend.getSession({ userId: "u" }, id)).rejects.toMatchObject({
+        code: "validation_error",
+        status: 422,
+      });
+      await expect(
+        backend.updateField({ userId: "u" }, "s1", "stage_0_pitch", id, "v"),
+      ).rejects.toMatchObject({ code: "validation_error" });
+      expect(fetchImpl).not.toHaveBeenCalled();
+    },
+  );
+
   it("reports an unreachable backend as 503", async () => {
     const fetchImpl = vi.fn<typeof fetch>(async () => {
       throw new TypeError("fetch failed");
@@ -78,10 +103,10 @@ describe("HttpBackend", () => {
     const body = new ReadableStream<Uint8Array>();
     const fetchImpl = vi.fn<typeof fetch>(async () => new Response(body, { status: 200 }));
     await expect(
-      client(fetchImpl).streamTurn({ userId: "u" }, "s 1", { message: "hi" }),
+      client(fetchImpl).streamTurn({ userId: "u" }, "s-1", { message: "hi" }),
     ).resolves.toBe(body);
     expect(String(fetchImpl.mock.calls[0][0])).toBe(
-      "http://backend:8000/api/v1/sessions/s%201/turns",
+      "http://backend:8000/api/v1/sessions/s-1/turns",
     );
   });
 });

@@ -23,12 +23,15 @@ export function DocumentPanel({
   stage,
   revision,
   comments,
+  readOnly,
   onComment,
 }: {
   sessionId: string;
   stage: StageId;
   revision: number;
   comments: SectionComment[];
+  /** Comments are disabled (turn or action in progress, archived session). */
+  readOnly: boolean;
   onComment: (section: string, body: string) => Promise<boolean>;
 }) {
   const key = `${stage}:${revision}`;
@@ -119,6 +122,7 @@ export function DocumentPanel({
               comments={comments.filter(
                 (comment) => comment.stage === stage && comment.section === section.heading,
               )}
+              readOnly={readOnly}
               onComment={onComment}
             />
           ))}
@@ -142,11 +146,13 @@ function DocumentSection({
   heading,
   markdown,
   comments,
+  readOnly,
   onComment,
 }: {
   heading: string | null;
   markdown: string;
   comments: SectionComment[];
+  readOnly: boolean;
   onComment: (section: string, body: string) => Promise<boolean>;
 }) {
   const [draft, setDraft] = useState<string | null>(null);
@@ -163,7 +169,7 @@ function DocumentSection({
               {comment.body}
             </p>
           ))}
-          {draft === null ? (
+          {readOnly && draft === null ? null : draft === null ? (
             <Button
               variant="ghost"
               size="xs"
@@ -193,7 +199,7 @@ function DocumentSection({
                 <Button type="button" variant="ghost" size="sm" onClick={() => setDraft(null)}>
                   Cancel
                 </Button>
-                <Button type="submit" size="sm">
+                <Button type="submit" size="sm" disabled={readOnly}>
                   Add comment
                 </Button>
               </div>
