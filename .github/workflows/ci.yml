@@ -53,6 +53,20 @@ jobs:
       run:
         working-directory: backend
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: brainstorm_test
+          POSTGRES_DB: brainstorm_test
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U brainstorm_test -d brainstorm_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      TEST_POSTGRES_URL: postgresql+psycopg://brainstorm_test@localhost:5432/brainstorm_test
     steps:
       - name: Checkout
         uses: actions/checkout@v4

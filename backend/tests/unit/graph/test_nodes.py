@@ -4,8 +4,8 @@ import asyncio
 from collections.abc import AsyncIterator  # noqa: TC003
 
 import pytest
-from sqlalchemy import String
 from pytest_mock import MockerFixture  # noqa: TC002
+from sqlalchemy import String
 
 from brainstorm_agent.core.enums import Stage
 from brainstorm_agent.core.models import (
@@ -16,7 +16,12 @@ from brainstorm_agent.core.models import (
     StageState,
 )
 from brainstorm_agent.core.stage_contracts import BacklogFields, BacklogItem, ProblemFields
-from brainstorm_agent.graph.nodes import apply_stage_rules, decide_transition, make_render_node, merge_analysis
+from brainstorm_agent.graph.nodes import (
+    apply_stage_rules,
+    decide_transition,
+    make_render_node,
+    merge_analysis,
+)
 from brainstorm_agent.persistence.models import OpenQuestionRecord
 from brainstorm_agent.services.llm_client import OpenAICompatibleBrainstormLLM
 

@@ -727,3 +727,9 @@ Session snapshots expose stage coverage, readiness, prioritized question options
 and stale markers. `CORS_ORIGINS` is an explicit JSON allowlist, empty by default.
 Run `cd frontend && pnpm generate:api` to regenerate the committed OpenAPI and TypeScript in
 `src/lib/backend/generated/`. Full UI adaptation to the real contract remains lot 7b.
+
+The CI quality job also runs the application persistence regression on an isolated PostgreSQL 17
+database: Alembic upgrades, bounded question/review identifiers, streamed turns, review persistence
+and soft deletion. For an equivalent local check, set `TEST_POSTGRES_URL` to an isolated database
+named `brainstorm_test` and run `tests/integration/persistence/test_application_postgres.py`.
+The test is skipped when that variable is absent.
