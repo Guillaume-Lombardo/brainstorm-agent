@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from concurrent.futures import Future, ThreadPoolExecutor
-from contextlib import aclosing
+from contextlib import aclosing, suppress
 from typing import TYPE_CHECKING, cast
 
 from anyio import CancelScope
@@ -114,3 +114,34 @@ async def research_in_worker(service: SessionService, session_id: str) -> Benchm
         finally:
             with CancelScope(shield=True):
                 await asyncio.shield(asyncio.wrap_future(worker))
+
+
+async def stream_research_in_worker(
+    service: SessionService,
+    session_id: str,
+    keepalive_seconds: float | None = None,
+) -> AsyncGenerator[Benchmark | Keepalive]:
+    """Relay one research result with keepalives during silent provider calls.
+
+    Args:
+        service (SessionService): Authorized request-scoped service.
+        session_id (str): Owned session id.
+        keepalive_seconds (float | None): Heartbeat interval; defaults to the turn interval.
+
+    Yields:
+        Benchmark | Keepalive: Heartbeats followed by exactly one committed result.
+    """
+    interval = TURN_KEEPALIVE_SECONDS if keepalive_seconds is None else keepalive_seconds
+    task = asyncio.create_task(research_in_worker(service, session_id))
+    try:
+        while not task.done():
+            done, _ = await asyncio.wait({task}, timeout=interval)
+            if not done:
+                yield Keepalive()
+        yield await task
+    finally:
+        with CancelScope(shield=True):
+            if not task.done():
+                task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task

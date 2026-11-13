@@ -26,7 +26,7 @@ from brainstorm_agent.core.models import SessionOverview, StepDocument  # noqa: 
 from brainstorm_agent.core.research import Benchmark, FeatureSelection  # noqa: TC001
 from brainstorm_agent.services.search import SearchProviderName
 from brainstorm_agent.services.session_service import SessionService
-from brainstorm_agent.services.streaming import Keepalive, research_in_worker, stream_in_worker
+from brainstorm_agent.services.streaming import Keepalive, stream_in_worker, stream_research_in_worker
 
 router = APIRouter(prefix="/sessions", tags=["application"])
 Service = Annotated[SessionService, Depends(get_session_service)]
@@ -302,8 +302,12 @@ async def research_products(session_id: str, service: Service) -> StreamingRespo
     async def events() -> AsyncIterator[str]:
         yield "event: research.started\ndata: {}\n\n"
         try:
-            result = await research_in_worker(service, session_id)
-            yield f"event: research.completed\ndata: {result.model_dump_json()}\n\n"
+            async with aclosing(stream_research_in_worker(service, session_id)) as stream:
+                async for result in stream:
+                    if isinstance(result, Keepalive):
+                        yield ": keepalive\n\n"
+                    else:
+                        yield f"event: research.completed\ndata: {result.model_dump_json()}\n\n"
         except Exception:
             await run_in_threadpool(service.db_session.rollback)
             yield 'event: error\ndata: {"message":"La recherche a échoué. Vérifiez le fournisseur ou réessayez."}\n\n'

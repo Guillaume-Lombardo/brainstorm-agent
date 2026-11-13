@@ -54,3 +54,13 @@ Availability and quality of third-party snippets vary; no live engine result is 
 Untrusted synthesis text is escaped before Benchmark Markdown rendering. The shared frontend
 Markdown renderer refuses images, including any reflected through a later model reply, so viewing
 a document cannot issue remote image requests containing framing data.
+
+## Streaming and structured output compatibility
+
+Research query generation and synthesis use the same bounded structured adapter as turns, including
+`LLM_OUTPUT_MODE=json_object`, an explicit output schema in each prompt, and typed validation with one repair attempt. Production retains the
+JSON-object default from PR #26; research does not request strict grammars independently.
+
+Research streams send `: keepalive` comments every 15 seconds of silence, including query planning
+and synthesis. They use the shared frontend SSE relay and its 60-second idle timeout from ADRs
+0010/0011. Heartbeats do not restart or duplicate work, and stop at completion or error.

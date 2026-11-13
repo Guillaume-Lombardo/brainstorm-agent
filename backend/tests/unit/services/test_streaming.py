@@ -12,7 +12,12 @@ from pytest_mock import MockerFixture  # noqa: TC002
 from brainstorm_agent.core.application import TurnEvent, TurnStarted
 from brainstorm_agent.core.enums import Stage
 from brainstorm_agent.services.session_service import SessionService
-from brainstorm_agent.services.streaming import Keepalive, research_in_worker, stream_in_worker
+from brainstorm_agent.services.streaming import (
+    Keepalive,
+    research_in_worker,
+    stream_in_worker,
+    stream_research_in_worker,
+)
 
 
 def test_worker_cancels_generator_and_keeps_http_loop_responsive(mocker: MockerFixture) -> None:
@@ -139,3 +144,25 @@ def test_research_uses_dedicated_worker() -> None:
     asyncio.run(research_in_worker(service, "session"))
     assert worker_threads
     assert worker_threads[0] != main_thread
+
+
+def test_research_keeps_connection_alive_until_completion(mocker: MockerFixture) -> None:
+    service = mocker.Mock(spec=SessionService)
+    result = mocker.Mock()
+
+    async def slow_research(_session_id: str) -> object:
+        await asyncio.sleep(0.12)
+        return result
+
+    service.research = mocker.AsyncMock(side_effect=slow_research)
+
+    async def collect() -> list[object]:
+        return [
+            event async for event in stream_research_in_worker(service, "session", keepalive_seconds=0.02)
+        ]
+
+    events = asyncio.run(asyncio.wait_for(collect(), timeout=2))
+    assert events[-1] is result
+    assert len(events) >= 3
+    assert all(isinstance(event, Keepalive) for event in events[:-1])
+    service.research.assert_awaited_once_with("session")

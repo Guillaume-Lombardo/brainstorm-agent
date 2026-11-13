@@ -102,6 +102,7 @@ export class HttpBackend {
   async research(caller: Caller, sessionId: string, signal?: AbortSignal) {
     return this.call({ caller }, "post", "/api/v1/sessions/{session_id}/research", {
       path: { session_id: sessionId },
+      accept: "text/event-stream",
       signal,
     });
   }

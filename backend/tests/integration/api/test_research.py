@@ -1,5 +1,6 @@
 """Owner API benchmark execution, persistence, selection and exports."""
 
+import asyncio
 import json
 import os
 from pathlib import Path  # noqa: TC003
@@ -9,13 +10,17 @@ from fastapi.testclient import TestClient
 
 from brainstorm_agent.api.main import create_app
 from brainstorm_agent.core.enums import LLMMode
+from brainstorm_agent.core.models import StageState  # noqa: TC001
+from brainstorm_agent.core.research import Benchmark  # noqa: TC001
 from brainstorm_agent.persistence.session import upgrade_database
+from brainstorm_agent.services.research import execute_research
 from brainstorm_agent.services.search import SearchProviderName
+from brainstorm_agent.services.session_service import SessionService  # noqa: TC001
 from brainstorm_agent.settings import Settings
 
 
 @pytest.mark.parametrize("postgres", [False, True])
-def test_benchmark_flow(tmp_path: Path, *, postgres: bool) -> None:
+def test_benchmark_flow(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, postgres: bool) -> None:
     if postgres and not os.environ.get("TEST_POSTGRES_URL"):
         pytest.skip("TEST_POSTGRES_URL is not configured")
     database_url = os.environ["TEST_POSTGRES_URL"] if postgres else f"sqlite:///{tmp_path / 'research.db'}"
@@ -36,7 +41,15 @@ def test_benchmark_flow(tmp_path: Path, *, postgres: bool) -> None:
         client.post(base + "/messages", json={"content": "problem: Teams need project framing"}).status_code
         == 200
     )
+
+    async def delayed_research(service: SessionService, stage: StageState, version: int) -> Benchmark:
+        await asyncio.sleep(0.06)
+        return await execute_research(service, stage, version)
+
+    monkeypatch.setattr("brainstorm_agent.services.session_service.execute_research", delayed_research)
+    monkeypatch.setattr("brainstorm_agent.services.streaming.TURN_KEEPALIVE_SECONDS", 0.01)
     stream = client.post(base + "/research")
+    assert ": keepalive\n\n" in stream.text
     assert "event: research.completed" in stream.text, stream.text
     benchmark = client.get(base + "/research").json()["benchmarks"][-1]
     selected = [item["id"] for item in benchmark["synthesis"]["features"]]

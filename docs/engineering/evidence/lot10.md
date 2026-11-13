@@ -21,3 +21,7 @@ Rebased onto lot 9 (550a0f0). Full combined backend run: 268 passed, two Postgre
 cases skipped and covered separately. All pre-commit hooks passed. Reviewed in two rounds; all
 findings resolved, including the final security pass. Regressions cover Markdown image suppression,
 complete document regeneration on deselection, lock-lease deadlines and worker isolation.
+
+Follow-up integration with PRs #25/#26 retains JSON-object output and turn keepalives. A real
+OpenAI-compatible HTTP mock checks both research calls and schema repair without tools/grammars;
+research streaming and the frontend idle relay are tested with accelerated heartbeat intervals.

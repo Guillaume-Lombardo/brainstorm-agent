@@ -57,7 +57,11 @@ async def execute_research(
                 await llm._structured(  # noqa: SLF001 - Shared bounded structured adapter
                     stage=Stage.STAGE_1_PROBLEM_FRAMING,
                     model=ResearchQueries,
-                    prompt=service.prompt_loader.research_prompt("queries") + json.dumps(fields),
+                    prompt="\n\n".join([
+                        service.prompt_loader.research_prompt("queries"),
+                        "Output JSON schema: " + json.dumps(ResearchQueries.model_json_schema()),
+                        "Framing: " + json.dumps(fields),
+                    ]),
                 ),
             )
         results = []
@@ -98,11 +102,14 @@ async def execute_research(
                 await llm._structured(  # noqa: SLF001 - Shared bounded structured adapter
                     stage=Stage.STAGE_1_PROBLEM_FRAMING,
                     model=ResearchSynthesis,
-                    prompt=service.prompt_loader.research_prompt("synthesis")
-                    + json.dumps({
-                        "framing": fields,
-                        "evidence": [item.model_dump(mode="json") for item in results],
-                    }),
+                    prompt="\n\n".join([
+                        service.prompt_loader.research_prompt("synthesis"),
+                        "Output JSON schema: " + json.dumps(ResearchSynthesis.model_json_schema()),
+                        json.dumps({
+                            "framing": fields,
+                            "evidence": [item.model_dump(mode="json") for item in results],
+                        }),
+                    ]),
                 ),
             )
         return Benchmark(
@@ -113,5 +120,5 @@ async def execute_research(
             synthesis=validate_evidence(synthesis, results),
         )
     finally:
-        if isinstance(llm, OpenAICompatibleBrainstormLLM) and isinstance(llm, OpenAICompatibleBrainstormLLM):
+        if isinstance(llm, OpenAICompatibleBrainstormLLM):
             await llm.client.close()

@@ -1,4 +1,5 @@
-import { json, withCaller } from "@/lib/backend/route";
+import { BackendError } from "@/lib/backend";
+import { json, sseResponse, withCaller } from "@/lib/backend/route";
 export const dynamic = "force-dynamic";
 export async function GET(
   request: Request,
@@ -16,12 +17,9 @@ export async function POST(
   const { sessionId } = await context.params;
   return withCaller(request, async (caller, backend) => {
     const response = await backend.research(caller, sessionId, request.signal);
-    return new Response(response.body, {
-      headers: {
-        "content-type": "text/event-stream",
-        "cache-control": "no-cache",
-        "x-accel-buffering": "no",
-      },
-    });
+    if (!response.body) {
+      throw new BackendError("backend_unavailable", "The backend returned no research stream.");
+    }
+    return sseResponse(response.body);
   });
 }

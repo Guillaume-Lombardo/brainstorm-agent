@@ -179,6 +179,13 @@ describe("sseResponse", () => {
     expect(text).not.toContain("event: error");
   });
 
+  it("keeps research synthesis open beyond the idle delay while comments arrive", async () => {
+    const complete = 'event: research.completed\ndata: {"version":1}\n\n';
+    const frames: [number, string][] = Array.from({ length: 6 }, () => [15, ": keepalive\n\n"]);
+    const response = sseResponse(timedStream([...frames, [15, complete]]), { idleMs: 60 });
+    expect(await response.text()).toBe(frames.map(([, frame]) => frame).join("") + complete);
+  });
+
   it("ends a silent stream with a turn_failed error and cancels the backend request", async () => {
     const onCancel = vi.fn();
     const response = sseResponse(
