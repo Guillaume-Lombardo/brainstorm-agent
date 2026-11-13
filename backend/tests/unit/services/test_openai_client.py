@@ -152,6 +152,6 @@ def test_challenge_only_appends_findings():
 
 def test_missing_provider_configuration_fails_before_client_creation(mocker):
     client = mocker.patch("brainstorm_agent.services.llm_client.AsyncOpenAI")
-    with pytest.raises(ValueError, match="OPENAI_BASE_URL.*OPENAI_API_KEY"):
+    with pytest.raises(ValueError, match=r"OPENAI_BASE_URL.*OPENAI_API_KEY"):
         build_llm(settings=Settings(openai_api_key=None, openai_base_url=None), prompt_loader=PromptLoader())
     client.assert_not_called()

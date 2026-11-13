@@ -387,9 +387,6 @@ class OpenAICompatibleBrainstormLLM:
 
         Returns:
             BaseModel: Validated structured output.
-
-        Raises:
-            ValueError: If output is truncated, malformed or for a different stage.
         """
         if finish_reason not in {"stop", "tool_calls"}:
             cls._invalid_response(cls._truncated_error())
@@ -419,6 +416,7 @@ class OpenAICompatibleBrainstormLLM:
 
         Raises:
             LLMResponseError: If output is still invalid after repair.
+            AssertionError: If the bounded retry loop terminates unexpectedly.
         """
         messages: list[ChatCompletionMessageParam] = [
             {"role": "system", "content": self.prompt_loader.system_prompt()},

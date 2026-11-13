@@ -63,6 +63,9 @@ def test_identified_backlog_patch_preserves_empty_lists_and_retracts_by_id():
 def test_clarified_uncertainty_disappears_from_current_state():
     previous = StageState(stage=Stage.STAGE_1_PROBLEM_FRAMING, uncertainties=["Target users are unknown"])
     patch = AssistantAnalysis(
-        stage=previous.stage, summary="Users clarified", assistant_message="Continue", uncertainties=[]
+        stage=previous.stage,
+        summary="Users clarified",
+        assistant_message="Continue",
+        uncertainties=[],
     )
     assert merge_analysis(previous=previous, patch=patch).uncertainties == []

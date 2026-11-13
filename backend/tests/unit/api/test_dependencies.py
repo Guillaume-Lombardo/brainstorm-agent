@@ -4,7 +4,6 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
 from unittest.mock import AsyncMock
 
-
 from brainstorm_agent.api.dependencies import get_session_service
 from brainstorm_agent.async_runner import run_async
 from brainstorm_agent.services.llm_client import OpenAICompatibleBrainstormLLM
