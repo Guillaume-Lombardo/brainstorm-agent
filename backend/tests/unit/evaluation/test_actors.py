@@ -1,6 +1,6 @@
 import json
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 from brainstorm_agent.async_runner import run_async
 from brainstorm_agent.evaluation.actors import EvaluationActors
@@ -20,7 +20,8 @@ def test_simulator_has_no_oracle_and_judge_rubric():
             ],
         ),
     )
-    client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=complete)))
+    client = MagicMock()
+    client.chat.completions.create = complete
     actors = EvaluationActors(client, "reference")
     scenario = load_scenarios(default_scenarios())[0]
     assert run_async(actors.answer(scenario, "Who uses it?")) == "I export monthly reports"

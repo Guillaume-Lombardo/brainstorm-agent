@@ -18,7 +18,7 @@ from brainstorm_agent.evaluation.metrics import calculate_metrics
 from brainstorm_agent.evaluation.models import AnswerMode, Observation, Scenario, load_scenarios
 from brainstorm_agent.exceptions import LLMResponseError
 from brainstorm_agent.graph.builder import build_turn_graph
-from brainstorm_agent.services.llm_client import FakeBrainstormLLM, OpenAICompatibleBrainstormLLM
+from brainstorm_agent.services.llm_client import FakeBrainstormLLM, OpenAICompatibleBrainstormLLM, build_llm
 from brainstorm_agent.services.markdown import MarkdownRenderer
 from brainstorm_agent.services.prompt_loader import PromptLoader
 
@@ -35,7 +35,7 @@ def default_scenarios() -> Path:
     return Path(__file__).parents[1] / "resources" / "evaluation"
 
 
-async def run_scenario(  # noqa: C901, PLR0915 - bounded sequential conversation trace
+async def run_scenario(  # noqa: C901, PLR0912, PLR0915 - bounded sequential conversation trace
     scenario: Scenario,
     settings: Settings,
     actors: EvaluationActors | None,
@@ -54,7 +54,7 @@ async def run_scenario(  # noqa: C901, PLR0915 - bounded sequential conversation
     llm = (
         FakeBrainstormLLM(prompt_loader=loader)
         if actors is None
-        else OpenAICompatibleBrainstormLLM(settings=settings, prompt_loader=loader)
+        else build_llm(settings=settings, prompt_loader=loader)
     )
     graph = build_turn_graph(llm=llm, renderer=MarkdownRenderer(loader))
     state = BrainstormSessionState(session_id=str(uuid4()))
@@ -72,11 +72,15 @@ async def run_scenario(  # noqa: C901, PLR0915 - bounded sequential conversation
                 continue
             start = perf_counter()
             try:
-                answer = (
-                    await actors.answer(scenario, question)
-                    if actors and scenario.answer_mode is AnswerMode.SIMULATED
-                    else turn.answer
-                )
+                answer = turn.answer
+                if actors and scenario.answer_mode is AnswerMode.SIMULATED:
+                    try:
+                        answer = await actors.answer(scenario, question)
+                    except Exception as exc:
+                        observation.actor_errors["simulator"] = type(exc).__name__
+                        observation.target_attempted = False
+                        failures.append(f"turn {index + 1}: simulator failed; target not evaluated")
+                        continue
                 if isinstance(llm, FakeBrainstormLLM):
                     llm.scripted_responses.append(AssistantAnalysis.model_validate(turn.recorded_analysis))
                 result = await graph.ainvoke({
@@ -112,13 +116,16 @@ async def run_scenario(  # noqa: C901, PLR0915 - bounded sequential conversation
                 )
                 completed = turn.stage is Stage.STAGE_7_DELIVERY_SLICING and observation.actual
                 if actors:
-                    observation.quality = await actors.judge(
-                        [
-                            *scenario.hidden_facts,
-                            *(item["content"] for item in state.transcript if item["role"] == "user"),
-                        ],
-                        observation.markdown,
-                    )
+                    try:
+                        observation.quality = await actors.judge(
+                            [
+                                *scenario.hidden_facts,
+                                *(item["content"] for item in state.transcript if item["role"] == "user"),
+                            ],
+                            observation.markdown,
+                        )
+                    except Exception as exc:
+                        observation.actor_errors["judge"] = type(exc).__name__
             except (ValidationError, LLMResponseError) as exc:
                 observation.schema_failure = True
                 observation.error = type(exc).__name__
@@ -236,6 +243,8 @@ def write_reports(output_dir: Path, reports: list[dict[str, Any]]) -> None:
                 f"- {result['scenario']}: {'PASS' if result['passed'] else 'FAIL'} {result['failures']}",
             )
             for index, item in enumerate(result["observations"], 1):
+                if item["actor_errors"]:
+                    lines.append(f"  - Turn {index} actor errors: {item['actor_errors']}")
                 if item["quality"]:
                     lines.append(f"  - Document {index} rubric: {json.dumps(item['quality'])}")
     (output_dir / "report.md").write_text("\n".join(lines) + "\n")

@@ -691,3 +691,7 @@ may not expose usage. Replay labels results `recorded-fixtures`, never a measure
 model score. Live document judging scores specificity, traceability and absence
 of invented facts from 0 to 4, with an evidence rationale; rubric scores are
 reported separately from deterministic gate expectations.
+
+Simulator/judge errors are reported separately as `actor_errors`. A simulator
+failure excludes the unattempted target turn from transition metrics. A judge
+failure leaves the measured target gate result intact and omits its quality score.

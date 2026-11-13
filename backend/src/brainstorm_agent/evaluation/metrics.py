@@ -21,10 +21,13 @@ def calculate_metrics(observations: list[Observation]) -> dict[str, object]:
     Returns:
         dict[str, object]: Counts, precision/recall, usage and latency.
     """
+    actor_failures = sum(len(item.actor_errors) for item in observations)
+    observations = [item for item in observations if item.target_attempted]
     tp = sum(item.expected and item.actual for item in observations)
     fp = sum(not item.expected and item.actual for item in observations)
     fn = sum(item.expected and not item.actual for item in observations)
     return {
+        "actor_failures": actor_failures,
         "true_positive": tp,
         "false_positive": fp,
         "false_negative": fn,

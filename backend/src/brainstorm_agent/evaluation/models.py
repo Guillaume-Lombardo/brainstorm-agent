@@ -64,6 +64,8 @@ class Observation(BaseModel):
     prompt_tokens: int = 0
     completion_tokens: int = 0
     schema_failure: bool = False
+    target_attempted: bool = True
+    actor_errors: dict[str, str] = Field(default_factory=dict)
     error: str | None = None
     contradiction_found: bool | None = None
     markdown: str = ""

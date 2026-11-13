@@ -62,7 +62,7 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 core-metadata-version = "2.4"
 packages = ["src/brainstorm_agent"]
-include = ["src/brainstorm_agent/resources/prompts/**/*.md"]
+include = ["src/brainstorm_agent/resources/prompts/**/*.md", "src/brainstorm_agent/resources/evaluation/*.yaml"]
 
 [tool.hatch.build.targets.sdist]
 core-metadata-version = "2.4"
