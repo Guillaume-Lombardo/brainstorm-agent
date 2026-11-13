@@ -40,6 +40,8 @@ export function OpenQuestions({
                     key={option}
                     size="sm"
                     variant={recommended ? "default" : "outline"}
+                    // Options are model-written sentences: let them wrap within the panel.
+                    className="h-auto max-w-full py-1 text-left whitespace-normal"
                     disabled={disabled}
                     onClick={() => onAnswer(question, option)}
                     data-recommended={recommended || undefined}
