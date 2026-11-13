@@ -255,15 +255,21 @@
 
 ### Lot 8: Packaging and deployment
 
-- ADR impact: `none` (extends ADR 0005)
+- ADR impact: `none` (extends ADR 0005, amendment recorded there)
 
 #### Steps
 
-- [ ] Frontend Dockerfile (Next.js standalone output).
-- [ ] Dev compose: backend, frontend, Postgres, Redis, LiteLLM (Docker work runs on `codex-dev`).
-- [ ] Prod compose and Caddy: `/api/v1` and `/v1` to the backend, everything else (including
-      Auth.js `/api/auth/*` and Next.js route handlers) to the frontend.
-- [ ] Root `README.md`, backend and frontend `.env.template`, validation commands updated.
+- [x] Frontend Dockerfile (Next.js standalone output), built and healthy as uid 1000; backend image
+      rebuilt multi-stage as uid 10001 with a `/readyz` healthcheck.
+- [x] Dev compose: backend, frontend, Postgres, Redis, LiteLLM (Docker work runs on `codex-dev`).
+- [x] Prod compose and Caddy: `/api/v1` and `/v1` to the backend, everything else (including
+      Auth.js `/api/auth/*` and Next.js route handlers) to the frontend; SSE flushed immediately.
+- [x] docker-box Dockhand stack `deploy/docker-box/compose.yaml` (single port 47280, external
+      LiteLLM, secrets as stack variables, one-shot migrations and idempotent admin bootstrap).
+- [x] Root `README.md`, backend and frontend `.env.template`, validation commands updated;
+      `deploy/smoke.sh` end-to-end check and a CI job building the images.
+  The frontend `BACKEND_MODE=http` login and pages become complete with lot 7b; the backend API
+  is fully usable through the stacks.
 
 ### Later (not scheduled)
 

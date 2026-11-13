@@ -85,3 +85,6 @@ src/
 docker build -t brainstorm-agent-frontend frontend
 docker run --rm -p 3000:3000 --env-file frontend/.env.local brainstorm-agent-frontend
 ```
+
+The Compose stacks at the repository root build it next to the backend; see the root `README.md`
+and `deploy/docker-box/README.md`.
