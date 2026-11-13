@@ -21,6 +21,7 @@ from brainstorm_agent.api.schemas import (
     PostMessageResponse,
     SessionResponse,
 )
+from brainstorm_agent.core.application import CreateSessionInput  # noqa: TC001
 from brainstorm_agent.core.models import StepDocument  # noqa: TC001
 from brainstorm_agent.services.session_service import SessionService  # noqa: TC001
 
@@ -33,16 +34,18 @@ router = APIRouter(prefix="/sessions", tags=["sessions"])
 @router.post("", response_model=CreateSessionResponse, status_code=status.HTTP_201_CREATED)
 def create_session(
     session_service: Annotated[SessionService, Depends(get_session_service)],
+    payload: CreateSessionInput | None = None,
 ) -> CreateSessionResponse:
     """Create a new brainstorming session.
 
     Args:
         session_service: Session application service.
+        payload: Optional creation metadata.
 
     Returns:
         CreateSessionResponse: Newly created session payload.
     """
-    overview = session_service.create_session()
+    overview = session_service.create_session(title=payload.title if payload else "Untitled session")
     return CreateSessionResponse(
         session_id=overview.session_id,
         current_stage=overview.current_stage,

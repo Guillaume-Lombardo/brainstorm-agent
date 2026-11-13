@@ -24,6 +24,7 @@ class Settings(BaseSettings):
 
     project_name: str = "brainstorm-agent"
     app_env: str = Field(default="dev", validation_alias="APP_ENV")
+    cors_origins: list[str] = Field(default_factory=list)
     api_v1_prefix: str = "/api/v1"
     host: str = Field(default="127.0.0.1", validation_alias="HOST")
     port: int = Field(default=8000, validation_alias="PORT")

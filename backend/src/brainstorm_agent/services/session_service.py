@@ -2,21 +2,52 @@
 
 from __future__ import annotations
 
+import asyncio
+import difflib
+from collections.abc import AsyncIterator, Awaitable, Callable  # noqa: TC003
+from contextlib import suppress
 from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
+from pydantic import ValidationError
+from sqlalchemy import select
+
 from brainstorm_agent.async_runner import run_async
+from brainstorm_agent.core.application import (
+    AnalysisStatus,
+    BacklogExport,
+    CommentInput,
+    CoverageUpdated,
+    DocumentDiff,
+    DocumentUpdated,
+    MessageDelta,
+    ReviewAction,
+    ReviewInput,
+    ReviewRequired,
+    SessionPage,
+    SessionPatch,
+    SliceSpecsExport,
+    StageChanged,
+    StagePatch,
+    TurnCompleted,
+    TurnError,
+    TurnEvent,
+    TurnStarted,
+)
 from brainstorm_agent.core.enums import HumanReviewDecision, MessageRole, Modality, Stage
 from brainstorm_agent.core.models import (
+    AssistantAnalysis,
     AssistantTurnOutput,
     BrainstormSessionState,
     ConversationTurn,
     HumanReviewRecord,
     PendingHumanReview,
+    SectionComment,
     SessionOverview,
     StageState,
     StepDocument,
 )
+from brainstorm_agent.core.validation import validate_stage
 from brainstorm_agent.exceptions import ConflictError, NotFoundError
 from brainstorm_agent.graph.builder import build_turn_graph
 from brainstorm_agent.persistence.models import BOOTSTRAP_USER_ID, SessionRecord
@@ -40,7 +71,7 @@ if TYPE_CHECKING:
     from brainstorm_agent.settings import Settings
 
 
-class SessionService:
+class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
     """Orchestrate session creation and message processing."""
 
     @staticmethod
@@ -113,12 +144,20 @@ class SessionService:
         """
         record = self.sessions.get(session_id)
         user = UserService(self.db_session).get_active(self.owner_id)
-        if record is None or record.owner_id != self.owner_id or user is None:
+        if (
+            record is None
+            or record.owner_id != self.owner_id
+            or user is None
+            or self.sessions.to_state(record).deleted
+        ):
             raise NotFoundError.missing_session(session_id)
         return record
 
-    def create_session(self) -> SessionOverview:
+    def create_session(self, title: str = "Untitled session") -> SessionOverview:
         """Create a new brainstorming session.
+
+        Args:
+            title (str): Initial session title.
 
         Returns:
             SessionOverview: Created session overview.
@@ -130,7 +169,7 @@ class SessionService:
             message = "An active owner is required."
             raise ValueError(message)
         session_id = str(uuid4())
-        state = BrainstormSessionState(session_id=session_id)
+        state = BrainstormSessionState(session_id=session_id, title=title)
         self.sessions.create(state, owner_id=self.owner_id)
         welcome_turn = ConversationTurn(
             session_id=session_id,
@@ -150,6 +189,7 @@ class SessionService:
         session_id: str,
         content: str,
         modality: Modality = Modality.TEXT,
+        on_delta: Callable[[str], Awaitable[None]] | None = None,
     ) -> AssistantTurnOutput:
         """Process one user message through the orchestration graph.
 
@@ -157,6 +197,7 @@ class SessionService:
             session_id: Session identifier.
             content: User message content.
             modality: Input modality.
+            on_delta: Optional async reply delta consumer.
 
         Returns:
             AssistantTurnOutput: Structured assistant response.
@@ -178,12 +219,19 @@ class SessionService:
             ):
                 self.llm = build_llm(settings=self.settings, prompt_loader=self.prompt_loader)
                 self.graph = build_turn_graph(llm=self.llm, renderer=self.renderer)
+            comments = [item for item in state.comments if not item.consumed]
+            context = content
+            if comments:
+                context += "\n\nOwner section comments:\n" + "\n".join(
+                    f"[{item.stage.value}/{item.section}] {item.body}" for item in comments
+                )
             graph_output = await self._invoke_graph(
                 {
                     "session_id": session_id,
                     "session_state": state.model_dump(mode="json"),
                     "current_stage": current_stage.value,
-                    "user_message": content,
+                    "user_message": context,
+                    "on_delta": on_delta,
                 },
             )
             output = AssistantTurnOutput.model_validate(graph_output["assistant_output"])
@@ -193,6 +241,8 @@ class SessionService:
                 partial_fields={
                     item["field"]: item["reason"] for item in graph_output["analysis"]["partial_fields"]
                 },
+                coverage=output.coverage,
+                readiness=output.readiness,
                 clarifications=graph_output["analysis"]["clarifications"],
                 summary=output.summary,
                 assistant_message=output.assistant_message,
@@ -232,6 +282,8 @@ class SessionService:
             else:
                 state.current_stage = output.current_stage
                 output.pending_review = None
+            for comment in comments:
+                comment.consumed = True
             state.transcript.extend([
                 {"role": "user", "content": content},
                 {"role": "assistant", "content": output.assistant_message},
@@ -529,3 +581,349 @@ class SessionService:
         """
         self._require_owned(session_id)
         return self.human_reviews.list_for_session(session_id)
+
+    def list_sessions(self, *, offset: int, limit: int, include_archived: bool) -> SessionPage:
+        """List live sessions for the active owner.
+
+        Args:
+            offset (int): Number of records to skip.
+            limit (int): Page size.
+            include_archived (bool): Include archived sessions.
+
+        Returns:
+            SessionPage: Owner-scoped page and total.
+        """
+        rows = self.db_session.scalars(
+            select(SessionRecord)
+            .where(
+                SessionRecord.owner_id == self.owner_id,
+            )
+            .order_by(SessionRecord.created_at.desc(), SessionRecord.id),
+        ).all()
+        items = []
+        if UserService(self.db_session).get_active(self.owner_id):
+            for row in rows:
+                state = self.sessions.to_state(row)
+                if not state.deleted and (include_archived or not state.archived):
+                    items.append(self.sessions.overview(row, self.open_questions.list_open(row.id)))
+        return SessionPage(items=items[offset : offset + limit], total=len(items), offset=offset, limit=limit)
+
+    def update_session(
+        self,
+        session_id: str,
+        patch: SessionPatch,
+        *,
+        delete: bool = False,
+    ) -> SessionOverview:
+        """Update metadata or soft-delete an owned session.
+
+        Args:
+            session_id (str): Session id.
+            patch (SessionPatch): Metadata changes.
+            delete (bool): Hide session from every access path.
+
+        Returns:
+            SessionOverview: Committed metadata.
+        """
+        self._require_owned(session_id)
+        with self.lock_manager.lock(session_id):
+            record = self._require_owned(session_id)
+            state = self.sessions.to_state(record)
+            for key, value in patch.model_dump(exclude_none=True).items():
+                setattr(state, key, value)
+            state.deleted = delete
+            self.sessions.save_state(session_id, state)
+            self.db_session.commit()
+            return self.sessions.overview(record, self.open_questions.list_open(session_id))
+
+    def reopen_stage(self, session_id: str, stage: Stage) -> SessionOverview:
+        """Reopen an earlier visited stage and invalidate all downstream state.
+
+        Args:
+            session_id (str): Owned session.
+            stage (Stage): Previously visited stage.
+
+        Returns:
+            SessionOverview: Reopened state.
+
+        Raises:
+            ConflictError: Target is not an earlier visited stage.
+        """
+        self._require_owned(session_id)
+        with self.lock_manager.lock(session_id):
+            record = self._require_owned(session_id)
+            state = self.sessions.to_state(record)
+            ordered = Stage.ordered()
+            if stage.value not in state.stage_states or ordered.index(stage) >= ordered.index(
+                state.current_stage,
+            ):
+                message = "Only an earlier visited stage can be reopened."
+                raise ConflictError(message)
+            for key, value in state.stage_states.items():
+                if ordered.index(Stage(key)) > ordered.index(stage):
+                    value.stale = True
+            state.current_stage = stage
+            state.pending_human_review = None
+            state.stage_states[stage.value].stage_is_clear_enough = False
+            self.sessions.save_state(session_id, state)
+            self.db_session.commit()
+            return self.get_session(session_id)
+
+    def edit_stage(self, session_id: str, stage: Stage, patch: StagePatch) -> SessionOverview:
+        """Edit current stage fields/items and regenerate a validated document.
+
+        Args:
+            session_id (str): Owned session.
+            stage (Stage): Active stage; reopen earlier stages first.
+            patch (StagePatch): Supplied field values and replacement collections.
+
+        Returns:
+            SessionOverview: Revalidated state.
+
+        Raises:
+            ConflictError: Stage is inactive or an edit violates the typed contract.
+        """
+        self._require_owned(session_id)
+        with self.lock_manager.lock(session_id):
+            record = self._require_owned(session_id)
+            state = self.sessions.to_state(record)
+            if stage != state.current_stage:
+                message = "Reopen the stage before editing it."
+                raise ConflictError(message)
+            current = state.stage_states.get(stage.value, StageState(stage=stage))
+            data = current.model_dump()
+            data["extracted_fields"] = current.extracted_fields.model_dump() | patch.fields
+            allowed = {"facts", "assumptions", "decisions", "risks", "open_questions"}
+            if patch.items.keys() - allowed:
+                message = "Unknown item collection."
+                raise ConflictError(message)
+            data.update(patch.items)
+            try:
+                current = StageState.model_validate(data)
+            except ValidationError as exc:
+                message = "Edit does not match the stage contract."
+                raise ConflictError(message) from exc
+            validation = validate_stage(
+                stage=stage,
+                extracted_fields=current.extracted_fields.model_dump(exclude_none=True),
+                open_questions=current.open_questions,
+                partial_fields=current.partial_fields,
+                contradictions=current.contradictions,
+                previous_fields={
+                    key: value.extracted_fields.model_dump(exclude_none=True)
+                    for key, value in state.stage_states.items()
+                    if key != stage.value
+                },
+            )
+            current.coverage = validation.coverage
+            current.readiness = validation.readiness
+            current.stage_is_clear_enough = validation.stage_is_clear_enough
+            current.transition_decision_reason = validation.transition_decision_reason
+            current.stale = False
+            analysis = AssistantAnalysis.model_validate({
+                key: value
+                for key, value in current.model_dump().items()
+                if key in AssistantAnalysis.model_fields and key != "partial_fields"
+            })
+            current.latest_markdown = self.renderer.render(
+                stage=stage,
+                analysis=analysis,
+                validation=validation,
+            )
+            state.stage_states[stage.value] = current
+            state.pending_human_review = None
+            versions = [item.version for item in self.documents.list_all(session_id) if item.stage == stage]
+            document = StepDocument(
+                session_id=session_id,
+                stage=stage,
+                version=max(versions, default=0) + 1,
+                markdown=current.latest_markdown,
+                summary=current.summary,
+                facts=current.facts,
+                assumptions=current.assumptions,
+                decisions=current.decisions,
+                uncertainties=current.uncertainties,
+                open_questions=current.open_questions,
+                risks=current.risks,
+            )
+            self.documents.create_version(document)
+            self.open_questions.sync_stage_questions(
+                session_id=session_id,
+                stage=stage,
+                questions=current.open_questions,
+            )
+            self.sessions.save_state(session_id, state)
+            self.db_session.commit()
+            return self.get_session(session_id)
+
+    def add_comment(self, session_id: str, comment: CommentInput) -> SessionOverview:
+        """Persist section feedback for the next successful turn.
+
+        Args:
+            session_id (str): Owned session.
+            comment (CommentInput): Section and feedback.
+
+        Returns:
+            SessionOverview: State including the comment.
+        """
+        self._require_owned(session_id)
+        with self.lock_manager.lock(session_id):
+            record = self._require_owned(session_id)
+            state = self.sessions.to_state(record)
+            state.comments.append(SectionComment(**comment.model_dump()))
+            self.sessions.save_state(session_id, state)
+            self.db_session.commit()
+            return self.get_session(session_id)
+
+    def submit_review(self, session_id: str, review: ReviewInput) -> SessionOverview:
+        """Apply an explicit review action to the pending stage.
+
+        Args:
+            session_id (str): Owned session.
+            review (ReviewInput): Action and note.
+
+        Returns:
+            SessionOverview: Updated session.
+
+        Raises:
+            ConflictError: Review stage does not match pending review.
+        """
+        overview = self.get_session(session_id)
+        if overview.pending_human_review is None or overview.pending_human_review.from_stage != review.stage:
+            message = "Review does not match the pending stage."
+            raise ConflictError(message)
+        return self.review_pending_transition(
+            session_id=session_id,
+            approved=review.action == ReviewAction.APPROVE,
+            note=review.note,
+        )
+
+    def document_diff(
+        self,
+        session_id: str,
+        stage: Stage,
+        from_version: int,
+        to_version: int,
+    ) -> DocumentDiff:
+        """Compare immutable versions within one owned stage.
+
+        Args:
+            session_id (str): Owned session.
+            stage (Stage): Document stage.
+            from_version (int): Source version.
+            to_version (int): Target version.
+
+        Returns:
+            DocumentDiff: Unified diff.
+
+        Raises:
+            NotFoundError: Either version is missing.
+        """
+        versions = {item.version: item for item in self.list_documents(session_id) if item.stage == stage}
+        if from_version not in versions or to_version not in versions:
+            message = "Document version was not found."
+            raise NotFoundError(message)
+        diff = "".join(
+            difflib.unified_diff(
+                versions[from_version].markdown.splitlines(keepends=True),
+                versions[to_version].markdown.splitlines(keepends=True),
+                fromfile=str(from_version),
+                tofile=str(to_version),
+            ),
+        )
+        return DocumentDiff(stage=stage, from_version=from_version, to_version=to_version, diff=diff)
+
+    def export_backlog(self, session_id: str) -> BacklogExport:
+        """Export existing backlog items; slicing metadata is deferred to lot 4.
+
+        Args:
+            session_id (str): Owned session.
+
+        Returns:
+            BacklogExport: Existing typed backlog items.
+        """
+        state = self.sessions.to_state(self._require_owned(session_id))
+        backlog = state.stage_states.get(Stage.STAGE_6_BACKLOG_SYNTHESIS.value)
+        fields = backlog.extracted_fields.model_dump(exclude_none=True) if backlog else {}
+        return BacklogExport(
+            items=[dict(item, collection=key) for key, values in fields.items() for item in values],
+        )
+
+    def export_slice_specs(self, session_id: str) -> SliceSpecsExport:
+        """Return documented empty specs until delivery slicing exists.
+
+        Args:
+            session_id (str): Owned session.
+
+        Returns:
+            SliceSpecsExport: Explicit unavailable status.
+        """
+        self._require_owned(session_id)
+        return SliceSpecsExport()
+
+    def prepare_turn(self, session_id: str) -> None:
+        """Authorize before sending stream headers.
+
+        Args:
+            session_id (str): Owned session.
+
+        Raises:
+            pending_human_review_in_progress: Human review is pending.
+        """
+        if self.get_session(session_id).pending_human_review is not None:
+            raise ConflictError.pending_human_review_in_progress()
+
+    async def stream_turn(self, session_id: str, content: str) -> AsyncIterator[TurnEvent]:
+        """Stream tentative provider deltas then committed state or terminal error.
+
+        Args:
+            session_id (str): Authorized session.
+            content (str): User message.
+
+        Yields:
+            TurnEvent: Ordered typed event, exactly one terminal event.
+        """
+        stage = self.get_session(session_id).current_stage
+        turn_id = str(uuid4())
+        yield TurnStarted(turn_id=turn_id, stage=stage)
+        yield AnalysisStatus()
+        queue: asyncio.Queue[str] = asyncio.Queue()
+
+        async def on_delta(delta: str) -> None:
+            await queue.put(delta)
+
+        task = asyncio.create_task(
+            self.aprocess_user_message(session_id=session_id, content=content, on_delta=on_delta),
+        )
+        try:
+            while not task.done() or not queue.empty():
+                waiter = asyncio.create_task(queue.get())
+                await asyncio.wait({task, waiter}, return_when=asyncio.FIRST_COMPLETED)
+                if waiter.done():
+                    yield MessageDelta(delta=waiter.result())
+                else:
+                    waiter.cancel()
+                    with suppress(asyncio.CancelledError):
+                        await waiter
+            output = await task
+            document = next(
+                item
+                for item in reversed(self.list_documents(session_id))
+                if item.stage == output.processed_stage
+            )
+            overview = self.get_session(session_id)
+            yield DocumentUpdated(document=document)
+            yield CoverageUpdated(stage=overview.stage_states[stage.value])
+            if output.current_stage != stage:
+                yield StageChanged(from_stage=stage, to_stage=output.current_stage)
+            if output.pending_review:
+                yield ReviewRequired(review=output.pending_review)
+            yield TurnCompleted(turn_id=turn_id, output=output)
+        except Exception:
+            self.db_session.rollback()
+            yield TurnError()
+        finally:
+            if not task.done():
+                task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await task

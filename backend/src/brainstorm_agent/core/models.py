@@ -208,6 +208,9 @@ class StageState(BaseModel):
             value["extracted_fields"] = STAGE_MODELS[stage].model_validate(fields)
         return value
 
+    coverage: dict[str, CoverageStatus] = Field(default_factory=dict)
+    readiness: list[ReadinessItem] = Field(default_factory=list)
+    stale: bool = False
     stage: Stage
     contradictions: list[str] = Field(default_factory=list)
     partial_fields: dict[str, str] = Field(default_factory=dict)
@@ -227,9 +230,24 @@ class StageState(BaseModel):
     updated_at: datetime = Field(default_factory=utc_now)
 
 
+class SectionComment(BaseModel):
+    """Owner annotation consumed as context by the next successful turn."""
+
+    id: str = Field(default_factory=lambda: str(uuid4()))
+    stage: Stage
+    section: str
+    body: str
+    consumed: bool = False
+    created_at: datetime = Field(default_factory=utc_now)
+
+
 class BrainstormSessionState(BaseModel):
     """Persistent structured state for a brainstorming session."""
 
+    title: str = "Untitled session"
+    archived: bool = False
+    deleted: bool = False
+    comments: list[SectionComment] = Field(default_factory=list)
     session_id: str
     turn_usage: dict[str, dict[str, int]] = Field(default_factory=dict)
     transcript: list[dict[str, str]] = Field(default_factory=list)
@@ -326,6 +344,10 @@ class AssistantTurnOutput(BaseModel):
 class SessionOverview(BaseModel):
     """Session snapshot returned by the API."""
 
+    title: str = "Untitled session"
+    archived: bool = False
+    stage_states: dict[str, StageState] = Field(default_factory=dict)
+    comments: list[SectionComment] = Field(default_factory=list)
     session_id: str
     current_stage: Stage
     created_at: datetime

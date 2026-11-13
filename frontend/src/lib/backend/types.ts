@@ -1,6 +1,10 @@
+import type { components } from "./generated/api";
+
 /**
  * Provisional application contract between the Next.js server and the backend.
  *
+ * Presentation types for the mock workspace (full HTTP mapping is lot 7b).
+ * Generated primitives are reused where shapes already match.
  * These types mirror the planned lot 6 API (sessions, typed SSE turn events,
  * reviews, reopen/stale, direct edits, exports). They are hand-written until
  * the OpenAPI-to-TypeScript generation of lot 6 replaces them. Browser code
@@ -48,7 +52,7 @@ export function earlierStagesValidated(
   );
 }
 
-export type Coverage = "clear" | "partial" | "missing";
+export type Coverage = components["schemas"]["CoverageStatus"];
 
 export interface AuthenticatedUser {
   id: string;
@@ -173,7 +177,7 @@ export interface DeliverySlicing {
 }
 
 export const REVIEW_ACTIONS = ["approve", "reject", "request_changes"] as const;
-export type ReviewAction = (typeof REVIEW_ACTIONS)[number];
+export type ReviewAction = components["schemas"]["ReviewAction"];
 
 export const EXPORT_FORMATS = ["markdown", "json", "slice_specs", "backlog_json"] as const;
 export type ExportFormat = (typeof EXPORT_FORMATS)[number];

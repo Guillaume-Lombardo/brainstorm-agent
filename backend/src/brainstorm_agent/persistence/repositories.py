@@ -151,9 +151,13 @@ class SessionRepository:
         completed_stages = [
             Stage(stage_name)
             for stage_name, stage_state in state.stage_states.items()
-            if stage_state.stage_is_clear_enough
+            if stage_state.stage_is_clear_enough and not stage_state.stale
         ]
         return SessionOverview(
+            title=state.title,
+            archived=state.archived,
+            stage_states=state.stage_states,
+            comments=state.comments,
             session_id=record.id,
             current_stage=Stage(record.current_stage),
             created_at=record.created_at,

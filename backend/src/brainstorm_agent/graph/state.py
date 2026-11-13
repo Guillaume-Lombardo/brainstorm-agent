@@ -8,6 +8,7 @@ from typing import Any, NotRequired, TypedDict
 class TurnGraphState(TypedDict):
     """Graph state for one processed assistant turn."""
 
+    on_delta: NotRequired[Any]
     session_id: str
     session_state: dict[str, Any]
     current_stage: str

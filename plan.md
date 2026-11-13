@@ -204,6 +204,11 @@
 - Objective: a stable, typed contract for the Next.js frontend.
 - ADR impact: `required` (`docs/adr/0010-application-api-and-event-stream.md`)
 
+Implementation decisions (validated lot 6 scope): preserve legacy endpoints; add typed application
+endpoints backed by the existing owner-only session service. Persist metadata, comments and stale
+markers additively in session JSON. Generate the versioned OpenAPI snapshot and frontend types.
+Reuse lot 2 validators and elicitation metadata; delivery slicing exports stay explicitly unavailable.
+
 #### Steps
 
 - [ ] Typed SSE event stream per turn: `turn.started`, `analysis.status`, `message.delta`,
