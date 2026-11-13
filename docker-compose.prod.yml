@@ -27,8 +27,11 @@ x-backend-env: &backend-env
   OPENAI_BASE_URL: http://litellm:4000/v1
   OPENAI_API_KEY: ${BRAINSTORM_LLM_API_KEY:?BRAINSTORM_LLM_API_KEY is required}
   MODEL_NAME: ${BRAINSTORM_MODEL_NAME:-glm-5.3-flash}
-  OPENAI_TIMEOUT_SECONDS: ${BRAINSTORM_LLM_TIMEOUT_SECONDS:-60}
-  REDIS_LOCK_TIMEOUT_SECONDS: ${BRAINSTORM_REDIS_LOCK_TIMEOUT_SECONDS:-300}
+  # A detailed stage analysis is a JSON document of several thousand tokens: 4096 truncates it.
+  LLM_MAX_TOKENS: ${BRAINSTORM_LLM_MAX_TOKENS:-12288}
+  # Two silent analysis attempts must stay under the frontend proxy's 300-second body timeout.
+  OPENAI_TIMEOUT_SECONDS: ${BRAINSTORM_LLM_TIMEOUT_SECONDS:-120}
+  REDIS_LOCK_TIMEOUT_SECONDS: ${BRAINSTORM_REDIS_LOCK_TIMEOUT_SECONDS:-480}
 
 x-backend-env-file: &backend-env-file
   - path: backend/.env

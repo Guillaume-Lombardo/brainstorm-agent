@@ -63,8 +63,9 @@ committed `.env`. A missing secret makes the deployment fail (`${VAR:?}`).
 | `BRAINSTORM_LLM_MODE` | `openai` | `fake` runs the deterministic offline model (tests only) |
 | `BRAINSTORM_LLM_BASE_URL` | `http://10.16.0.117:4000/v1` | OpenAI-compatible gateway |
 | `BRAINSTORM_MODEL_NAME` | `GLM-5.3-Flash` | Default model, as named by the docker-box gateway (model names are case-sensitive: `glm-5.3-flash` is rejected); the gateway has no `claude-opus-5-5` alias yet |
-| `BRAINSTORM_LLM_TIMEOUT_SECONDS` | `60` | Per-call LLM timeout |
-| `BRAINSTORM_REDIS_LOCK_TIMEOUT_SECONDS` | `300` | Must exceed three LLM timeouts (five with the challenge pass) |
+| `BRAINSTORM_LLM_MAX_TOKENS` | `12288` | Output budget per LLM call; a detailed stage analysis exceeds 4096 tokens and is then rejected as truncated |
+| `BRAINSTORM_LLM_TIMEOUT_SECONDS` | `120` | Per-call LLM timeout; two analysis attempts stream nothing, so keep twice this value under the frontend proxy's 300-second body timeout |
+| `BRAINSTORM_REDIS_LOCK_TIMEOUT_SECONDS` | `480` | Must exceed three LLM timeouts (five with the challenge pass) |
 | `BRAINSTORM_LOG_LEVEL` | `INFO` | Backend log level |
 
 The administrator is created only when its email does not exist yet: setting
