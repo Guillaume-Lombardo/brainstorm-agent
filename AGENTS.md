@@ -142,7 +142,7 @@ Keep separate modules for:
   - `docs/adr/README.md`
 - Create an ADR whenever architecture or structural choices are introduced or changed.
 - Before each push or PR, run one explicit dead-code pass.
-- Keep `README.md`, `backend/.env.template`, and local validation config synchronized with behavior changes.
+- Keep `README.md` (quick start), `docs/reference.md` (setup, configuration, API), `backend/.env.template`, and local validation config synchronized with behavior changes.
 - End each feature delivery with a GitHub PR.
 - After PR creation or update, poll CI and review status every 60 seconds until:
   - CI is complete, and
@@ -175,7 +175,7 @@ Then verify:
 - dead code has been removed
 - modified code paths use Google-style docstrings with explicit types
 - `backend/tests/unit` mirrors `backend/src/brainstorm_agent` structure in touched areas
-- `README.md` matches the current API and setup
+- `README.md` and `docs/reference.md` match the current API and setup
 - `backend/.env.template` matches the environment contract
 - ADRs were added or updated when architecture changed
 

@@ -20,7 +20,7 @@ uv sync --group dev
 1. Create a dedicated branch from `main`.
 2. Implement the change with tests.
 3. Keep docs/config in sync when behavior changes:
-   - `README.md`
+   - `README.md` (quick start) and `docs/reference.md`
    - `backend/.env.template`
 
 4. Open a Pull Request.
