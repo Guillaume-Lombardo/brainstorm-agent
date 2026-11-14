@@ -128,7 +128,14 @@ def _values(value: object, language: Language) -> list[str]:
             for part in _values(child, language)
         ]
     if isinstance(value, list):
-        return [part for child in value for part in _values(child, language)]
+        return [
+            part
+            for child in value
+            for part in (
+                ["; ".join(_values(child, language))] if isinstance(child, dict) else _values(child, language)
+            )
+            if part
+        ]
     if value is None or (isinstance(value, str) and not value):
         return []
     if isinstance(value, bool):
@@ -187,21 +194,23 @@ def _deduplicate(
     """
     seen: set[str] = set()
 
-    def unique(items: list[str]) -> list[str]:
+    def unique(items: list[str], covered: set[str] | None = None) -> list[str]:
         """Keep statements not covered by a previously emitted item.
 
         Args:
             items (list[str]): Ordered candidate statements.
+            covered (set[str] | None): Keys to check against; the global set by default.
 
         Returns:
             list[str]: First occurrence of each new statement.
         """
+        scope = seen if covered is None else covered
         result = []
         for item in items:
             key = _identity(item)
-            if key and key not in seen:
-                seen.add(key)
-                seen.update(_identity(alias) for alias in (aliases or {}).get(key, []))
+            if key and key not in scope:
+                scope.add(key)
+                scope.update(_identity(alias) for alias in (aliases or {}).get(key, []))
                 result.append(" ".join(item.split()))
         return result
 
@@ -210,11 +219,15 @@ def _deduplicate(
         name: unique(getattr(document, name))
         for name in ("risks", "open_questions", "assumptions", "decisions")
     }
-    sections = [
-        section.model_copy(update={"items": items})
-        for section in document.sections
-        if (items := unique(section.items))
-    ]
+    # Each section keeps its own membership; later facts still dedupe against all sections.
+    section_keys: set[str] = set()
+    sections = []
+    for section in document.sections:
+        local = set(seen)
+        if items := unique(section.items, local):
+            sections.append(section.model_copy(update={"items": items}))
+            section_keys |= local
+    seen |= section_keys
     overview = unique(re.split(r"(?<=[.!?])\s+(?=[A-ZÀ-Þ])", document.overview))
     seen.add(_identity(document.overview))
     facts = [*overview[4:], *unique(document.facts)]

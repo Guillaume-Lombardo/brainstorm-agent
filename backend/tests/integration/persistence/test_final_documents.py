@@ -279,3 +279,38 @@ def test_export_title_keeps_punctuation_and_neutralizes_links(service):
     assert exported.startswith("# mobile-first D+1 (a, b) ")
     assert r"\[link\](h&#8203;ttps://bad.test)" in exported
     assert "https://bad.test" not in exported
+
+
+def test_stale_validated_stage_is_finalized_again_on_revalidation(service, mocker):
+    rewrite = mocker.spy(service.llm, "final_document")
+    sid = service.create_session().session_id
+    state = service.sessions.to_state(service.sessions.require(sid))
+    state.current_stage = Stage.STAGE_7_DELIVERY_SLICING
+    # An upstream reopen leaves downstream stages validated but stale.
+    state.stage_states[Stage.STAGE_7_DELIVERY_SLICING] = StageState(
+        stage=Stage.STAGE_7_DELIVERY_SLICING,
+        stage_is_clear_enough=True,
+        stale=True,
+    )
+    state.stage_states[Stage.STAGE_6_BACKLOG_SYNTHESIS] = StageState(
+        stage=Stage.STAGE_6_BACKLOG_SYNTHESIS,
+        extracted_fields=BacklogFields.model_validate({
+            "mvp_user_stories": [{"id": "story-1", "statement": "Export a report"}],
+        }),
+    )
+    service.documents.create_version(
+        StepDocument(
+            session_id=sid,
+            stage=Stage.STAGE_7_DELIVERY_SLICING,
+            version=1,
+            kind=DocumentKind.FINAL,
+            markdown="## Outdated final",
+            summary="Outdated",
+        ),
+    )
+    service.sessions.save_state(sid, state)
+    service.db_session.commit()
+    content = 'slices: [{"id":"slice-0","goal":"Walking skeleton","backlog_item_ids":["story-1"],"integration_scenarios":[{"ears":"WHEN requested THE SYSTEM SHALL export reports"}]}]'
+    assert service.process_user_message(session_id=sid, content=content).stage_clear_enough
+    assert rewrite.call_count == 1
+    assert "Outdated final" not in service.export_markdown(sid)

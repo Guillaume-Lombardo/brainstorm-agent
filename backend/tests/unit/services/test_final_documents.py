@@ -5,7 +5,7 @@ from __future__ import annotations
 from brainstorm_agent.core.enums import Language, OpenQuestionStatus, Stage
 from brainstorm_agent.core.final_documents import FinalSection
 from brainstorm_agent.core.models import AssumptionItem, DecisionItem, FactItem, OpenQuestionItem, StageState
-from brainstorm_agent.core.stage_contracts import DeliveryFields, PitchFields
+from brainstorm_agent.core.stage_contracts import DeliveryFields, PitchFields, StoryMapFields
 from brainstorm_agent.services.final_documents import escape_final_markdown, from_stage_state, render_final
 
 
@@ -228,3 +228,28 @@ def test_risk_fields_keep_each_complete_record_and_suppress_duplicate_state_rows
     for expected in ("risk-1", "Tools get lost", "High", "Track returns", "Agree a lending policy"):
         assert expected in content.risks[0]
     assert content.facts == []
+
+
+def test_artefact_sections_keep_membership_and_complete_records():
+    state = StageState(
+        stage=Stage.STAGE_2_USER_STORY_MAPPING,
+        extracted_fields=StoryMapFields.model_validate({
+            "capabilities": ["Search", "Export"],
+            "mvp_scope": ["Search"],
+        }),
+    )
+    sections = {section.title: section.items for section in from_stage_state(state, Language.EN).sections}
+    assert sections["MVP scope"] == ["Search"]
+    assert sections["Capabilities"] == ["Search", "Export"]
+    delivery = StageState(
+        stage=Stage.STAGE_7_DELIVERY_SLICING,
+        extracted_fields=DeliveryFields.model_validate({
+            "slices": [
+                {"id": "slice-0", "goal": "Search", "backlog_item_ids": ["story-1"]},
+                {"id": "slice-1", "goal": "Export", "backlog_item_ids": ["story-1"]},
+            ],
+        }),
+    )
+    slices = from_stage_state(delivery, Language.EN).sections[0].items
+    assert len(slices) == 2
+    assert all("story-1" in item for item in slices)

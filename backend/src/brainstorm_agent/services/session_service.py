@@ -401,12 +401,16 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
                     risks=output.risks,
                 ),
             )
+            newly_validated = (
+                previous_stage_state is None
+                or not previous_stage_state.stage_is_clear_enough
+                or previous_stage_state.stale
+            )
             if (
                 output.stage_clear_enough
                 and not output.requires_human_review
                 and (
-                    previous_stage_state is None
-                    or not previous_stage_state.stage_is_clear_enough
+                    newly_validated
                     or not any(
                         item.kind == DocumentKind.FINAL and item.stage == output.processed_stage
                         for item in self.documents.list_all(session_id)
