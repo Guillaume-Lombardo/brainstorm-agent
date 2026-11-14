@@ -37,3 +37,7 @@ asset is a template consumed by the deterministic Markdown renderer. v1 remains 
 never turn summaries, transcript, gate decisions or clarification history. It runs once
 on validation; ordinary working Markdown continues to use `step-markdown.md`. Invalid
 output is not repaired: the same schema is built deterministically from state instead.
+The final contract has a short prose overview, optional artefact sections and five distinct
+governance lists. Each substantive item belongs once in its most specific section;
+normalization removes presentation duplicates, and the rewrite merges near-duplicates
+without omitting business content. This prompt is introduced together with ADR 0013.

@@ -66,7 +66,7 @@ committed `.env`. A missing secret makes the deployment fail (`${VAR:?}`).
 | `BRAINSTORM_LLM_OUTPUT_MODE` | `json_object` | Structured output mode (`json_object`, `json_schema`, `tool`). Anthropic models reject the strict `tool` and `json_schema` grammars of the stage analysis as too large, so the stack keeps the schema in the prompt and validates the JSON in the backend |
 | `BRAINSTORM_LLM_MAX_TOKENS` | `32768` | Output budget per LLM call; a detailed stage analysis exceeds 4096 tokens and is then rejected as truncated |
 | `BRAINSTORM_LLM_TIMEOUT_SECONDS` | `300` | Per-call LLM timeout; Opus 5.5 can spend several minutes on one analysis. The turn stream sends a keepalive every 15 seconds meanwhile, so the frontend proxy and the reverse proxies keep a long turn open, retries included |
-| `BRAINSTORM_REDIS_LOCK_TIMEOUT_SECONDS` | `1800` | Must exceed the worst turn: five LLM timeouts when the challenge pass is `findings`, three otherwise (1500 s with the 300 s default; 900 s makes the backend refuse to start) |
+| `BRAINSTORM_REDIS_LOCK_TIMEOUT_SECONDS` | `1800` | Must exceed four LLM timeouts with challenge off (1200 s by default). With `LLM_CHALLENGE_PASS=findings`, exceed six timeouts: set this above 1800 s, e.g. 2100 |
 | `BRAINSTORM_LOG_LEVEL` | `INFO` | Backend log level |
 
 The administrator is created only when its email does not exist yet: setting

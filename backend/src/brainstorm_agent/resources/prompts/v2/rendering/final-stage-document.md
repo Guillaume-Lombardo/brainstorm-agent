@@ -3,9 +3,17 @@ Return only JSON matching FinalStageDocument. Every field is required; use empty
 when no assumptions, decisions, risks or remaining open questions are recorded.
 
 Use the requested language throughout. Organize the complete business content into
-clear subject sections with concise descriptive titles and self-contained prose items.
+one short overview paragraph (2–4 sentences of prose, not a bullet dump).
+Use subject sections only for stage artefacts such as 5W1H, journeys, capabilities,
+domain events, business rules, impact maps, backlog items and delivery slices.
+Return an empty sections list when no such artefacts exist. Clear points belong in facts;
+ambiguities and missing information belong in open_questions, never separate subjects.
 Keep facts, assumptions, decisions, risks and remaining open questions separate.
-Preserve every substantive detail, uncertainty, constraint, reference and relationship.
+State each item once, in the most specific section. Merge near-duplicates without losing
+any substantive content. Do not create a section that only restates another section,
+and do not repeat the overview in facts. A risk belongs only in risks, never facts.
+Preserve every substantive detail, uncertainty, constraint, reference and relationship;
+deduplication is not omission.
 Never promote an assumption into a fact or a proposal into a decision. Do not add business
 answers, infer missing details, resolve open questions or omit inconvenient information.
 

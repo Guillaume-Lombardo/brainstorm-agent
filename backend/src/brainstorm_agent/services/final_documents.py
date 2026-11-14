@@ -3,28 +3,18 @@
 from __future__ import annotations
 
 import json
+import re
+import unicodedata
 from typing import TYPE_CHECKING
 
 from brainstorm_agent.core.enums import Language, OpenQuestionStatus, Stage
 from brainstorm_agent.core.final_documents import FinalSection, FinalStageDocument
 from brainstorm_agent.core.language import session_language
-from brainstorm_agent.core.research import escape_markdown
 
 if TYPE_CHECKING:
     from brainstorm_agent.core.models import BrainstormSessionState, StageState
 
 _FR_LABELS = {
-    "pitch_summary": "Présentation du projet",
-    "clear_points": "Points établis",
-    "ambiguities": "Ambiguïtés",
-    "missing_information": "Informations manquantes",
-    "problem_statement": "Problème à résoudre",
-    "users_actors": "Utilisateurs et acteurs",
-    "measurable_objectives": "Objectifs mesurables",
-    "constraints": "Contraintes",
-    "non_goals": "Hors périmètre",
-    "hypotheses": "Hypothèses",
-    "initial_risks": "Risques initiaux",
     "five_w_one_h": "Qui, quoi, où, quand, pourquoi et comment",
     "actors_personas": "Acteurs et profils",
     "user_journeys": "Parcours utilisateurs",
@@ -45,8 +35,6 @@ _FR_LABELS = {
     "influential_actors": "Acteurs influents",
     "expected_behaviors": "Comportements attendus",
     "deliverables": "Livrables",
-    "value_hypotheses": "Hypothèses de valeur",
-    "risks_by_category": "Risques par catégorie",
     "mvp_user_stories": "Récits utilisateurs du MVP",
     "risk_spikes": "Explorations des risques",
     "cross_cutting_work": "Travaux transversaux",
@@ -148,38 +136,213 @@ def _values(value: object, language: Language) -> list[str]:
     return [str(value)]
 
 
+_FIELD_GOVERNANCE = {
+    "clear_points": "facts",
+    "ambiguities": "open_questions",
+    "missing_information": "open_questions",
+    "users_actors": "facts",
+    "measurable_objectives": "facts",
+    "constraints": "facts",
+    "non_goals": "decisions",
+    "hypotheses": "assumptions",
+    "initial_risks": "risks",
+    "value_hypotheses": "assumptions",
+}
+_RISK_PREFIX = re.compile(
+    r"^(?:(?:main |initial )?risk(?: identified)?|risque(?: principal| initial)?(?: identifié)?)\s*:\s*",
+    re.IGNORECASE,
+)
+
+
+def _identity(text: str) -> str:
+    """Normalize presentation differences without merging distinct business values.
+
+    Args:
+        text (str): Business statement, optionally with an explicit risk prefix.
+
+    Returns:
+        str: Comparable key preserving internal punctuation and numeric values.
+    """
+    # Normalize presentation only; preserve numbers, operators and business distinctions.
+    text = unicodedata.normalize("NFKC", _RISK_PREFIX.sub("", text)).casefold()
+    text = text.replace("\u2019", "'").replace("\u2013", "-").replace("\u2010", "-")
+    text = re.sub(r"\s+([.,?!:;])", r"\1", " ".join(text.split()))
+    return text.strip().rstrip(".?!")
+
+
+def _deduplicate(
+    document: FinalStageDocument,
+    language: Language,
+    aliases: dict[str, list[str]] | None = None,
+) -> FinalStageDocument:
+    """Assign repeated statements to their most specific existing section.
+
+    Args:
+        document (FinalStageDocument): Unescaped business content.
+        language (Language): Language for a neutral overview when none remains.
+        aliases (dict[str, list[str]] | None): Bare statements covered by richer records.
+
+    Returns:
+        FinalStageDocument: Deduplicated content with overview overflow kept in facts.
+    """
+    seen: set[str] = set()
+
+    def unique(items: list[str]) -> list[str]:
+        """Keep statements not covered by a previously emitted item.
+
+        Args:
+            items (list[str]): Ordered candidate statements.
+
+        Returns:
+            list[str]: First occurrence of each new statement.
+        """
+        result = []
+        for item in items:
+            key = _identity(item)
+            if key and key not in seen:
+                seen.add(key)
+                seen.update(_identity(alias) for alias in (aliases or {}).get(key, []))
+                result.append(" ".join(item.split()))
+        return result
+
+    # Specific governance wins over generic facts; artefacts retain their relationships.
+    governance = {
+        name: unique(getattr(document, name))
+        for name in ("risks", "open_questions", "assumptions", "decisions")
+    }
+    sections = [
+        section.model_copy(update={"items": items})
+        for section in document.sections
+        if (items := unique(section.items))
+    ]
+    overview = unique(re.split(r"(?<=[.!?])\s+(?=[A-ZÀ-Þ])", document.overview))
+    seen.add(_identity(document.overview))
+    facts = [*overview[4:], *unique(document.facts)]
+    return document.model_copy(
+        update={
+            "overview": " ".join(overview[:4]) or _overview(language),
+            "sections": sections,
+            "facts": facts,
+            **governance,
+        },
+    )
+
+
 def from_stage_state(state: StageState, language: Language) -> FinalStageDocument:
-    """Build complete clean content without conversational or gate metadata.
+    """Build content once, routing governance fields to their specific lists.
 
     Args:
         state (StageState): Accumulated business content.
         language (Language): Language for headings and empty states.
 
     Returns:
-        FinalStageDocument: Deterministic fallback and source for the bounded rewrite.
+        FinalStageDocument: Deduplicated fallback and source for the bounded rewrite.
     """
     fields = state.extracted_fields.model_dump(exclude_none=True)
-    # The fake adapter's facts duplicate typed fields using their raw identifiers.
-    duplicates = {f"{name}: {value}" for name, value in fields.items()}
-    sections = [
-        FinalSection(title=_label(name, language), items=items)
-        for name, value in fields.items()
-        if (items := _values(value, language))
-    ]
-    return FinalStageDocument(
-        sections=sections
-        or [FinalSection(title=stage_title(state.stage, language), items=[_none(language)])],
-        facts=[item.statement for item in state.facts if item.statement not in duplicates],
-        assumptions=[item.statement for item in state.assumptions],
-        decisions=[
+    duplicates = {_identity(f"{name}: {value}") for name, value in fields.items()}
+    overview = str(
+        fields.pop("pitch_summary", None) or fields.pop("problem_statement", None) or _overview(language),
+    )
+    governance: dict[str, list[str]] = {
+        "facts": [],
+        "assumptions": [item.statement for item in state.assumptions],
+        "decisions": [
             f"{item.statement} ({item.rationale})" if item.rationale else item.statement
             for item in state.decisions
         ],
-        risks=["; ".join(_values(item.model_dump(exclude={"id"}), language)) for item in state.risks],
-        open_questions=[
+        "risks": ["; ".join(_values(item.model_dump(exclude={"id"}), language)) for item in state.risks],
+        "open_questions": [
             *[item.question for item in state.open_questions if item.status == OpenQuestionStatus.OPEN],
             *[item for item in state.uncertainties if item != "Blocking questions remain unresolved."],
         ],
+    }
+    aliases = {
+        _identity(text): [item.description]
+        for text, item in zip(governance["risks"], state.risks, strict=True)
+    }
+    aliases.update({
+        _identity(text): [item.statement]
+        for text, item in zip(governance["decisions"], state.decisions, strict=True)
+    })
+    field_risks = fields.pop("risks_by_category", [])
+    if isinstance(field_risks, list):
+        records = []
+        for risk in field_risks:
+            text = "; ".join(_values(risk, language))
+            records.append(text)
+            if isinstance(risk, dict):
+                aliases[_identity(text)] = [
+                    str(risk.get("description", "")),
+                    "; ".join(_values({key: value for key, value in risk.items() if key != "id"}, language)),
+                ]
+        governance["risks"] = [*records, *governance["risks"]]
+    sections = []
+    for name, value in fields.items():
+        items = _values(value, language)
+        if name in _FIELD_GOVERNANCE:
+            governance[_FIELD_GOVERNANCE[name]].extend(items)
+        elif items:
+            sections.append(FinalSection(title=_label(name, language), items=items))
+    governance["facts"].extend(
+        item.statement for item in state.facts if _identity(item.statement) not in duplicates
+    )
+    facts = []
+    for item in governance["facts"]:
+        if _RISK_PREFIX.match(item):
+            governance["risks"].append(_RISK_PREFIX.sub("", item))
+        else:
+            facts.append(item)
+    return _deduplicate(
+        FinalStageDocument(
+            overview=overview,
+            sections=sections,
+            facts=facts,
+            assumptions=governance["assumptions"],
+            decisions=governance["decisions"],
+            risks=governance["risks"],
+            open_questions=governance["open_questions"],
+        ),
+        language,
+        aliases,
+    )
+
+
+def escape_final_markdown(text: str) -> str:
+    """Keep untrusted final content literal while preserving ordinary punctuation.
+
+    Args:
+        text (str): One untrusted prose item, title or overview.
+
+    Returns:
+        str: Single-line Markdown with inert syntax, URLs and email addresses.
+    """
+    text = " ".join(text.split()).replace("&", "&amp;")
+    text = re.sub(r"([\\`*_\[\]<>|~])", r"\\\1", text)
+    text = re.sub(r"^(\s*)([#\-+])", r"\1\\\2", text)
+    text = re.sub(r"^(\s*\d+)\.", r"\1\\.", text)
+    # GFM scans decoded text too: an invisible separator must survive entity decoding.
+    text = re.sub(
+        r"(?i)\b(https?|ftp):",
+        lambda match: f"{match[1][0]}&#8203;{match[1][1:]}:",
+        text,
+    )
+    text = re.sub(r"(?i)\b(w)(ww\.)", r"\1&#8203;\2", text)
+    return text.replace("@", "@&#8203;")
+
+
+def _overview(language: Language) -> str:
+    """Provide neutral prose without inventing business content.
+
+    Args:
+        language (Language): Session language.
+
+    Returns:
+        str: Two-sentence introduction for stages without a pitch or problem statement.
+    """
+    return (
+        "Cette étape consigne les éléments de cadrage validés. Les détails figurent ci-dessous."
+        if language == Language.FR
+        else "This stage records the validated framing content. Details follow below."
     )
 
 
@@ -198,12 +361,13 @@ def render_final(document: FinalStageDocument, *, stage: Stage, language: Langua
     Returns:
         str: Deterministic Markdown without working metadata.
     """
-    lines = [f"## {stage_title(stage, language)}", ""]
+    document = _deduplicate(document, language)
+    lines = [f"## {stage_title(stage, language)}", "", escape_final_markdown(document.overview), ""]
     for section in document.sections:
         lines.extend([
-            f"### {escape_markdown(section.title)}",
+            f"### {escape_final_markdown(section.title)}",
             "",
-            *[f"- {escape_markdown(item)}" for item in section.items],
+            *[f"- {escape_final_markdown(item)}" for item in section.items],
             "",
         ])
     for name, title in zip(
@@ -215,7 +379,7 @@ def render_final(document: FinalStageDocument, *, stage: Stage, language: Langua
         lines.extend([
             f"### {title}",
             "",
-            *[f"- {escape_markdown(item)}" for item in items or [_none(language)]],
+            *[f"- {escape_final_markdown(item)}" for item in items or [_none(language)]],
             "",
         ])
     return "\n".join(lines).strip() + "\n"

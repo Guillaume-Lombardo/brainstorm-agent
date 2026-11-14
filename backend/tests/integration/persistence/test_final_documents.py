@@ -187,7 +187,7 @@ def test_final_language_survives_disabled_transcript_retention(service, human):
     assert final.kind == "final"
     assert "### Faits" in final.markdown
     assert "### Questions ouvertes" in final.markdown
-    assert "### Présentation du projet" in final.markdown
+    assert "\n\nUn planificateur de repas pour les familles pressées\n\n" in final.markdown
     assert "Document de cadrage" in service.export_markdown(sid)
 
 
@@ -270,3 +270,12 @@ def test_legacy_validated_stages_export_cleanly_without_mutating_history(service
     assert "working history" not in markdown
     assert len(service.list_documents(sid)) == 1
     assert rewrite.call_count == 0
+
+
+def test_export_title_keeps_punctuation_and_neutralizes_links(service):
+    sid = service.create_session("mobile-first D+1 (a, b) [link](https://bad.test)").session_id
+    service.process_user_message(session_id=sid, content=PITCH)
+    exported = service.export_markdown(sid)
+    assert exported.startswith("# mobile-first D+1 (a, b) ")
+    assert r"\[link\](h&#8203;ttps://bad.test)" in exported
+    assert "https://bad.test" not in exported

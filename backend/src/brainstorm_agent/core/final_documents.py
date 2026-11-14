@@ -19,7 +19,8 @@ class FinalStageDocument(BaseModel):
     """Provider output shared by rewriting and deterministic fallback rendering."""
 
     model_config = ConfigDict(extra="forbid", strict=True)
-    sections: list[FinalSection] = Field(min_length=1)
+    overview: DocumentText
+    sections: list[FinalSection]
     facts: list[DocumentText]
     assumptions: list[DocumentText]
     decisions: list[DocumentText]

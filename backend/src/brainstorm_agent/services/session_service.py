@@ -66,7 +66,12 @@ from brainstorm_agent.persistence.repositories import (
     TransitionRepository,
 )
 from brainstorm_agent.services.delivery import export_backlog_json, export_slice_specs
-from brainstorm_agent.services.final_documents import document_language, from_stage_state, render_final
+from brainstorm_agent.services.final_documents import (
+    document_language,
+    escape_final_markdown,
+    from_stage_state,
+    render_final,
+)
 from brainstorm_agent.services.llm_client import BrainstormLLM, OpenAICompatibleBrainstormLLM, build_llm
 from brainstorm_agent.services.locks import NoopSessionLockManager, SessionLockManager
 from brainstorm_agent.services.markdown import MarkdownRenderer
@@ -474,7 +479,7 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
                 version=max(versions, default=0) + 1,
                 kind=DocumentKind.FINAL,
                 markdown=markdown,
-                summary=" ".join(clean.sections[0].items),
+                summary=clean.overview,
                 facts=current.facts,
                 assumptions=current.assumptions,
                 decisions=current.decisions,
@@ -595,7 +600,7 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
             if language.value == "fr"
             else "Project framing — validated stages."
         )
-        sections = [f"# {escape_markdown(overview.title)}", "", header, ""]
+        sections = [f"# {escape_final_markdown(overview.title)}", "", header, ""]
         documents = self.list_documents(session_id)
         for stage in Stage.ordered():
             current = state.stage_states.get(stage.value)

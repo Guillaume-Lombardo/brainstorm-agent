@@ -351,3 +351,14 @@ Validated scope: reproduce the deployed expense-sharing journey; correct the Que
 English chrome and exposed internal priority codes without changing question content or gates.
 Add a failing regression test first, verify the frontend, run the requested review loop, and open
 an unmerged ready PR. Report ambiguous model behavior separately; do not change production.
+
+### PR 32: Final-document review corrections
+
+Validated scope: keep one short prose overview, reserve subject sections for stage artefacts,
+and fold governance-like fields into deduplicated governance lists. Preserve substantive
+content and business relationships in both the bounded rewrite and deterministic fallback.
+Use context-aware literal Markdown escaping for finals/exports without changing benchmarks.
+Budget the finalization call in the turn lock (four calls, six with challenge findings),
+align deployment defaults/docs, and cover each correction with failing regression tests first.
+Run the complete quality checklist, regenerate API contracts if affected, rebase onto main
+if the README reference split lands, update PR 32 and push without merging.

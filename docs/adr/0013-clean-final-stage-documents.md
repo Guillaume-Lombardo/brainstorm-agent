@@ -18,8 +18,18 @@ without a next stage. Reopening invalidates prior validation without deleting hi
 - Finalization belongs to `SessionService`, after the deterministic gate and any required
   human approval. The terminal stage also requires approval when that setting is enabled.
   A completed terminal stage can be reopened explicitly and finalized again.
-- Define `FinalStageDocument` in domain code: subject sections plus facts, assumptions,
-  decisions, risks and remaining open questions. Render Markdown deterministically.
+- Define `FinalStageDocument` in domain code: one short prose `overview`, optional subject
+  sections for stage artefacts only, then facts, assumptions, decisions, risks and remaining
+  open questions. Stage 0/1 governance-like fields fold into those lists; a pitch/problem
+  statement supplies the overview. Do not create subject sections that restate governance.
+- State each substantive item once. The rewrite merges near-duplicates; the fallback and
+  renderer remove exact/normalized duplicates (case, whitespace, Unicode presentation and
+  terminal punctuation). Specific governance and artefacts take precedence over generic
+  facts. Rich risk/decision records retain details and suppress their bare duplicates.
+  Deterministic matching does not infer semantic equivalence between paraphrases.
+- Render final Markdown and export titles with a dedicated narrow escaper. Preserve normal
+  punctuation while neutralizing active Markdown, HTML, URLs and email autolinks; collapse
+  untrusted line breaks so they cannot inject blocks. Benchmark escaping stays unchanged.
 - Use the separate versioned `v2/rendering/final-stage-document.md` prompt for one bounded
   structured provider request. Supply only state-derived business content in the session
   language; exclude the analysis summary, transcript, gate metadata and clarifications.
@@ -43,7 +53,12 @@ Validation adds one provider request, bounded by existing timeout and token sett
 turns incur no added request. A rendering failure cannot veto a valid transition. Rewrites
 remain subject to model faithfulness: typed validation checks shape, not semantic equivalence.
 All original state and working versions remain available in JSON for audit and comparison.
-No settings or environment variables are added.
+The lock budget includes finalization: strictly more than four provider timeouts, or six
+with challenge findings. Default lock values are 210 seconds for 30-second calls and
+840 seconds for 120-second production calls. docker-box retains 1800 seconds for 300-second
+calls with challenge off; findings requires more than 1800 seconds (for example 2100).
+No environment variables are added. The overview is internal provider content; persisted
+Markdown and the public document API retain their existing shapes.
 
 ## Alternatives
 

@@ -41,7 +41,8 @@ x-backend-env: &backend-env
   # Opus 5.5 can spend several minutes on a detailed analysis. Turn streams send a keepalive
   # every 15 s meanwhile, so the frontend proxy and the reverse proxies keep them open.
   OPENAI_TIMEOUT_SECONDS: ${BRAINSTORM_LLM_TIMEOUT_SECONDS:-300}
-  # Must exceed five LLM timeouts (1500 s with the 300 s default), or the backend refuses to start.
+  # Must exceed 4 LLM timeouts (1200 s). Challenge is off by default.
+  # With LLM_CHALLENGE_PASS=findings, set the lock above 1800 s (e.g. 2100).
   REDIS_LOCK_TIMEOUT_SECONDS: ${BRAINSTORM_REDIS_LOCK_TIMEOUT_SECONDS:-1800}
 
 services:
