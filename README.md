@@ -108,8 +108,8 @@ complete. Prompts are versioned assets and every LLM output targets a typed sche
 ## 🛠️ Develop
 
 ```bash
-cd backend && uv sync --group dev && uv run pytest -m unit
-cd frontend && pnpm install && pnpm test
+(cd backend && uv sync --group dev && uv run pytest -m unit)
+(cd frontend && pnpm install && pnpm test)
 ```
 
 Run the frontend without Docker (real backend, stub model, SQLite) with `pnpm dev:backend` and
