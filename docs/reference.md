@@ -36,7 +36,7 @@ The service does not skip stages and does not persist critical state in Redis.
 
 - `backend/`: Python source, tests, migrations, packaging and Dockerfile
 - `frontend/`: Next.js workspace (see `frontend/README.md`)
-- `docs/`, `skills/`: shared governance
+- `docs/`: shared governance; `.agents/`: AI tooling (skills, plan, execution contract)
 - `deploy/`, `docker-compose*.yml`, `examples/`: cross-service deployment
 
 ## Backend architecture
