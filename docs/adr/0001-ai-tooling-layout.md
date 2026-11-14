@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted, amended on 2026-11-14 (AI tooling moved to `.agents/`).
 
 ## Context
 
@@ -31,6 +31,19 @@ Adopt the following AI tooling structure:
   - `rendering/*.md`
 
 Business invariants remain duplicated intentionally between governance docs, prompts, and future code-level validators so that prompt wording is never the only source of truth.
+
+## Amendment (2026-11-14): `.agents/` directory
+
+`AGENTS.md` stays at the repository root, where coding agents discover it automatically.
+The other AI tooling moves to `.agents/` so the root only holds product, documentation and
+deployment entry points:
+
+- `.agents/agent.md`: short execution contract
+- `.agents/SKILLS.md`: local skill index
+- `.agents/skills/*/SKILL.md`: project-local delivery skills
+- `.agents/plan.md`: validated plan and roadmap
+
+Prompt assets stay packaged under `backend/src/brainstorm_agent/resources/prompts/`.
 
 ## Consequences
 

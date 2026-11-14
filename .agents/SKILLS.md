@@ -2,27 +2,29 @@
 
 ## Purpose
 
-This file maps project-local skills to the active initiative in `plan.md`.
+This file maps project-local skills to the active initiative in `.agents/plan.md`.
 Use the smallest set of skills that covers the validated scope.
 
 ## Core Skills
 
-- `skills/architecture/SKILL.md`
+- `.agents/skills/architecture/SKILL.md`
   - Use for module boundaries, domain contracts, LangGraph shape, and ADR-worthy decisions.
-- `skills/code-style/SKILL.md`
+- `.agents/skills/code-style/SKILL.md`
   - Use for Python typing, enum conventions, docstrings, and schema discipline.
-- `skills/testing/SKILL.md`
+- `.agents/skills/testing/SKILL.md`
   - Use for unit, integration, and end-to-end coverage strategy.
-- `skills/tooling/SKILL.md`
+- `.agents/skills/tooling/SKILL.md`
   - Use for `uv`, lint/type/test workflow, local setup, and PR validation.
-- `skills/brainstorm-workflow/SKILL.md`
+- `.agents/skills/brainstorm-workflow/SKILL.md`
   - Use for stage definitions, prompt responsibilities, transition criteria, and document shape.
-- `skills/review-followup/SKILL.md`
+- `.agents/skills/review-followup/SKILL.md`
   - Use after PR review comments arrive.
+- `.agents/skills/release/SKILL.md`
+  - Use to build and publish the backend package (TestPyPI, PyPI).
 
 ## Skill Selection Rules
 
-- Start from `plan.md`.
+- Start from `.agents/plan.md`.
 - Use `architecture` and `brainstorm-workflow` for scope affecting the stage engine.
 - Add `testing` whenever behavior or persistence changes.
 - Add `tooling` for environment, CI, Docker, or local validation work.

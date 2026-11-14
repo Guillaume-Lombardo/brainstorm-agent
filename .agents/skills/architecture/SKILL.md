@@ -15,7 +15,7 @@ Design a maintainable architecture with clear contracts and low coupling.
 2. Define or update typed contracts first (models, protocols, interfaces).
 3. Choose simple abstractions before adding polymorphism.
 4. Decouple domain logic, orchestration, and infrastructure adapters.
-5. Record architecture tradeoffs in `plan.md`.
+5. Record architecture tradeoffs in `.agents/plan.md`.
 
 ## Mandatory Decisions
 

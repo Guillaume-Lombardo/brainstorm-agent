@@ -83,16 +83,18 @@ If sub-agents are added later, they must remain optional and subordinate to the 
 
 - `backend/`: source, tests, migrations, Python config, Dockerfile and env template
 - `frontend/`: future Next.js application (lot 7)
-- Root: governance, docs, skills, deployment, examples, Compose and CI
+- `.agents/`: AI tooling (execution contract, skill index, skills, active plan)
+- Root: `AGENTS.md`, docs, deployment, examples, Compose and CI
 
 ## AI Tooling Layout
 
 Use the following repository layout for AI-facing assets:
 
 - `AGENTS.md`: source of truth for runtime and delivery rules
-- `agent.md`: concise execution contract referencing `AGENTS.md`
-- `SKILLS.md`: local skill index and usage guidance
-- `skills/`: reusable project-local delivery skills
+- `.agents/agent.md`: concise execution contract referencing `AGENTS.md`
+- `.agents/SKILLS.md`: local skill index and usage guidance
+- `.agents/skills/`: reusable project-local delivery skills
+- `.agents/plan.md`: validated plan and roadmap of the current initiative
 - `backend/src/brainstorm_agent/resources/prompts/README.md`: prompt organization and versioning policy
 - `backend/src/brainstorm_agent/resources/prompts/v*/system.md`: global system prompt
 - `backend/src/brainstorm_agent/resources/prompts/v*/stages/*.md`: stage-specific prompts
@@ -135,14 +137,14 @@ Keep separate modules for:
 ## Delivery Workflow
 
 - Work only on a dedicated non-`main` branch.
-- Before substantial implementation, align on scope with the user and write the validated plan in `plan.md`.
+- Before substantial implementation, align on scope with the user and write the validated plan in `.agents/plan.md`.
 - Read and respect:
   - `docs/engineering/DEFINITION_OF_DONE.md`
   - `docs/engineering/REVIEW_RUNBOOK.md`
   - `docs/adr/README.md`
 - Create an ADR whenever architecture or structural choices are introduced or changed.
 - Before each push or PR, run one explicit dead-code pass.
-- Keep `README.md`, `backend/.env.template`, and local validation config synchronized with behavior changes.
+- Keep `README.md` (quick start), `docs/reference.md` (setup, configuration, API), `backend/.env.template`, and local validation config synchronized with behavior changes.
 - End each feature delivery with a GitHub PR.
 - After PR creation or update, poll CI and review status every 60 seconds until:
   - CI is complete, and
@@ -175,18 +177,19 @@ Then verify:
 - dead code has been removed
 - modified code paths use Google-style docstrings with explicit types
 - `backend/tests/unit` mirrors `backend/src/brainstorm_agent` structure in touched areas
-- `README.md` matches the current API and setup
+- `README.md` and `docs/reference.md` match the current API and setup
 - `backend/.env.template` matches the environment contract
 - ADRs were added or updated when architecture changed
 
 ## Local Skills
 
-Project-local skills live in `skills/`.
+Project-local skills live in `.agents/skills/`.
 Current expected set:
 
-- `skills/architecture/SKILL.md`
-- `skills/code-style/SKILL.md`
-- `skills/testing/SKILL.md`
-- `skills/tooling/SKILL.md`
-- `skills/brainstorm-workflow/SKILL.md`
-- `skills/review-followup/SKILL.md`
+- `.agents/skills/architecture/SKILL.md`
+- `.agents/skills/code-style/SKILL.md`
+- `.agents/skills/testing/SKILL.md`
+- `.agents/skills/tooling/SKILL.md`
+- `.agents/skills/brainstorm-workflow/SKILL.md`
+- `.agents/skills/review-followup/SKILL.md`
+- `.agents/skills/release/SKILL.md`
