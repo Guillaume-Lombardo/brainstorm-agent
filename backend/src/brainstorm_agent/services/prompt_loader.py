@@ -125,3 +125,11 @@ class PromptLoader:
             str: Versioned task prompt.
         """
         return self._read(f"research/{responsibility}.md")
+
+    def final_document_prompt(self) -> str:
+        """Return the bounded final-stage rewrite task.
+
+        Returns:
+            str: Versioned schema-targeted rewrite prompt.
+        """
+        return self._read("rendering/final-stage-document.md")

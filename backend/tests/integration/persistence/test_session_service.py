@@ -76,8 +76,9 @@ def test_session_service_persists_versions_and_resolves_open_questions(tmp_path:
 
         documents = service.list_documents(session.session_id)
         stage_1_documents = [item for item in documents if item.stage is Stage.STAGE_1_PROBLEM_FRAMING]
-        assert len(stage_1_documents) == 2
-        assert stage_1_documents[-1].version == 2
+        assert len(stage_1_documents) == 3
+        assert stage_1_documents[-1].version == 3
+        assert stage_1_documents[-1].kind == "final"
         assert service.get_session(session.session_id).open_questions == []
 
 

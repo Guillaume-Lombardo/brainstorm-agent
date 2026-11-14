@@ -1,3 +1,22 @@
+# Clean final stage documents
+
+Validated scope: create an additional immutable final document on automatic validation,
+human approval, and final-stage completion; regenerate after reopen. Preserve all working
+versions. Omit unvalidated stages from the clean Markdown export; retain everything in JSON.
+
+1. Add failing tests for validation paths, fallback, reopen, export and migrations.
+2. Define a typed clean-document schema, bounded rewrite adapter and versioned prompt;
+   render Markdown deterministically with a state-derived fallback and fake adapter.
+3. Persist a document kind with a backward-compatible migration and expose the Final label.
+4. Update ADR, prompt policy, reference documentation, generated API types and journeys.
+5. Run all backend gates and frontend checks, perform a dead-code/review pass, open a PR
+   against main and follow CI/reviews without merging.
+
+Architecture: finalization belongs to the session persistence boundary, never to ordinary
+turn rendering. Provider failure must leave validation successful. No new settings.
+
+---
+
 # plan.md
 
 ## Roadmap v2: working agent, delivery slicing, Next.js application (remaining work)
@@ -332,3 +351,14 @@ Validated scope: reproduce the deployed expense-sharing journey; correct the Que
 English chrome and exposed internal priority codes without changing question content or gates.
 Add a failing regression test first, verify the frontend, run the requested review loop, and open
 an unmerged ready PR. Report ambiguous model behavior separately; do not change production.
+
+### PR 32: Final-document review corrections
+
+Validated scope: keep one short prose overview, reserve subject sections for stage artefacts,
+and fold governance-like fields into deduplicated governance lists. Preserve substantive
+content and business relationships in both the bounded rewrite and deterministic fallback.
+Use context-aware literal Markdown escaping for finals/exports without changing benchmarks.
+Budget the finalization call in the turn lock (four calls, six with challenge findings),
+align deployment defaults/docs, and cover each correction with failing regression tests first.
+Run the complete quality checklist, regenerate API contracts if affected, rebase onto main
+if the README reference split lands, update PR 32 and push without merging.

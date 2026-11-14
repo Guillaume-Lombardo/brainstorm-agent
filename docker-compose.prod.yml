@@ -31,7 +31,8 @@ x-backend-env: &backend-env
   LLM_MAX_TOKENS: ${BRAINSTORM_LLM_MAX_TOKENS:-32768}
   # Per-call provider timeout. Turn streams send a keepalive every 15 s, so slow calls stay open.
   OPENAI_TIMEOUT_SECONDS: ${BRAINSTORM_LLM_TIMEOUT_SECONDS:-120}
-  REDIS_LOCK_TIMEOUT_SECONDS: ${BRAINSTORM_REDIS_LOCK_TIMEOUT_SECONDS:-480}
+  # Must exceed 4 provider timeouts, or 6 with challenge findings.
+  REDIS_LOCK_TIMEOUT_SECONDS: ${BRAINSTORM_REDIS_LOCK_TIMEOUT_SECONDS:-840}
 
 x-backend-env-file: &backend-env-file
   - path: backend/.env

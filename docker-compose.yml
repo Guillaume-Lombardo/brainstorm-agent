@@ -33,7 +33,7 @@ x-backend-env: &backend-env
   LLM_OUTPUT_MODE: ${LLM_OUTPUT_MODE:-json_schema}
   # A stage analysis can take minutes; the lock must exceed three LLM timeouts.
   OPENAI_TIMEOUT_SECONDS: ${OPENAI_TIMEOUT_SECONDS:-120}
-  REDIS_LOCK_TIMEOUT_SECONDS: ${REDIS_LOCK_TIMEOUT_SECONDS:-600}
+  REDIS_LOCK_TIMEOUT_SECONDS: ${REDIS_LOCK_TIMEOUT_SECONDS:-900}
 
 services:
   searxng:

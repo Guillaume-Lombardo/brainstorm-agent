@@ -44,4 +44,36 @@ def test_full_initial_transition_and_stage_blocking(tmp_path: Path) -> None:
 
     documents_response = client.get(f"/api/v1/sessions/{session_id}/documents")
     assert documents_response.status_code == 200
-    assert len(documents_response.json()["items"]) == 2
+    assert [item["kind"] for item in documents_response.json()["items"]] == ["working", "final", "working"]
+
+
+def test_human_approval_persists_a_clean_final_and_export(tmp_path: Path) -> None:
+    client = TestClient(
+        create_app(
+            Settings(
+                database_url=f"sqlite:///{tmp_path / 'approved.db'}",
+                llm_mode=LLMMode.FAKE,
+                redis_url="redis://localhost:6399/0",
+                require_human_validation_for_transitions=True,
+            ),
+        ),
+    )
+    sid = client.post("/api/v1/sessions", json={"title": "Meal planner"}).json()["session_id"]
+    base = f"/api/v1/sessions/{sid}"
+    pitch = "pitch: A weekly meal planner that builds the shopping list\nclear: weekly plan\nambiguous: budgets\nmissing: pricing"
+    assert client.post(base + "/messages", json={"content": pitch}).json()["requires_human_review"]
+    before = client.get(base + "/documents").json()["items"]
+    assert [item["kind"] for item in before] == ["working"]
+    assert (
+        client.post(base + "/review", json={"stage": "stage_0_pitch", "action": "approve"}).status_code == 200
+    )
+    documents = client.get(base + "/documents").json()["items"]
+    assert [item["kind"] for item in documents] == ["working", "final"]
+    assert documents[0] == before[0]
+    markdown = client.get(base + "/export/markdown").json()["markdown"]
+    assert markdown.startswith("# Meal planner\n")
+    assert "weekly meal planner" in markdown
+    assert documents[-1]["markdown"] in markdown
+    assert "Readiness" not in markdown
+    assert "pitch_summary" not in markdown
+    assert sid not in markdown

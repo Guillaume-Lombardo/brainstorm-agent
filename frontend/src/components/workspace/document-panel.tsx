@@ -95,6 +95,7 @@ export function DocumentPanel({
           {versions.map((version) => (
             <option key={version.version} value={version.version}>
               v{version.version}
+              {version.kind === "final" ? " — Final" : ""}
               {version.version === latest.version ? " (latest)" : ""}
             </option>
           ))}

@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import re
+from pathlib import Path
 
 import pytest
+import yaml
+from dotenv import dotenv_values
 
 from brainstorm_agent.core.enums import AuthMode, ChallengePass
 from brainstorm_agent.settings import Settings, get_settings
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 def test_settings_load_from_env_file(tmp_path: Path, monkeypatch) -> None:
@@ -55,7 +55,7 @@ def test_settings_skip_mode_specific_validation_when_auth_disabled() -> None:
     assert settings.effective_auth_mode is AuthMode.NONE
 
 
-@pytest.mark.parametrize(("challenge", "calls"), [("off", 3), ("findings", 5)])
+@pytest.mark.parametrize(("challenge", "calls"), [("off", 4), ("findings", 6)])
 def test_session_lock_exceeds_all_call_timeouts(challenge, calls):
     with pytest.raises(ValueError, match="worst-case"):
         Settings(
@@ -74,7 +74,7 @@ def test_output_budget_defaults_to_32k() -> None:
     assert Settings().llm_max_tokens == 32768
 
 
-def test_deployment_lock_covers_five_slow_calls() -> None:
+def test_deployment_lock_requires_room_for_six_slow_calls() -> None:
     def slow(lock: int) -> Settings:
         return Settings(
             llm_challenge_pass=ChallengePass.FINDINGS,
@@ -82,7 +82,9 @@ def test_deployment_lock_covers_five_slow_calls() -> None:
             redis_lock_timeout_seconds=lock,
         )
 
-    assert slow(1800).redis_lock_timeout_seconds == 1800
+    assert slow(2100).redis_lock_timeout_seconds == 2100
+    with pytest.raises(ValueError, match="final document"):
+        slow(1800)
     with pytest.raises(ValueError, match="worst-case"):
         slow(900)
 
@@ -107,3 +109,41 @@ def test_cors_accepts_explicit_origins() -> None:
         "http://localhost:3000",
         "https://example.com",
     ]
+
+
+@pytest.mark.parametrize(
+    "compose",
+    [
+        "docker-compose.yml",
+        "docker-compose.prod.yml",
+        "deploy/docker-box/compose.yaml",
+    ],
+)
+def test_deployment_timeout_defaults_remain_valid(compose: str):
+    root = Path(__file__).resolve().parents[3]
+    values = dotenv_values(root / "backend/.env.template")
+    config = yaml.safe_load((root / compose).read_text())
+    values.update(config["x-backend-env"])
+    timeouts = {
+        key: re.sub(r"\$\{[^}]+:-(.*?)\}", r"\1", str(values[key]))
+        for key in ("OPENAI_TIMEOUT_SECONDS", "REDIS_LOCK_TIMEOUT_SECONDS")
+    }
+    settings = Settings.model_validate(timeouts)
+    assert settings.redis_lock_timeout_seconds > 4 * settings.openai_timeout_seconds
+    if compose.endswith("compose.yaml"):
+        assert settings.openai_timeout_seconds == 300
+        assert settings.redis_lock_timeout_seconds == 1800
+        with pytest.raises(ValueError, match="final document"):
+            Settings.model_validate({**timeouts, "llm_challenge_pass": ChallengePass.FINDINGS})
+    else:
+        assert Settings.model_validate({**timeouts, "llm_challenge_pass": ChallengePass.FINDINGS})
+
+
+def test_environment_template_timeout_defaults_cover_challenge_findings():
+    root = Path(__file__).resolve().parents[3]
+    values = dotenv_values(root / "backend/.env.template")
+    settings = Settings.model_validate({
+        **{key: values[key] for key in ("OPENAI_TIMEOUT_SECONDS", "REDIS_LOCK_TIMEOUT_SECONDS")},
+        "llm_challenge_pass": ChallengePass.FINDINGS,
+    })
+    assert settings.redis_lock_timeout_seconds > 6 * settings.openai_timeout_seconds

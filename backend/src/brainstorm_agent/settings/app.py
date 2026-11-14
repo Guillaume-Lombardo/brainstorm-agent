@@ -96,7 +96,7 @@ class Settings(BaseSettings):
     )
     redis_url: str = Field(default="redis://redis:6379/0", validation_alias="REDIS_URL")
     redis_lock_timeout_seconds: float = Field(
-        default=180.0,
+        default=210.0,
         validation_alias="REDIS_LOCK_TIMEOUT_SECONDS",
     )
     redis_lock_blocking_timeout_seconds: float = Field(
@@ -243,7 +243,7 @@ class Settings(BaseSettings):
 
     @staticmethod
     def _lock_timeout_error() -> str:
-        return "REDIS_LOCK_TIMEOUT_SECONDS must exceed the worst-case turn duration (analysis retry, optional challenge retry, reply)."
+        return "REDIS_LOCK_TIMEOUT_SECONDS must exceed the worst-case turn duration (analysis retry, optional challenge retry, reply, final document; 4 calls, or 6 with findings)."
 
     @model_validator(mode="after")
     def _validate_security_settings(self) -> Settings:
@@ -255,7 +255,7 @@ class Settings(BaseSettings):
         Raises:
             ValueError: If the configuration is inconsistent.
         """
-        calls = 5 if self.llm_challenge_pass is ChallengePass.FINDINGS else 3
+        calls = 6 if self.llm_challenge_pass is ChallengePass.FINDINGS else 4
         if self.redis_lock_timeout_seconds <= calls * self.openai_timeout_seconds:
             raise ValueError(self._lock_timeout_error())
         effective_mode = self.effective_auth_mode

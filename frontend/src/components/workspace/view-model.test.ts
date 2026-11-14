@@ -56,6 +56,24 @@ describe("canReopen", () => {
   });
 });
 
+it("validates and reopens the terminal stage after approval", () => {
+  const stage = "stage_7_delivery_slicing";
+  const session = sessionFixture({
+    current_stage: stage,
+    stage_states: { [stage]: stageStateFixture(stage, { stage_is_clear_enough: true }) },
+  });
+  expect(stageStatus(session, stage)).toBe("validated");
+  expect(canReopen(session, stage)).toBe(true);
+  session.pending_human_review = {
+    from_stage: stage,
+    to_stage: null,
+    summary: "Ready",
+    transition_decision_reason: "Complete",
+  };
+  expect(stageStatus(session, stage)).toBe("awaiting_review");
+  expect(canReopen(session, stage)).toBe(false);
+});
+
 describe("stageFields", () => {
   it("lists the contract fields in order with coverage and reasons", () => {
     const fields = stageFields(stage2Session(), "stage_2_user_story_mapping");

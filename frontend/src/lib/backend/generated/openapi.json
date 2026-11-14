@@ -828,6 +828,15 @@
         "title": "DocumentDiff",
         "type": "object"
       },
+      "DocumentKind": {
+        "description": "Persisted document lifecycle classification.",
+        "enum": [
+          "working",
+          "final"
+        ],
+        "title": "DocumentKind",
+        "type": "string"
+      },
       "DocumentUpdated": {
         "description": "Committed document version.",
         "properties": {
@@ -3363,6 +3372,10 @@
           "id": {
             "title": "Id",
             "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/DocumentKind",
+            "default": "working"
           },
           "markdown": {
             "title": "Markdown",

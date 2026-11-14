@@ -75,6 +75,17 @@ def test_application_migrations_ids_and_reviews_on_postgres() -> None:
     )
     assert review.status_code == 200
     assert client.get(base + "/reviews").json()["items"][-1]["decision"] == "request_changes"
+    assert (
+        "event: review.required"
+        in client.post(base + "/turns", json={"content": "clear: Guided framing"}).text
+    )
+    assert (
+        client.post(base + "/review", json={"stage": "stage_0_pitch", "action": "approve"}).status_code == 200
+    )
+    documents = client.get(base + "/documents").json()["items"]
+    assert documents[-1]["kind"] == "final"
+    assert "Readiness" not in documents[-1]["markdown"]
+    assert "pitch_summary" not in documents[-1]["markdown"]
     assert client.patch(base, json={"archived": True}).status_code == 200
     assert client.delete(base).status_code == 204
     assert client.get(base).status_code == 404

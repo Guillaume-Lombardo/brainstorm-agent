@@ -14,9 +14,11 @@ import pytest
 from openai import AsyncOpenAI
 
 from brainstorm_agent.async_runner import run_async
-from brainstorm_agent.core.enums import ChallengePass, LLMMode, Stage, StructuredOutputMode
-from brainstorm_agent.core.models import AssistantAnalysis, BrainstormSessionState
+from brainstorm_agent.core.enums import ChallengePass, Language, LLMMode, Stage, StructuredOutputMode
+from brainstorm_agent.core.models import AssistantAnalysis, BrainstormSessionState, StageState
+from brainstorm_agent.core.stage_contracts import PitchFields
 from brainstorm_agent.exceptions import LLMResponseError
+from brainstorm_agent.services.final_documents import from_stage_state
 from brainstorm_agent.services.llm_client import OpenAICompatibleBrainstormLLM, build_llm
 from brainstorm_agent.services.prompt_loader import PromptLoader
 from brainstorm_agent.settings import Settings
@@ -192,3 +194,30 @@ def test_analysis_provider_schema_has_no_open_objects():
                 check(child)
 
     check(schema)
+
+
+@pytest.mark.parametrize("invalid", [False, True])
+def test_final_rewrite_uses_one_structured_call_and_clean_source(invalid):
+
+    source = from_stage_state(
+        StageState(
+            stage=Stage.STAGE_0_PITCH,
+            summary="Newly confirmed at turn 7",
+            extracted_fields=PitchFields(pitch_summary="A tool for product teams"),
+        ),
+        Language.EN,
+    )
+    llm = make_llm(["invalid" if invalid else source.model_dump_json()])
+    if invalid:
+        with pytest.raises(LLMResponseError):
+            run_async(llm.final_document(stage=Stage.STAGE_0_PITCH, source=source, language=Language.EN))
+    else:
+        result = run_async(llm.final_document(stage=Stage.STAGE_0_PITCH, source=source, language=Language.EN))
+        assert result == source
+    create = cast("AsyncMock", llm.client.chat.completions.create)
+    assert create.await_count == 1
+    prompt = create.call_args.kwargs["messages"][-1]["content"]
+    assert "A tool for product teams" in prompt
+    assert "Newly confirmed at turn 7" not in prompt
+    assert "pitch_summary" not in prompt
+    assert create.call_args.kwargs["response_format"]["json_schema"]["name"] == "FinalStageDocument"

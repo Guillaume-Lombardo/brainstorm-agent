@@ -9,6 +9,7 @@ from uuid import uuid4
 from sqlalchemy import Select, desc, func, select, update
 
 from brainstorm_agent.core.enums import (
+    DocumentKind,
     HumanReviewDecision,
     MessageRole,
     Modality,
@@ -261,7 +262,7 @@ class DocumentRepository:
         """Persist a new current document version.
 
         Args:
-            document: Domain document to store.
+            document (StepDocument): Domain document to store.
 
         Returns:
             DocumentRecord: Created ORM row.
@@ -280,6 +281,7 @@ class DocumentRepository:
             session_id=document.session_id,
             stage=document.stage.value,
             version=document.version or self._next_version(document.session_id, document.stage),
+            kind=document.kind.value,
             markdown=document.markdown,
             summary=document.summary,
             facts_payload=[item.model_dump(mode="json") for item in document.facts],
@@ -343,12 +345,21 @@ class DocumentRepository:
 
     @staticmethod
     def _to_model(record: DocumentRecord) -> StepDocument:
+        """Convert persisted lifecycle metadata and content to the API contract.
+
+        Args:
+            record (DocumentRecord): Persisted version.
+
+        Returns:
+            StepDocument: Typed version with explicit kind conversion.
+        """
         return StepDocument.model_validate(
             {
                 "id": record.id,
                 "session_id": record.session_id,
                 "stage": record.stage,
                 "version": record.version,
+                "kind": DocumentKind(record.kind),
                 "markdown": record.markdown,
                 "summary": record.summary,
                 "facts": record.facts_payload,
