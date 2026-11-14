@@ -47,7 +47,8 @@ def test_selected_candidates_reach_stage_two(tmp_path: Path) -> None:
             FeatureSelection(selected_ids=[item.id for item in benchmark.synthesis.features]),
         )
         assert service.benchmark_context(sid) == "Shared framing\nMarkdown export"
-        assert "## Benchmark" in service.export_markdown(sid)
+        assert "## Benchmark" not in service.export_markdown(sid)
+        assert "## Benchmark" in service.list_documents(sid)[-1].markdown
         assert service.export_json(sid)["benchmarks"]
         record = service.sessions.get(sid)
         assert record is not None

@@ -91,6 +91,7 @@ describe("workspaceReducer", () => {
           session_id: session.session_id,
           stage: "stage_2_user_story_mapping",
           version: 3,
+          kind: "working",
           markdown: "# Story map",
           summary: "",
         },

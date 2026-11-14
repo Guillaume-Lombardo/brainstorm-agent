@@ -34,7 +34,8 @@ from brainstorm_agent.core.application import (
     TurnEvent,
     TurnStarted,
 )
-from brainstorm_agent.core.enums import HumanReviewDecision, MessageRole, Modality, Stage
+from brainstorm_agent.core.enums import DocumentKind, HumanReviewDecision, MessageRole, Modality, Stage
+from brainstorm_agent.core.final_documents import FinalStageDocument
 from brainstorm_agent.core.models import (
     AssistantAnalysis,
     AssistantTurnOutput,
@@ -65,6 +66,7 @@ from brainstorm_agent.persistence.repositories import (
     TransitionRepository,
 )
 from brainstorm_agent.services.delivery import export_backlog_json, export_slice_specs
+from brainstorm_agent.services.final_documents import document_language, from_stage_state, render_final
 from brainstorm_agent.services.llm_client import BrainstormLLM, OpenAICompatibleBrainstormLLM, build_llm
 from brainstorm_agent.services.locks import NoopSessionLockManager, SessionLockManager
 from brainstorm_agent.services.markdown import MarkdownRenderer
@@ -199,13 +201,47 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
         modality: Modality = Modality.TEXT,
         on_delta: Callable[[str], Awaitable[None]] | None = None,
     ) -> AssistantTurnOutput:
+        """Process and persist a turn, then close the owned provider transport.
+
+        Args:
+            session_id (str): Owned session identifier.
+            content (str): Latest user message.
+            modality (Modality): Input modality.
+            on_delta (Callable | None): Optional reply delta consumer.
+
+        Returns:
+            AssistantTurnOutput: Committed turn output.
+        """
+        try:
+            return await self._aprocess_user_message(
+                session_id=session_id,
+                content=content,
+                modality=modality,
+                on_delta=on_delta,
+            )
+        finally:
+            if (
+                self._owns_llm
+                and isinstance(self.llm, OpenAICompatibleBrainstormLLM)
+                and not self.llm.client.is_closed()
+            ):
+                await self.llm.client.close()
+
+    async def _aprocess_user_message(  # noqa: PLR0915 - Atomic turn persistence
+        self,
+        *,
+        session_id: str,
+        content: str,
+        modality: Modality = Modality.TEXT,
+        on_delta: Callable[[str], Awaitable[None]] | None = None,
+    ) -> AssistantTurnOutput:
         """Process one user message through the orchestration graph.
 
         Args:
-            session_id: Session identifier.
-            content: User message content.
-            modality: Input modality.
-            on_delta: Optional async reply delta consumer.
+            session_id (str): Session identifier.
+            content (str): User message content.
+            modality (Modality): Input modality.
+            on_delta (Callable | None): Optional async reply delta consumer.
 
         Returns:
             AssistantTurnOutput: Structured assistant response.
@@ -220,6 +256,7 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
             if state.pending_human_review is not None:
                 raise ConflictError.pending_human_review_in_progress()
             current_stage = state.current_stage
+            previous_stage_state = state.stage_states.get(current_stage.value)
             if (
                 self._owns_llm
                 and isinstance(self.llm, OpenAICompatibleBrainstormLLM)
@@ -238,7 +275,7 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
                 context += "\n\nOwner section comments:\n" + "\n".join(
                     f"[{item.stage.value}/{item.section}] {item.body}" for item in comments
                 )
-            graph_output = await self._invoke_graph(
+            graph_output = await self.graph.ainvoke(
                 {
                     "session_id": session_id,
                     "session_state": state.model_dump(mode="json"),
@@ -278,11 +315,7 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
                 )
             state.stage_states[output.processed_stage.value] = processed_stage_state
             proposed_next_stage = output.next_stage
-            if (
-                self.settings.require_human_validation_for_transitions
-                and output.stage_clear_enough
-                and proposed_next_stage is not None
-            ):
+            if self.settings.require_human_validation_for_transitions and output.stage_clear_enough:
                 pending_review = PendingHumanReview(
                     from_stage=output.processed_stage,
                     to_stage=proposed_next_stage,
@@ -294,9 +327,10 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
                 output.current_stage = output.processed_stage
                 output.requires_human_review = True
                 output.pending_review = pending_review
-                output.assistant_message = (
-                    f"{output.assistant_message.rstrip()}\n\n"
+                output.assistant_message = f"{output.assistant_message.rstrip()}\n\n" + (
                     "Human validation is required before advancing to the next stage."
+                    if proposed_next_stage is not None
+                    else "Human validation is required to complete this stage."
                 )
             else:
                 state.current_stage = output.current_stage
@@ -362,6 +396,20 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
                     risks=output.risks,
                 ),
             )
+            if (
+                output.stage_clear_enough
+                and not output.requires_human_review
+                and (
+                    previous_stage_state is None
+                    or not previous_stage_state.stage_is_clear_enough
+                    or not any(
+                        item.kind == DocumentKind.FINAL and item.stage == output.processed_stage
+                        for item in self.documents.list_all(session_id)
+                    )
+                )
+            ):
+                await self._finalize_stage(state, output.processed_stage)
+                self.sessions.save_state(session_id, state)
             self.open_questions.sync_stage_questions(
                 session_id=session_id,
                 stage=output.processed_stage,
@@ -377,20 +425,65 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
             self.db_session.commit()
             return output
 
-    async def _invoke_graph(self, payload: dict[str, Any]) -> dict[str, Any]:
-        """Run the async graph and close owned transports in the same event loop.
+    async def _finalize_stage(self, state: BrainstormSessionState, stage: Stage) -> None:
+        """Persist one final version; provider errors never veto stage validation.
 
         Args:
-            payload (dict[str, Any]): Initial graph state.
-
-        Returns:
-            dict[str, Any]: Completed graph state.
+            state (BrainstormSessionState): Locked mutable session state.
+            stage (Stage): Stage validated by the gate and any required review.
         """
+        current = state.stage_states[stage.value]
+        language = document_language(state)
+        source = from_stage_state(current, language)
+        clean = source
         try:
-            return await self.graph.ainvoke(payload)
+            if (
+                self._owns_llm
+                and isinstance(self.llm, OpenAICompatibleBrainstormLLM)
+                and self.llm.client.is_closed()
+            ):
+                self.llm = build_llm(settings=self.settings, prompt_loader=self.prompt_loader)
+                self.graph = build_turn_graph(llm=self.llm, renderer=self.renderer)
+            clean = FinalStageDocument.model_validate(
+                await self.llm.final_document(
+                    stage=stage,
+                    source=source.model_copy(deep=True),
+                    language=language,
+                ),
+            )
+        except Exception as exc:
+            get_logger(__name__).warning(
+                "final_document_fallback",
+                session_id=state.session_id,
+                stage=stage.value,
+                error_type=type(exc).__name__,
+            )
         finally:
-            if self._owns_llm and isinstance(self.llm, OpenAICompatibleBrainstormLLM):
+            if (
+                self._owns_llm
+                and isinstance(self.llm, OpenAICompatibleBrainstormLLM)
+                and not self.llm.client.is_closed()
+            ):
                 await self.llm.client.close()
+        markdown = render_final(clean, stage=stage, language=language)
+        versions = [item.version for item in self.documents.list_all(state.session_id) if item.stage == stage]
+        self.documents.create_version(
+            StepDocument(
+                session_id=state.session_id,
+                stage=stage,
+                version=max(versions, default=0) + 1,
+                kind=DocumentKind.FINAL,
+                markdown=markdown,
+                summary=" ".join(clean.sections[0].items),
+                facts=current.facts,
+                assumptions=current.assumptions,
+                decisions=current.decisions,
+                uncertainties=current.uncertainties,
+                open_questions=current.open_questions,
+                risks=current.risks,
+            ),
+        )
+        current.latest_markdown = markdown
 
     def process_user_message(
         self,
@@ -489,39 +582,39 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
         """Export the latest session documents into one Markdown artifact.
 
         Args:
-            session_id: Session identifier.
+            session_id (str): Session identifier.
 
         Returns:
             str: Consolidated Markdown export.
         """
         overview = self.get_session(session_id)
-        messages = self.list_messages(session_id)
-        documents_by_stage = {item.stage: item for item in self.list_documents(session_id) if item.version}
-        sections = [
-            "# Brainstorm Session Export",
-            "",
-            f"- Session ID: `{overview.session_id}`",
-            f"- Current stage: `{overview.current_stage.value}`",
-            f"- Pending human review: `{bool(overview.pending_human_review)}`",
-            "",
-            "## Conversation Summary",
-            "",
-            f"- Message count: `{len(messages)}`",
-            f"- Open questions: `{len(overview.open_questions)}`",
-            "",
-        ]
+        state = self.sessions.to_state(self._require_owned(session_id))
+        language = document_language(state)
+        header = (
+            "Document de cadrage — étapes validées."
+            if language.value == "fr"
+            else "Project framing — validated stages."
+        )
+        sections = [f"# {escape_markdown(overview.title)}", "", header, ""]
+        documents = self.list_documents(session_id)
         for stage in Stage.ordered():
-            document = documents_by_stage.get(stage)
-            if document is None:
+            current = state.stage_states.get(stage.value)
+            if current is None or current.stale or not current.stage_is_clear_enough:
                 continue
-            sections.extend(
-                [
-                    f"## {stage.label}",
+            if state.pending_human_review and state.pending_human_review.from_stage == stage:
+                continue
+            finals = [item for item in documents if item.stage == stage and item.kind == DocumentKind.FINAL]
+            if finals:
+                sections.extend([max(finals, key=lambda item: item.version).markdown.strip(), ""])
+            elif (
+                Stage.ordered().index(stage) < Stage.ordered().index(state.current_stage)
+                or stage == Stage.STAGE_7_DELIVERY_SLICING
+            ):
+                # Legacy validated stages have working documents only; do not export their analysis dumps.
+                sections.extend([
+                    render_final(from_stage_state(current, language), stage=stage, language=language).strip(),
                     "",
-                    document.markdown.strip(),
-                    "",
-                ],
-            )
+                ])
         return "\n".join(sections).strip() + "\n"
 
     def export_json(self, session_id: str) -> dict[str, object]:
@@ -554,11 +647,11 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
         """Approve or reject the pending human-reviewed transition.
 
         Args:
-            session_id: Session identifier.
-            approved: Whether to approve the pending transition.
-            note: Optional reviewer note.
-            expected_stage: Stage expected by the application caller.
-            request_changes: Record an explicit request for changes.
+            session_id (str): Session identifier.
+            approved (bool): Whether to approve the pending transition.
+            note (str | None): Optional reviewer note.
+            expected_stage (Stage | None): Stage expected by the application caller.
+            request_changes (bool): Record an explicit request for changes.
 
         Returns:
             SessionOverview: Updated session overview.
@@ -593,8 +686,12 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
                 note=note,
             )
             self.human_reviews.add(review)
-            if approved and pending.to_stage is not None:
-                state.current_stage = pending.to_stage
+            if approved:
+                run_async(self._finalize_stage(state, pending.from_stage))
+                if pending.to_stage is not None:
+                    state.current_stage = pending.to_stage
+            else:
+                state.stage_states[pending.from_stage.value].stage_is_clear_enough = False
             state.pending_human_review = None
             self.sessions.save_state(session_id, state)
             self.db_session.commit()
@@ -681,7 +778,7 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
             return self.sessions.overview(record, self.open_questions.list_open(session_id))
 
     def reopen_stage(self, session_id: str, stage: Stage) -> SessionOverview:
-        """Reopen an earlier visited stage and invalidate all downstream state.
+        """Reopen a visited earlier or completed terminal stage and invalidate downstream state.
 
         Args:
             session_id (str): Owned session.
@@ -691,17 +788,23 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
             SessionOverview: Reopened state.
 
         Raises:
-            ConflictError: Target is not an earlier visited stage.
+            ConflictError: Target is neither an earlier visited nor a completed terminal stage.
         """
         self._require_owned(session_id)
         with self.lock_manager.lock(session_id):
             record = self._require_owned(session_id)
             state = self.sessions.to_state(record)
             ordered = Stage.ordered()
-            if stage.value not in state.stage_states or ordered.index(stage) >= ordered.index(
-                state.current_stage,
+            terminal_reopen = (
+                stage == state.current_stage == Stage.STAGE_7_DELIVERY_SLICING
+                and state.pending_human_review is None
+                and state.stage_states.get(stage.value) is not None
+                and state.stage_states[stage.value].stage_is_clear_enough
+            )
+            if stage.value not in state.stage_states or (
+                ordered.index(stage) >= ordered.index(state.current_stage) and not terminal_reopen
             ):
-                message = "Only an earlier visited stage can be reopened."
+                message = "Only an earlier visited stage or the completed terminal stage can be reopened."
                 raise ConflictError(message)
             for key, value in state.stage_states.items():
                 if ordered.index(Stage(key)) > ordered.index(stage):
@@ -791,9 +894,7 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
                     summary=current.summary,
                     transition_decision_reason=current.transition_decision_reason,
                 )
-                if self.settings.require_human_validation_for_transitions
-                and current.stage_is_clear_enough
-                and stage.next_stage() is not None
+                if self.settings.require_human_validation_for_transitions and current.stage_is_clear_enough
                 else None
             )
             versions = [item.version for item in self.documents.list_all(session_id) if item.stage == stage]
@@ -811,6 +912,8 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
                 risks=current.risks,
             )
             self.documents.create_version(document)
+            if current.stage_is_clear_enough and state.pending_human_review is None:
+                run_async(self._finalize_stage(state, stage))
             self.open_questions.sync_stage_questions(
                 session_id=session_id,
                 stage=stage,

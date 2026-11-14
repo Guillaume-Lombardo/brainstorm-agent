@@ -77,8 +77,8 @@ def test_reopen_edits_versions_comments_and_exports(tmp_path: Path) -> None:
     assert state["readiness"]
     assert state["facts"][0]["id"] == "fact-1"
     versions = client.get(base + f"/stages/{STAGE}/documents").json()
-    assert len(versions) == 2
-    diff = client.get(base + f"/stages/{STAGE}/documents/diff?from_version=1&to_version=2")
+    assert [item["kind"] for item in versions] == ["working", "final", "working"]
+    diff = client.get(base + f"/stages/{STAGE}/documents/diff?from_version=2&to_version=3")
     assert "A revised project pitch" in diff.json()["diff"]
     assert client.patch(base + f"/stages/{STAGE}", json={"fields": {"unknown": "bad"}}).status_code == 409
     assert client.patch(base + f"/stages/{STAGE}/fields/clear_points", json={"value": 42}).status_code == 409

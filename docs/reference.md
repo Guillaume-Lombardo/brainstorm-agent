@@ -753,7 +753,9 @@ The test is skipped when that variable is absent.
 Stage 1 and later expose an optional, explicitly triggered snippet benchmark, built from the pitch
 and from the stage 1 framing once answered (it can run right after the pitch). Users select features;
 only selected candidates become benchmark decisions and stage 2 context. Reruns are versioned.
-Markdown and JSON exports include Benchmark. Apply migration 0003 through the init service.
+Working stage documents and JSON exports include the complete benchmark. Clean Markdown
+exports include owner-selected decisions after stage validation. Apply migrations through
+the init service.
 
 `SEARCH_PROVIDER=none|searxng|tavily|brave|litellm|fake` defaults to `none` (control hidden).
 SearXNG requires `SEARXNG_BASE_URL`; Tavily/Brave require their `*_API_KEY`, with configurable
@@ -771,3 +773,25 @@ For dev, set the secret, `SEARCH_PROVIDER=searxng`, and use `docker compose --pr
 Owner-scoped API: `GET /api/v1/sessions/{id}/research` returns availability/history; `POST` streams
 `research.started` and `research.completed` or `error`; `PATCH /research/{benchmark_id}/selection`
 replaces `selected_ids`. Empty results are valid. No search result page is downloaded.
+
+### Final stage documents and clean framing export
+
+Each ordinary turn still creates its detailed working document. When a stage is validated
+(automatic transition, human approval, or delivery-slicing completion), the service adds
+one immutable version with `kind: "final"`. The frontend version selector labels it `Final`.
+Human validation, when enabled, also applies to the last stage. Reopening a stage retains
+its history and creates a fresh final version when it is validated again.
+
+Final documents use readable subject sections and explicitly separate facts, assumptions,
+decisions, risks and remaining open questions. One bounded structured rewrite uses only
+accumulated stage content, in the session language. On provider failure or invalid output,
+a deterministic clean rendering is saved instead; validation proceeds. `LLM_MODE=fake`
+produces that deterministic document entirely offline. No additional settings are required.
+
+The Markdown export starts with the project title and includes only validated, non-stale
+stages, in workflow order, using their latest final versions. In-progress stages are omitted
+to keep the framing document ready to share. Session identifiers, review flags and message
+counts are absent. The JSON export retains all working/final versions and review history.
+Legacy validated stages without a final version are rendered cleanly from state during export.
+Apply migration `0004` before starting the updated backend; existing documents remain
+`kind: "working"`. See [ADR 0013](adr/0013-clean-final-stage-documents.md).

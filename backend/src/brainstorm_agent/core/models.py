@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, SerializeAsAny, model_validat
 
 from brainstorm_agent.core.enums import (
     AuthMode,
+    DocumentKind,
     HumanReviewDecision,
     MessageRole,
     Modality,
@@ -153,6 +154,7 @@ class StepDocument(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
     session_id: str
     stage: Stage
+    kind: DocumentKind = DocumentKind.WORKING
     version: int
     markdown: str
     summary: str

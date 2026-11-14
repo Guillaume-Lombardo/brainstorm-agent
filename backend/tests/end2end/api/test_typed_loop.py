@@ -125,7 +125,15 @@ def test_every_stage_accumulates_multiple_free_form_turns(tmp_path):  # noqa: C9
                 .stage_states[stage]
                 .extracted_fields.model_dump(exclude_none=True)
             )
-        assert len(service.list_documents(session_id)) == 16
+        documents = service.list_documents(session_id)
+        assert len(documents) == 24
+        finals = [item for item in documents if item.kind == "final"]
+        assert [item.stage for item in finals] == list(Stage.ordered())
+        assert all("Readiness" not in item.markdown for item in finals)
+        assert all("Premier détail" not in item.markdown for item in finals)
+        exported = service.export_markdown(session_id)
+        assert "Découpage de la livraison" in exported
+        assert "Readiness" not in exported
         assert len(service.list_messages(session_id)) == 33
 
 
@@ -173,6 +181,6 @@ def test_vague_pitch_blocks_until_clarification_and_logs_answer(tmp_path):
         assert "### Clarifications" in second.step_markdown
         assert "Who uses this? -> Accountants" in second.step_markdown
         assert "passed/total" in second.step_markdown
-        assert len(service.list_documents(session_id)) == 2
+        assert [item.kind for item in service.list_documents(session_id)] == ["working", "working", "final"]
         state = service.sessions.to_state(service.sessions.require(session_id))
         assert state.stage_states[Stage.STAGE_0_PITCH].clarifications[0].question_id == question_id

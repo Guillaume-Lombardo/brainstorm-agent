@@ -35,6 +35,9 @@ export function stageStatus(session: SessionOverview, stage: Stage): StageStatus
   if (session.pending_human_review?.from_stage === stage) {
     return "awaiting_review";
   }
+  if (stage === STAGES.at(-1) && state?.stage_is_clear_enough) {
+    return "validated";
+  }
   if (stage === session.current_stage) {
     return "active";
   }
@@ -44,11 +47,14 @@ export function stageStatus(session: SessionOverview, stage: Stage): StageStatus
   return "locked";
 }
 
-/** The backend reopens only earlier stages it has visited. */
+/** The backend reopens earlier visited stages and the validated terminal stage. */
 export function canReopen(session: SessionOverview, stage: Stage): boolean {
   return (
     stageState(session, stage) !== undefined &&
-    STAGES.indexOf(stage) < STAGES.indexOf(session.current_stage)
+    (STAGES.indexOf(stage) < STAGES.indexOf(session.current_stage) ||
+      (stage === session.current_stage &&
+        stage === STAGES.at(-1) &&
+        stageStatus(session, stage) === "validated"))
   );
 }
 

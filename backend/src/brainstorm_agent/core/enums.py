@@ -145,3 +145,10 @@ class Language(StrEnum):
         """
         primary = value.strip().lower().replace("_", "-").split("-", maxsplit=1)[0]
         return cls(primary) if primary in cls._value2member_map_ else cls.EN
+
+
+class DocumentKind(StrEnum):
+    """Persisted document lifecycle classification."""
+
+    WORKING = "working"
+    FINAL = "final"

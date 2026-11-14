@@ -31,3 +31,9 @@ v2 injects typed stage field descriptions and strict patch schemas at runtime. F
 are derived from the Pydantic contracts, never duplicated in prompt assets. Previous stage
 context is summarized; current state and recent transcript are bounded separately. The rendering
 asset is a template consumed by the deterministic Markdown renderer. v1 remains unchanged.
+
+`v2/rendering/final-stage-document.md` is a separate bounded rewrite task targeting
+`core.final_documents.FinalStageDocument`. It receives only state-derived business content,
+never turn summaries, transcript, gate decisions or clarification history. It runs once
+on validation; ordinary working Markdown continues to use `step-markdown.md`. Invalid
+output is not repaired: the same schema is built deterministically from state instead.

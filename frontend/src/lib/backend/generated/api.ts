@@ -1261,6 +1261,12 @@ export interface components {
       to_version: number;
     };
     /**
+     * DocumentKind
+     * @description Persisted document lifecycle classification.
+     * @enum {string}
+     */
+    DocumentKind: "working" | "final";
+    /**
      * DocumentUpdated
      * @description Committed document version.
      */
@@ -2454,6 +2460,8 @@ export interface components {
       facts?: components["schemas"]["FactItem"][];
       /** Id */
       id?: string;
+      /** @default working */
+      kind: components["schemas"]["DocumentKind"];
       /** Markdown */
       markdown: string;
       /** Open Questions */

@@ -61,7 +61,7 @@ def test_session_api_round_trip(tmp_path: Path) -> None:
 
     markdown_export = client.get(f"/api/v1/sessions/{session_id}/export/markdown")
     assert markdown_export.status_code == 200
-    assert "# Brainstorm Session Export" in markdown_export.json()["markdown"]
+    assert markdown_export.json()["markdown"].startswith("# Untitled session\n")
 
     json_export = client.get(f"/api/v1/sessions/{session_id}/export/json")
     assert json_export.status_code == 200

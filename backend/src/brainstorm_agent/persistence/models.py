@@ -110,6 +110,7 @@ class DocumentRecord(Base):
     session_id: Mapped[str] = mapped_column(ForeignKey("sessions.id", ondelete="CASCADE"), nullable=False)
     stage: Mapped[str] = mapped_column(String(64), nullable=False)
     version: Mapped[int] = mapped_column(Integer, nullable=False)
+    kind: Mapped[str] = mapped_column(String(16), default="working", server_default="working", nullable=False)
     markdown: Mapped[str] = mapped_column(Text, nullable=False)
     summary: Mapped[str] = mapped_column(Text, nullable=False)
     facts_payload: Mapped[list] = mapped_column(JSON, default=list, nullable=False)

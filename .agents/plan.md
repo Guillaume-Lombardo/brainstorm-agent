@@ -1,3 +1,22 @@
+# Clean final stage documents
+
+Validated scope: create an additional immutable final document on automatic validation,
+human approval, and final-stage completion; regenerate after reopen. Preserve all working
+versions. Omit unvalidated stages from the clean Markdown export; retain everything in JSON.
+
+1. Add failing tests for validation paths, fallback, reopen, export and migrations.
+2. Define a typed clean-document schema, bounded rewrite adapter and versioned prompt;
+   render Markdown deterministically with a state-derived fallback and fake adapter.
+3. Persist a document kind with a backward-compatible migration and expose the Final label.
+4. Update ADR, prompt policy, reference documentation, generated API types and journeys.
+5. Run all backend gates and frontend checks, perform a dead-code/review pass, open a PR
+   against main and follow CI/reviews without merging.
+
+Architecture: finalization belongs to the session persistence boundary, never to ordinary
+turn rendering. Provider failure must leave validation successful. No new settings.
+
+---
+
 # plan.md
 
 ## Roadmap v2: working agent, delivery slicing, Next.js application (remaining work)

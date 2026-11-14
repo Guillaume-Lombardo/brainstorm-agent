@@ -135,6 +135,8 @@ test("login, new session, streamed turn, updated document, review and approval",
   // The approved stage stays readable, validated and reopenable.
   await page.getByRole("button", { name: /0\. Pitch/ }).click();
   await expect(page.getByTestId("stage-details")).toContainText("Validated");
+  await expect(page.getByLabel("Version").locator("option:checked")).toContainText("Final");
+  await expect(page.getByTestId("stage-document")).not.toContainText("Readiness");
   await expect(page.getByTestId("stage-document")).toContainText("weekly meal planner");
   await expect(page.getByRole("button", { name: "Reopen Pitch" })).toBeVisible();
   await page.screenshot({ path: `${SCREENSHOTS}/04-approved.png` });

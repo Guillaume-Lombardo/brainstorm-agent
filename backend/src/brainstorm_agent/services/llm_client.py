@@ -11,6 +11,7 @@ from openai import AsyncOpenAI, pydantic_function_tool
 from pydantic import BaseModel, ConfigDict, ValidationError, create_model
 
 from brainstorm_agent.core.enums import ChallengePass, Language, LLMMode, Stage, StructuredOutputMode
+from brainstorm_agent.core.final_documents import FinalStageDocument
 from brainstorm_agent.core.gate_questions import field_question
 from brainstorm_agent.core.language import detect_language, session_language
 from brainstorm_agent.core.models import (
@@ -115,6 +116,24 @@ class StreamingReply(Protocol):
 class BrainstormLLM(Protocol):
     """Async provider boundary."""
 
+    async def final_document(
+        self,
+        *,
+        stage: Stage,
+        source: FinalStageDocument,
+        language: Language,
+    ) -> FinalStageDocument:
+        """Rewrite validated business content into the clean document contract.
+
+        Args:
+            stage (Stage): Validated stage.
+            source (FinalStageDocument): Complete state-only source content.
+            language (Language): Session language.
+
+        Returns:
+            FinalStageDocument: Clean rewritten content.
+        """
+
     async def analyze(
         self,
         *,
@@ -138,6 +157,26 @@ class FakeBrainstormLLM:
 
     prompt_loader: PromptLoader
     scripted_responses: list[AssistantAnalysis] = field(default_factory=list)
+
+    @staticmethod
+    async def final_document(
+        *,
+        stage: Stage,
+        source: FinalStageDocument,
+        language: Language,
+    ) -> FinalStageDocument:
+        """Return the deterministic clean source without network access.
+
+        Args:
+            stage (Stage): Validated stage (unused).
+            source (FinalStageDocument): State-derived clean content.
+            language (Language): Session language (already applied to source).
+
+        Returns:
+            FinalStageDocument: Independent deterministic content copy.
+        """
+        del stage, language
+        return source.model_copy(deep=True)
 
     async def analyze(
         self,
@@ -422,6 +461,7 @@ class OpenAICompatibleBrainstormLLM:
         model: type[BaseModel],
         prompt: str,
         usage: AssistantAnalysis | None = None,
+        repair: bool = True,
     ) -> BaseModel:
         """Request structured output with one bounded validation repair.
 
@@ -430,6 +470,7 @@ class OpenAICompatibleBrainstormLLM:
             model (type[BaseModel]): Output contract.
             prompt (str): Task and context.
             usage (AssistantAnalysis | None): Mutable usage accumulator.
+            repair (bool): Allow one corrective request for ordinary analysis.
 
         Returns:
             BaseModel: Validated provider output.
@@ -464,7 +505,7 @@ class OpenAICompatibleBrainstormLLM:
                     "json_schema": {"name": model.__name__, "strict": True, "schema": schema},
                 },
             }
-        for attempt in range(2):
+        for attempt in range(2 if repair else 1):
             async with asyncio.timeout(self.settings.openai_timeout_seconds):
                 completion = await self.client.chat.completions.create(
                     model=self.settings.model_name,
@@ -487,10 +528,10 @@ class OpenAICompatibleBrainstormLLM:
                     completion.choices[0].finish_reason,
                 )
             except (ValueError, ValidationError) as exc:
-                if attempt:
+                if attempt or not repair:
                     raise LLMResponseError(
                         stage=stage.value,
-                        message="Invalid structured output after one retry. Check LLM_OUTPUT_MODE and model schema support; retry the turn.",
+                        message="Invalid structured output. Check LLM_OUTPUT_MODE and model schema support; retry the turn.",
                         raw_output_excerpt="",
                     ) from exc
                 messages.append({
@@ -500,6 +541,32 @@ class OpenAICompatibleBrainstormLLM:
             else:
                 return parsed
         raise AssertionError
+
+    async def final_document(
+        self,
+        *,
+        stage: Stage,
+        source: FinalStageDocument,
+        language: Language,
+    ) -> FinalStageDocument:
+        """Rewrite a validated stage with one bounded structured request.
+
+        Args:
+            stage (Stage): Validated stage.
+            source (FinalStageDocument): Complete business content only.
+            language (Language): Required output language.
+
+        Returns:
+            FinalStageDocument: Schema-validated clean content.
+        """
+        prompt = self.prompt_loader.final_document_prompt()
+        result = await self._structured(
+            stage=stage,
+            model=FinalStageDocument,
+            prompt=f"{prompt}\nLanguage: {language.value}\nSource JSON:\n{source.model_dump_json()}",
+            repair=False,
+        )
+        return FinalStageDocument.model_validate(result)
 
     async def analyze(
         self,
