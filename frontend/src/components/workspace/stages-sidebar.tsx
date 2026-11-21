@@ -39,41 +39,58 @@ export function StagesSidebar({ children }: { children: ReactNode }) {
     writeCollapsed(next);
   }
 
+  const label = collapsed ? "Expand stages panel" : "Collapse stages panel";
+  // Content fades out fast on collapse, and back in once the column is mostly open.
+  const fade = cn(
+    "motion-safe:transition-[opacity,visibility]",
+    collapsed
+      ? "lg:invisible lg:opacity-0 motion-safe:duration-150"
+      : "motion-safe:delay-100 motion-safe:duration-200",
+  );
+
   return (
     <aside
       data-collapsed={collapsed}
       className={cn(
-        "relative min-h-0 overflow-hidden border-r",
-        "motion-reduce:transition-none lg:transition-[width] lg:duration-300 lg:ease-[cubic-bezier(0.32,0.72,0,1)]",
+        "flex min-h-0 flex-col overflow-hidden border-r",
+        "lg:motion-safe:transition-[width] lg:motion-safe:duration-300 lg:motion-safe:ease-[cubic-bezier(0.32,0.72,0,1)]",
+        // Keep in sync with the inner `lg:w-[259px]` (open width minus the 1px border).
         collapsed ? "lg:w-12" : "lg:w-[260px]",
       )}
     >
+      <div className="relative hidden h-11 shrink-0 lg:block">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="absolute top-3 right-2 text-muted-foreground"
+          aria-controls="stages-panel"
+          aria-expanded={!collapsed}
+          aria-label={label}
+          title={label}
+          onClick={toggle}
+        >
+          {collapsed ? <PanelLeftOpenIcon /> : <PanelLeftCloseIcon />}
+        </Button>
+        <p
+          aria-hidden
+          className={cn(
+            "mt-3 flex h-8 w-[259px] items-center px-5 text-xs font-medium tracking-wide text-muted-foreground uppercase",
+            fade,
+          )}
+        >
+          Stages
+        </p>
+      </div>
       <div
         id="stages-panel"
         className={cn(
-          "flex h-full flex-col gap-4 overflow-y-auto p-3 lg:w-[259px]",
-          "transition-[opacity,visibility] motion-reduce:transition-none",
-          collapsed ? "duration-150 lg:invisible lg:opacity-0" : "delay-100 duration-200",
+          "flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-3 lg:w-[259px] lg:pt-4",
+          fade,
         )}
       >
-        <h2 className="flex h-8 shrink-0 items-center px-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-          Stages
-        </h2>
         {children}
       </div>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="absolute top-3 right-2 hidden text-muted-foreground lg:inline-flex"
-        aria-controls="stages-panel"
-        aria-expanded={!collapsed}
-        aria-label={collapsed ? "Expand stages panel" : "Collapse stages panel"}
-        title={collapsed ? "Expand stages panel" : "Collapse stages panel"}
-        onClick={toggle}
-      >
-        {collapsed ? <PanelLeftOpenIcon /> : <PanelLeftCloseIcon />}
-      </Button>
     </aside>
   );
 }

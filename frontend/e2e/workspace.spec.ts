@@ -219,7 +219,7 @@ test("the stages column collapses to a rail and stays collapsed after a reload",
   await createSession(page, `Sidebar ${Date.now()}`);
   const stages = page.getByRole("navigation", { name: "Stages" });
   const conversation = page.getByRole("region", { name: "Conversation" });
-  const railWidth = async () => (await page.locator("aside").first().boundingBox())!.width;
+  const railWidth = async () => (await page.locator("aside[data-collapsed]").boundingBox())!.width;
   const chatWidth = async () => (await conversation.boundingBox())!.width;
   expect(await railWidth()).toBe(260);
   const openChat = await chatWidth();
@@ -237,6 +237,11 @@ test("the stages column collapses to a rail and stays collapsed after a reload",
   await page.getByRole("button", { name: "Expand stages panel" }).click();
   await expect(stages).toBeVisible();
   await expect.poll(railWidth).toBe(260);
+
+  // With reduced motion the column snaps to its new width instead of animating.
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.getByRole("button", { name: "Collapse stages panel" }).click();
+  expect(await railWidth()).toBe(48);
 });
 
 test("a French pitch gets readable gate questions and a formatted reply", async ({ page }) => {
