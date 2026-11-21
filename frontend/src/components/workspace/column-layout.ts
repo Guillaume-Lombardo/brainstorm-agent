@@ -341,6 +341,10 @@ export function useSideColumns(
           return;
         }
         const next = clamp(Math.round(width), spec.minWidth, maxWidth);
+        // A vertical move or one past a bound changes nothing.
+        if (next === (current.widths.get(index) ?? current.start[index])) {
+          return;
+        }
         if (next === current.start[index]) {
           // Back where it started: the preferences come back, which may be wider than shown.
           current.widths = new Map();

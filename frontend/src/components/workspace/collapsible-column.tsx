@@ -183,7 +183,6 @@ export function CollapsibleColumn({
         side === "left" ? "border-r" : "border-l",
         // Collapse, expand, key steps and resets animate; drags and refits to the window do not.
         layout.animate &&
-          !resizing &&
           "lg:motion-safe:transition-[width] lg:motion-safe:duration-300 lg:motion-safe:ease-[cubic-bezier(0.32,0.72,0,1)]",
         collapsed ? "lg:w-12" : "lg:w-(--open-width)",
       )}
