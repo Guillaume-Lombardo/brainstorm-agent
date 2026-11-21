@@ -219,7 +219,8 @@ test("the stages column collapses to a rail and stays collapsed after a reload",
   await createSession(page, `Sidebar ${Date.now()}`);
   const stages = page.getByRole("navigation", { name: "Stages" });
   const conversation = page.getByRole("region", { name: "Conversation" });
-  const railWidth = async () => (await page.locator("aside[data-collapsed]").boundingBox())!.width;
+  const railWidth = async () =>
+    (await page.locator('aside[data-side="left"]').boundingBox())!.width;
   const chatWidth = async () => (await conversation.boundingBox())!.width;
   expect(await railWidth()).toBe(260);
   const openChat = await chatWidth();
@@ -243,6 +244,39 @@ test("the stages column collapses to a rail and stays collapsed after a reload",
   await page.getByRole("button", { name: "Collapse stages panel" }).click();
   expect(await railWidth()).toBe(48);
   expect(await stages.isVisible()).toBe(false);
+});
+
+test("the document column collapses to a rail, alone or with the stages column", async ({
+  page,
+}) => {
+  await signIn(page, "document@example.com");
+  await createSession(page, `Document ${Date.now()}`);
+  const tabs = page.getByRole("tablist");
+  const conversation = page.getByRole("region", { name: "Conversation" });
+  const railWidth = async () =>
+    (await page.locator('aside[data-side="right"]').boundingBox())!.width;
+  const chatWidth = async () => (await conversation.boundingBox())!.width;
+  expect(await railWidth()).toBe(440);
+  const openChat = await chatWidth();
+
+  await page.getByRole("button", { name: "Collapse document panel" }).click();
+  await expect(tabs).toBeHidden();
+  await expect.poll(railWidth).toBe(48);
+  expect(await chatWidth()).toBe(openChat + 392);
+
+  // Both columns collapsed leave the whole width to the conversation.
+  await page.getByRole("button", { name: "Collapse stages panel" }).click();
+  await expect.poll(chatWidth).toBe(openChat + 392 + 212);
+  await page.screenshot({ path: `${SCREENSHOTS}/08-both-collapsed.png` });
+
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Expand document panel" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Expand stages panel" })).toBeVisible();
+  await expect(tabs).toBeHidden();
+
+  await page.getByRole("button", { name: "Expand document panel" }).click();
+  await expect(page.getByRole("tab", { name: "Document" })).toBeVisible();
+  await expect.poll(railWidth).toBe(440);
 });
 
 test("a French pitch gets readable gate questions and a formatted reply", async ({ page }) => {
