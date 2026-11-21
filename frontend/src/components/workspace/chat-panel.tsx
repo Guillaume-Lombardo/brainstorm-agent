@@ -41,10 +41,14 @@ export function ChatPanel({
   // Follow new text only while the reader is at the bottom, so they can scroll up mid-reply.
   const followRef = useRef(true);
   const userMessages = messages.filter((message) => message.role === "user").length;
+  const userMessagesRef = useRef(userMessages);
 
   // A new question from the user (composer or open questions panel) follows its reply again.
   useEffect(() => {
-    followRef.current = true;
+    if (userMessages > userMessagesRef.current) {
+      followRef.current = true;
+    }
+    userMessagesRef.current = userMessages;
   }, [userMessages]);
 
   useEffect(() => {

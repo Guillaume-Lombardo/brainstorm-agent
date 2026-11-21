@@ -38,7 +38,11 @@ export function continueList(value: string, start: number, end: number): TextEdi
   if (!match) {
     return null;
   }
-  const [, indent, bullet, number, delimiter, content] = match;
+  const [prefix, indent, bullet, number, delimiter, content] = match;
+  // Only edit inside the item text: a caret or selection over the marker keeps Enter as send.
+  if (start < line.start + prefix.length - content.length) {
+    return null;
+  }
   if (content.trim() === "") {
     return { start: line.start, end: line.end, text: "" };
   }

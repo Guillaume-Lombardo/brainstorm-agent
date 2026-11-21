@@ -22,6 +22,8 @@ describe("continueList", () => {
   it("replaces a selection inside an item and ignores plain lines", () => {
     expect(applied("• milk eggs", continueList("• milk eggs", 6, 7))).toBe("• milk\n• eggs");
     expect(continueList("• milk\nmore", 2, 9)).toBeNull();
+    expect(continueList("1. milk", 0, 7)).toBeNull();
+    expect(continueList("1. milk", 1, 1)).toBeNull();
     expect(continueList("Hello", 5, 5)).toBeNull();
     expect(continueList("-5 degrees", 10, 10)).toBeNull();
   });

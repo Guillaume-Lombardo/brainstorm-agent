@@ -185,5 +185,11 @@ describe("ChatPanel", () => {
       />,
     );
     expect(scrollIntoView).toHaveBeenCalledTimes(3);
+
+    // A failed turn drops the local question: a reader who scrolled up stays where they are.
+    (log as HTMLElement).scrollTop = 0;
+    fireEvent.scroll(log);
+    rerender(<Harness onSend={vi.fn()} />);
+    expect(scrollIntoView).toHaveBeenCalledTimes(3);
   });
 });
