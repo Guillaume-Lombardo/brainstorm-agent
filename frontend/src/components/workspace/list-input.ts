@@ -3,6 +3,8 @@ export interface TextEdit {
   start: number;
   end: number;
   text: string;
+  /** Keep the new text selected (several lines toggled) instead of placing the caret after it. */
+  select?: boolean;
 }
 
 export type ListKind = "bullet" | "numbered";
@@ -11,7 +13,7 @@ const BULLET = "•";
 const ITEM = /^(\s*)(?:([-*•])|(\d+)([.)]))[ \t]+(.*)$/;
 
 function lineBounds(value: string, position: number): { start: number; end: number } {
-  const start = value.lastIndexOf("\n", position - 1) + 1;
+  const start = position === 0 ? 0 : value.lastIndexOf("\n", position - 1) + 1;
   const next = value.indexOf("\n", position);
   return { start, end: next === -1 ? value.length : next };
 }
@@ -28,10 +30,10 @@ function lineBounds(value: string, position: number): { start: number; end: numb
  *   TextEdit | null: The edit to apply, or `null` when the caret is not on a list item.
  */
 export function continueList(value: string, start: number, end: number): TextEdit | null {
-  if (start !== end) {
+  const line = lineBounds(value, start);
+  if (end > line.end) {
     return null;
   }
-  const line = lineBounds(value, start);
   const match = ITEM.exec(value.slice(line.start, line.end));
   if (!match) {
     return null;
@@ -58,7 +60,8 @@ export function continueList(value: string, start: number, end: number): TextEdi
  */
 export function toggleList(value: string, start: number, end: number, kind: ListKind): TextEdit {
   const first = lineBounds(value, start).start;
-  const last = lineBounds(value, Math.max(start, end)).end;
+  // A selection ending at the start of a line does not include that line.
+  const last = lineBounds(value, end > start ? end - 1 : start).end;
   const lines = value.slice(first, last).split("\n");
   const items = lines.map((line) => ITEM.exec(line));
   const isKind = (item: RegExpExecArray | null) =>
@@ -70,5 +73,5 @@ export function toggleList(value: string, start: number, end: number, kind: List
         const indent = /^\s*/.exec(line)![0];
         return `${indent}${kind === "bullet" ? BULLET : `${index + 1}.`} ${content}`;
       });
-  return { start: first, end: last, text: text.join("\n") };
+  return { start: first, end: last, text: text.join("\n"), select: lines.length > 1 };
 }

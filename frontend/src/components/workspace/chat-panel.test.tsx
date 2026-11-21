@@ -173,5 +173,17 @@ describe("ChatPanel", () => {
     fireEvent.scroll(log);
     rerender(view("First words, more"));
     expect(scrollIntoView).toHaveBeenCalledTimes(2);
+
+    // Scrolled up again, then a new question (from any panel) follows its reply.
+    (log as HTMLElement).scrollTop = 0;
+    fireEvent.scroll(log);
+    rerender(
+      <Harness
+        onSend={vi.fn()}
+        messages={[message("user", "Next question")]}
+        streaming={{ turnId: null, status: "Sending…", text: "" }}
+      />,
+    );
+    expect(scrollIntoView).toHaveBeenCalledTimes(3);
   });
 });

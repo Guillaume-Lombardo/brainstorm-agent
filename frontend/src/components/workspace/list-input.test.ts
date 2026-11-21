@@ -19,10 +19,11 @@ describe("continueList", () => {
     expect(applied("1. milk\n2. ", continueList("1. milk\n2. ", 11, 11))).toBe("1. milk\n");
   });
 
-  it("ignores plain lines and selections", () => {
+  it("replaces a selection inside an item and ignores plain lines", () => {
+    expect(applied("• milk eggs", continueList("• milk eggs", 6, 7))).toBe("• milk\n• eggs");
+    expect(continueList("• milk\nmore", 2, 9)).toBeNull();
     expect(continueList("Hello", 5, 5)).toBeNull();
     expect(continueList("-5 degrees", 10, 10)).toBeNull();
-    expect(continueList("• milk", 0, 6)).toBeNull();
   });
 });
 
@@ -35,7 +36,13 @@ describe("toggleList", () => {
     expect(applied(numbered, toggleList(numbered, 9, 20, "bullet"))).toBe("Before\n• milk\n• eggs");
   });
 
-  it("starts a bullet on an empty composer", () => {
+  it("keeps several toggled lines selected, and stops at a selection ending on a line start", () => {
+    expect(toggleList("milk\neggs", 0, 9, "bullet")).toMatchObject({ select: true });
+    expect(applied("milk\neggs", toggleList("milk\neggs", 0, 5, "bullet"))).toBe("• milk\neggs");
+  });
+
+  it("starts a bullet on an empty composer or an empty first line", () => {
     expect(applied("", toggleList("", 0, 0, "bullet"))).toBe("• ");
+    expect(applied("\nmilk", toggleList("\nmilk", 0, 0, "numbered"))).toBe("1. \nmilk");
   });
 });
