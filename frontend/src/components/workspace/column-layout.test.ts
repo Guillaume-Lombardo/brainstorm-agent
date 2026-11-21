@@ -120,6 +120,23 @@ describe("useSideColumns", () => {
     );
   });
 
+  it("handles moves batched before a render from the drag's own start", () => {
+    window.localStorage.setItem("t.left.width", "480");
+    window.localStorage.setItem("t.right.width", "800");
+    const { result } = renderHook(() => useSideColumns(gridOf(1024), LEFT, RIGHT));
+    const shown = [result.current[0].width, result.current[1].width];
+
+    act(() => void result.current[1].startDrag());
+    act(() => {
+      result.current[1].dragTo(shown[1] + 1);
+      result.current[1].dragTo(shown[1]);
+      result.current[1].endDrag();
+    });
+    expect([result.current[0].width, result.current[1].width]).toEqual(shown);
+    expect(window.localStorage.getItem("t.left.width")).toBe("480");
+    expect(window.localStorage.getItem("t.right.width")).toBe("800");
+  });
+
   it("runs one drag at a time, and holds keys back until it ends", () => {
     const { result } = renderHook(() => useSideColumns(gridOf(1440), LEFT, RIGHT));
     let started = false;

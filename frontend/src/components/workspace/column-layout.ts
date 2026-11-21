@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  useLayoutEffect,
-  useState,
-  type Dispatch,
-  type RefObject,
-  type SetStateAction,
-} from "react";
+import { useLayoutEffect, useState, type RefObject } from "react";
 import { flushSync } from "react-dom";
 
 /** Width of a collapsed side column. */
@@ -131,7 +125,8 @@ class Gestures {
   private animatedAt = -Infinity;
   /**
    * The running drag: the column it moves, the widths shown and preferred when it started,
-   * and the last widths it set.
+   * and the widths it sets now (none while back at the start). It is computed from these
+   * alone, not from the last render, so moves batched before a render stay consistent.
    */
   drag: {
     index: number;
@@ -162,35 +157,20 @@ class Gestures {
 }
 
 /**
- * Ends the running drag, if any, and saves its widths. A drag that comes back to where it
- * started gives the columns back their preferences instead: the widths it showed may have
- * been shrunk to fit the window, and must not replace wider preferences.
+ * Ends the running drag, if any, and saves the widths it set. A drag that came back to where
+ * it started saves nothing: its columns already have their preferences back, which may be
+ * wider than the widths shown in a narrow window.
  *
  * Args:
  *   gestures (Gestures): Gesture bookkeeping holding the drag.
  *   specs (ColumnSpec[]): Column settings, for their storage keys.
- *   setPreferences (Dispatch<SetStateAction<Preference[]>>): Preference state setter.
  */
-function finishDrag(
-  gestures: Gestures,
-  specs: ColumnSpec[],
-  setPreferences: Dispatch<SetStateAction<Preference[]>>,
-) {
+function finishDrag(gestures: Gestures, specs: ColumnSpec[]) {
   const drag = gestures.drag;
   if (!drag) {
     return;
   }
   gestures.drag = null;
-  const returned = [...drag.widths].every(([index, width]) => width === drag.start[index]);
-  if (returned) {
-    setPreferences((current) =>
-      current.map((preference, index) => ({
-        ...preference,
-        width: drag.startPreferences[index],
-      })),
-    );
-    return;
-  }
   for (const [index, width] of drag.widths) {
     writeStored(`${specs[index].storageKey}.width`, String(width));
   }
@@ -243,7 +223,7 @@ export function useSideColumns(
       measured = grid.clientWidth;
       gestures.stopAnimations();
       // A new grid width (or layout mode) ends a drag: its pointer offsets no longer apply.
-      finishDrag(gestures, [left, right], setPreferences);
+      finishDrag(gestures, [left, right]);
       // Render the refit before the next paint, so the grid and the columns change together.
       flushSync(() => {
         setAnimate(false);
@@ -318,7 +298,7 @@ export function useSideColumns(
         const collapsed = !preferences[index].collapsed;
         // Ending a drag first: the dragged column jumps, so this change must not animate.
         const dragging = gestures.drag !== null;
-        finishDrag(gestures, specs, setPreferences);
+        finishDrag(gestures, specs);
         setAnimate(!dragging && gestures.startChange());
         setPreferences((current) =>
           current.map((preference, at) =>
@@ -360,17 +340,35 @@ export function useSideColumns(
         if (current?.index !== index) {
           return;
         }
+        const next = clamp(Math.round(width), spec.minWidth, maxWidth);
+        if (next === current.start[index]) {
+          // Back where it started: the preferences come back, which may be wider than shown.
+          current.widths = new Map();
+          setPreferences((previous) =>
+            previous.map((preference, at) => ({
+              ...preference,
+              width: current.startPreferences[at],
+            })),
+          );
+          return;
+        }
         // The other column is pushed from where it was when the drag started, so it gets its
         // width back when this one comes back.
-        const changes = widthsFor(width, current.start[other]);
-        for (const [at, value] of changes) {
-          current.widths.set(at, value);
+        current.widths = new Map([[index, next]]);
+        if (gridWidth > 0 && !otherCollapsed) {
+          current.widths.set(
+            other,
+            Math.max(
+              specs[other].minWidth,
+              Math.min(current.start[other], gridWidth - MIN_MAIN_WIDTH - next),
+            ),
+          );
         }
-        applyWidths(changes);
+        applyWidths(current.widths);
       },
       endDrag() {
         if (gestures.drag?.index === index) {
-          finishDrag(gestures, specs, setPreferences);
+          finishDrag(gestures, specs);
         }
       },
       isDragging() {

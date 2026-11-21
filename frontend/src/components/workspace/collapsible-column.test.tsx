@@ -119,7 +119,11 @@ describe("CollapsibleColumn", () => {
     fireEvent.pointerMove(handle(), { pointerId: 1, clientX: 140 });
     expect(handle()).toHaveAttribute("aria-valuenow", "340");
 
-    await userEvent.click(screen.getByRole("button", { name: "Collapse test panel" }));
+    // Collapsing mid-drag ends the drag first, so the column jumps instead of animating.
+    handle().focus();
+    fireEvent.keyDown(handle(), { key: "Enter" });
+    expect(column()).toHaveAttribute("data-collapsed", "true");
+    expect(column().className).not.toContain("transition-[width]");
     await userEvent.click(screen.getByRole("button", { name: "Expand test panel" }));
     expect(handle()).toHaveAttribute("data-resizing", "false");
     expect(window.localStorage.getItem(`${PREFIX}.width`)).toBe("340");
