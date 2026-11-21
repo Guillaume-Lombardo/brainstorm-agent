@@ -19,6 +19,7 @@ import {
 
 import { ChatPanel } from "./chat-panel";
 import { CollapsibleColumn } from "./collapsible-column";
+import { useSideColumns, type ColumnSpec } from "./column-layout";
 import { DeliveryView } from "./delivery-view";
 import { DocumentPanel } from "./document-panel";
 import { ExportMenu } from "./export-menu";
@@ -74,12 +75,27 @@ export function Workspace({ sessionId }: { sessionId: string }) {
   return <WorkspaceView initialSnapshot={loaded.snapshot} />;
 }
 
+const STAGES_COLUMN: ColumnSpec = {
+  storageKey: "workspace.stages-sidebar",
+  defaultWidth: 260,
+  minWidth: 200,
+  maxWidth: 480,
+};
+const DOCUMENT_COLUMN: ColumnSpec = {
+  storageKey: "workspace.document-panel",
+  defaultWidth: 440,
+  minWidth: 320,
+  maxWidth: 800,
+};
+
 function WorkspaceView({ initialSnapshot }: { initialSnapshot: SessionSnapshot }) {
   const [state, dispatch] = useReducer(workspaceReducer, initialSnapshot, initialWorkspaceState);
   const [selectedStage, setSelectedStage] = useState<Stage | null>(null);
   const [actionError, setActionError] = useState<unknown>(null);
   const [acting, setActing] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
+  const [stagesColumn, documentColumn] = useSideColumns(gridRef, STAGES_COLUMN, DOCUMENT_COLUMN);
   const { session } = state;
   const sessionId = session.session_id;
   const stage = selectedStage ?? session.current_stage;
@@ -188,16 +204,11 @@ function WorkspaceView({ initialSnapshot }: { initialSnapshot: SessionSnapshot }
           <ErrorState error={actionError} />
         </div>
       ) : null}
-      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:grid-rows-[minmax(0,1fr)]">
-        <CollapsibleColumn
-          side="left"
-          name="stages"
-          panelId="stages-panel"
-          storageKey="workspace.stages-sidebar"
-          defaultWidth={260}
-          minWidth={200}
-          maxWidth={480}
-        >
+      <div
+        ref={gridRef}
+        className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:grid-rows-[minmax(0,1fr)]"
+      >
+        <CollapsibleColumn side="left" name="stages" panelId="stages-panel" layout={stagesColumn}>
           <p
             aria-hidden
             className="mt-3 hidden h-8 shrink-0 items-center px-5 text-xs font-medium tracking-wide text-muted-foreground uppercase lg:flex"
@@ -242,10 +253,7 @@ function WorkspaceView({ initialSnapshot }: { initialSnapshot: SessionSnapshot }
           side="right"
           name="document"
           panelId="document-panel"
-          storageKey="workspace.document-panel"
-          defaultWidth={440}
-          minWidth={320}
-          maxWidth={800}
+          layout={documentColumn}
         >
           {/* Only the tab content scrolls: the tab row stays clear of the collapse toggle. */}
           <Tabs defaultValue="document" className="min-h-0 flex-1">

@@ -284,13 +284,13 @@ test("the document column collapses to a rail, alone or with the stages column",
   // expanding reaches its tabs (past the resize handle).
   const documentTab = page.getByRole("tab", { name: "Document" });
   await page.getByRole("button", { name: "Collapse document panel" }).focus();
+  const focusInPanel = () =>
+    page.evaluate(() => document.activeElement?.closest("#document-panel") !== null);
   await page.keyboard.press("Enter");
   await page.keyboard.press("Tab");
-  await expect(documentTab).not.toBeFocused();
-  await page.waitForTimeout(400);
-  expect(
-    await page.evaluate(() => document.activeElement?.closest("#document-panel") ?? null),
-  ).toBeNull();
+  expect(await focusInPanel()).toBe(false);
+  await expect.poll(railWidth).toBe(48);
+  expect(await focusInPanel()).toBe(false);
   await page.getByRole("button", { name: "Expand document panel" }).focus();
   await page.keyboard.press("Enter");
   await page.keyboard.press("Tab");
@@ -339,6 +339,26 @@ test("the side columns resize by dragging their inner edge, within bounds", asyn
   await page.getByRole("separator", { name: "Resize document panel" }).focus();
   await page.keyboard.press("ArrowRight");
   await expect.poll(() => width("right")).toBe(704);
+
+  // A narrower window shrinks both columns so the conversation keeps 360px, and a wider one
+  // brings back the chosen widths.
+  await page.setViewportSize({ width: 1024, height: 900 });
+  await expect.poll(chatWidth).toBeGreaterThanOrEqual(360);
+  expect(await chatWidth()).toBeLessThan(380);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await expect.poll(() => width("right")).toBe(704);
+  expect(await width("left")).toBe(260);
+
+  // The widest stages column, set while the document column is collapsed, still leaves room
+  // for the conversation once the document column reopens.
+  await page.getByRole("button", { name: "Collapse document panel" }).click();
+  await expect.poll(() => width("right")).toBe(48);
+  await drag("Resize stages panel", 1000);
+  expect(await width("left")).toBe(480);
+  await page.getByRole("button", { name: "Expand document panel" }).click();
+  await expect.poll(() => width("right")).toBeGreaterThan(600);
+  await expect.poll(chatWidth).toBeGreaterThanOrEqual(360);
+  expect(await chatWidth()).toBeLessThan(380);
 });
 
 test("a French pitch gets readable gate questions and a formatted reply", async ({ page }) => {
@@ -358,7 +378,8 @@ test("a French pitch gets readable gate questions and a formatted reply", async 
 
   // Questions are phrased in the session language, with options and a recommendation.
   await page.getByRole("tab", { name: /Questions/ }).click();
-  const panel = page.getByRole("tabpanel");
+  // The tab being left stays mounted while it exits: name the panel.
+  const panel = page.getByRole("tabpanel", { name: /Questions/ });
   await expect(panel.getByRole("listitem")).toHaveCount(3);
   await expect(panel).toContainText("Quels points de l'idée sont déjà clairs et arrêtés ?");
   await expect(panel).not.toContainText("Please clarify");
