@@ -4,7 +4,7 @@ import { useLayoutEffect, useState, type RefObject } from "react";
 import { flushSync } from "react-dom";
 
 /** Width of a collapsed side column. */
-export const RAIL_WIDTH = 48;
+const RAIL_WIDTH = 48;
 /** Width always left to the middle column on large screens. */
 export const MIN_MAIN_WIDTH = 360;
 /** Duration of the column width transition (`duration-300` in `CollapsibleColumn`). */
