@@ -218,6 +218,7 @@ test("the stages column collapses to a rail and stays collapsed after a reload",
   await signIn(page, "sidebar@example.com");
   await createSession(page, `Sidebar ${Date.now()}`);
   const stages = page.getByRole("navigation", { name: "Stages" });
+  const stagesPanel = page.locator("#stages-panel");
   const conversation = page.getByRole("region", { name: "Conversation" });
   const railWidth = async () =>
     (await page.locator('aside[data-side="left"]').boundingBox())!.width;
@@ -226,16 +227,17 @@ test("the stages column collapses to a rail and stays collapsed after a reload",
   const openChat = await chatWidth();
 
   await page.getByRole("button", { name: "Collapse stages panel" }).click();
-  await expect(stages).toBeHidden();
+  await expect(stagesPanel).toHaveAttribute("inert");
   await expect.poll(railWidth).toBe(48);
   expect(await chatWidth()).toBe(openChat + 212);
   await page.screenshot({ path: `${SCREENSHOTS}/07-stages-collapsed.png` });
 
   await page.reload();
   await expect(page.getByRole("button", { name: "Expand stages panel" })).toBeVisible();
-  await expect(stages).toBeHidden();
+  await expect(stagesPanel).toHaveAttribute("inert");
 
   await page.getByRole("button", { name: "Expand stages panel" }).click();
+  await expect(stagesPanel).not.toHaveAttribute("inert");
   await expect(stages).toBeVisible();
   await expect.poll(railWidth).toBe(260);
 
@@ -243,7 +245,7 @@ test("the stages column collapses to a rail and stays collapsed after a reload",
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.getByRole("button", { name: "Collapse stages panel" }).click();
   expect(await railWidth()).toBe(48);
-  expect(await stages.isVisible()).toBe(false);
+  expect(await stagesPanel.evaluate((panel) => getComputedStyle(panel).opacity)).toBe("0");
 });
 
 test("the document column collapses to a rail, alone or with the stages column", async ({
@@ -251,7 +253,7 @@ test("the document column collapses to a rail, alone or with the stages column",
 }) => {
   await signIn(page, "document@example.com");
   await createSession(page, `Document ${Date.now()}`);
-  const tabs = page.getByRole("tablist");
+  const panel = page.locator("#document-panel");
   const conversation = page.getByRole("region", { name: "Conversation" });
   const railWidth = async () =>
     (await page.locator('aside[data-side="right"]').boundingBox())!.width;
@@ -260,7 +262,7 @@ test("the document column collapses to a rail, alone or with the stages column",
   const openChat = await chatWidth();
 
   await page.getByRole("button", { name: "Collapse document panel" }).click();
-  await expect(tabs).toBeHidden();
+  await expect(panel).toHaveAttribute("inert");
   await expect.poll(railWidth).toBe(48);
   expect(await chatWidth()).toBe(openChat + 392);
 
@@ -272,11 +274,71 @@ test("the document column collapses to a rail, alone or with the stages column",
   await page.reload();
   await expect(page.getByRole("button", { name: "Expand document panel" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Expand stages panel" })).toBeVisible();
-  await expect(tabs).toBeHidden();
+  await expect(panel).toHaveAttribute("inert");
 
   await page.getByRole("button", { name: "Expand document panel" }).click();
   await expect(page.getByRole("tab", { name: "Document" })).toBeVisible();
   await expect.poll(railWidth).toBe(440);
+
+  // Keyboard: Tab right after collapsing never lands in the fading panel, and Tab right after
+  // expanding reaches its tabs (past the resize handle).
+  const documentTab = page.getByRole("tab", { name: "Document" });
+  await page.getByRole("button", { name: "Collapse document panel" }).focus();
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Tab");
+  await expect(documentTab).not.toBeFocused();
+  await page.waitForTimeout(400);
+  expect(
+    await page.evaluate(() => document.activeElement?.closest("#document-panel") ?? null),
+  ).toBeNull();
+  await page.getByRole("button", { name: "Expand document panel" }).focus();
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("separator", { name: "Resize document panel" })).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(documentTab).toBeFocused();
+});
+
+test("the side columns resize by dragging their inner edge, within bounds", async ({ page }) => {
+  await signIn(page, "resize@example.com");
+  await createSession(page, `Resize ${Date.now()}`);
+  const width = async (side: string) =>
+    (await page.locator(`aside[data-side="${side}"]`).boundingBox())!.width;
+  const chatWidth = async () =>
+    (await page.getByRole("region", { name: "Conversation" }).boundingBox())!.width;
+  async function drag(name: string, dx: number) {
+    const box = (await page.getByRole("separator", { name }).boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + dx, box.y + box.height / 2, { steps: 5 });
+    await page.mouse.up();
+  }
+  const openChat = await chatWidth();
+
+  await drag("Resize stages panel", 100);
+  expect(await width("left")).toBe(360);
+  await drag("Resize document panel", -100);
+  expect(await width("right")).toBe(540);
+  expect(await chatWidth()).toBe(openChat - 200);
+
+  // Widening stops where the conversation would get narrower than 360px.
+  // With the stages column at 360px, the 1440px viewport leaves room for 720px.
+  await drag("Resize document panel", -1000);
+  expect(await width("right")).toBe(720);
+  expect(await chatWidth()).toBe(360);
+  await page.screenshot({ path: `${SCREENSHOTS}/09-resized.png` });
+
+  await page.reload();
+  await expect(page.getByRole("separator", { name: "Resize stages panel" })).toBeVisible();
+  expect(await width("left")).toBe(360);
+  expect(await width("right")).toBe(720);
+
+  // Double click restores the default width; arrow keys step it.
+  await page.getByRole("separator", { name: "Resize stages panel" }).dblclick();
+  await expect.poll(() => width("left")).toBe(260);
+  await page.getByRole("separator", { name: "Resize document panel" }).focus();
+  await page.keyboard.press("ArrowRight");
+  await expect.poll(() => width("right")).toBe(704);
 });
 
 test("a French pitch gets readable gate questions and a formatted reply", async ({ page }) => {

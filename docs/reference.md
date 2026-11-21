@@ -100,8 +100,10 @@ configured), sessions list and the framing workspace (streamed chat that stops f
 when the reader scrolls up, a composer with bulleted and numbered lists, versioned stage documents
 with diff, 8-stage stepper with readiness and coverage, open questions, review bar, delivery
 slicing view, exports). On large screens the stages column (left) and the document, questions and
-delivery column (right) each collapse to a rail, and the browser remembers each choice. The browser only calls the Next.js server, which proxies to the backend
-with a short-lived signed JWT per call; passwords are checked through the backend login bridge.
+delivery column (right) each collapse to a rail and resize by dragging their inner edge (arrow keys
+on the focused edge, double click to reset); the browser remembers both. The browser only calls the
+Next.js server, which proxies to the backend with a short-lived signed JWT per call; passwords are
+checked through the backend login bridge.
 Every screen uses the generated OpenAPI types of the application API (ADR 0011).
 
 ```bash

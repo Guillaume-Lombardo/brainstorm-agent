@@ -52,7 +52,7 @@ export function Workspace({ sessionId }: { sessionId: string }) {
   if (!loaded || loaded.sessionId !== sessionId) {
     return (
       <div
-        className="grid flex-1 grid-cols-[260px_1fr_440px] gap-4 p-4"
+        className="grid flex-1 grid-cols-1 gap-4 p-4 lg:grid-cols-[260px_minmax(0,1fr)_440px]"
         aria-label="Loading workspace"
       >
         <Skeleton className="h-full" />
@@ -193,8 +193,10 @@ function WorkspaceView({ initialSnapshot }: { initialSnapshot: SessionSnapshot }
           side="left"
           name="stages"
           panelId="stages-panel"
-          storageKey="workspace.stages-sidebar.collapsed"
-          width={260}
+          storageKey="workspace.stages-sidebar"
+          defaultWidth={260}
+          minWidth={200}
+          maxWidth={480}
         >
           <p
             aria-hidden
@@ -240,8 +242,10 @@ function WorkspaceView({ initialSnapshot }: { initialSnapshot: SessionSnapshot }
           side="right"
           name="document"
           panelId="document-panel"
-          storageKey="workspace.document-panel.collapsed"
-          width={440}
+          storageKey="workspace.document-panel"
+          defaultWidth={440}
+          minWidth={320}
+          maxWidth={800}
         >
           {/* Only the tab content scrolls: the tab row stays clear of the collapse toggle. */}
           <Tabs defaultValue="document" className="min-h-0 flex-1">
