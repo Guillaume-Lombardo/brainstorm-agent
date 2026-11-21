@@ -320,6 +320,27 @@ test("the side columns resize by dragging their inner edge, within bounds", asyn
       () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))),
     );
   };
+  /** Narrowest conversation width over every frame while `action` runs and animations end. */
+  async function narrowestChatDuring(action: () => Promise<void>) {
+    await page.evaluate(() => {
+      const chat = document.querySelector('[aria-label="Conversation"]')!;
+      const state = { min: Infinity, running: true };
+      (window as unknown as { chatFrames: typeof state }).chatFrames = state;
+      const tick = () => {
+        state.min = Math.min(state.min, chat.getBoundingClientRect().width);
+        if (state.running) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+    await action();
+    await page.waitForTimeout(600);
+    return page.evaluate(() => {
+      const state = (window as unknown as { chatFrames: { min: number; running: boolean } })
+        .chatFrames;
+      state.running = false;
+      return state.min;
+    });
+  }
   const openChat = await chatWidth();
 
   await drag("Resize stages panel", 100);
@@ -337,6 +358,22 @@ test("the side columns resize by dragging their inner edge, within bounds", asyn
 
   await page.reload();
   await expect(page.getByRole("separator", { name: "Resize stages panel" })).toBeVisible();
+  expect(await width("left")).toBe(280);
+  expect(await width("right")).toBe(800);
+
+  // A second command while the first one still animates never squeezes the conversation.
+  const stagesEdge = page.getByRole("separator", { name: "Resize stages panel" });
+  const documentEdge = page.getByRole("separator", { name: "Resize document panel" });
+  await stagesEdge.focus();
+  await page.keyboard.press("Home");
+  await expect.poll(() => width("left")).toBe(200);
+  const narrowest = await narrowestChatDuring(async () => {
+    await stagesEdge.focus();
+    await page.keyboard.press("End");
+    await documentEdge.focus();
+    await page.keyboard.press("End");
+  });
+  expect(narrowest).toBeGreaterThanOrEqual(360);
   expect(await width("left")).toBe(280);
   expect(await width("right")).toBe(800);
 
@@ -362,22 +399,10 @@ test("the side columns resize by dragging their inner edge, within bounds", asyn
   await expect.poll(() => width("right")).toBe(48);
   await drag("Resize stages panel", 1000);
   expect(await width("left")).toBe(480);
-  await page.getByRole("button", { name: "Expand document panel" }).click();
-  const narrowest = await page.evaluate(
-    () =>
-      new Promise<number>((resolve) => {
-        const chat = document.querySelector('[aria-label="Conversation"]')!;
-        let min = Infinity;
-        const start = performance.now();
-        const tick = () => {
-          min = Math.min(min, chat.getBoundingClientRect().width);
-          if (performance.now() - start < 500) requestAnimationFrame(tick);
-          else resolve(min);
-        };
-        requestAnimationFrame(tick);
-      }),
+  const reopening = await narrowestChatDuring(() =>
+    page.getByRole("button", { name: "Expand document panel" }).click(),
   );
-  expect(narrowest).toBeGreaterThanOrEqual(360);
+  expect(reopening).toBeGreaterThanOrEqual(360);
   expect(await width("right")).toBeGreaterThan(600);
 
   // Widening a column that was shrunk to fit the window widens it.

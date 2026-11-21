@@ -83,8 +83,11 @@ export function CollapsibleColumn({
   const drag = useRef<{ pointerId: number; x: number; start: number } | null>(null);
 
   function endDrag() {
-    drag.current = null;
-    setResizing(false);
+    if (drag.current) {
+      drag.current = null;
+      setResizing(false);
+      layout.endDrag();
+    }
   }
 
   function toggle() {
@@ -106,6 +109,7 @@ export function CollapsibleColumn({
     event.currentTarget.setPointerCapture(event.pointerId);
     drag.current = { pointerId: event.pointerId, x: event.clientX, start: width };
     setResizing(true);
+    layout.startDrag();
   }
 
   function onPointerMove(event: PointerEvent<HTMLDivElement>) {
@@ -114,7 +118,7 @@ export function CollapsibleColumn({
       return;
     }
     const delta = side === "left" ? event.clientX - current.x : current.x - event.clientX;
-    layout.resize(current.start + delta, { animate: false });
+    layout.dragTo(current.start + delta);
   }
 
   function onPointerEnd(event: PointerEvent<HTMLDivElement>) {

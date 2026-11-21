@@ -7,6 +7,8 @@ import { flushSync } from "react-dom";
 export const RAIL_WIDTH = 48;
 /** Width always left to the middle column on large screens. */
 export const MIN_MAIN_WIDTH = 360;
+/** Duration of the column width transition (`duration-300` in `CollapsibleColumn`). */
+const TRANSITION_MS = 300;
 
 /** Fixed settings of a side column. */
 export interface ColumnSpec {
@@ -26,14 +28,15 @@ export interface ColumnLayout {
   /** Largest width the column can take now, pushing the other one to its minimum. */
   maxWidth: number;
   defaultWidth: number;
-  /** Whether width changes should animate: only after the user's own toggles and resizes. */
+  /** Whether width changes animate: only the user's toggles and resizes, one at a time. */
   animate: boolean;
   toggle: () => void;
-  /**
-   * Sets the width, clamped to `[minWidth, maxWidth]`, and remembers it. `animate: false`
-   * for a drag, which follows the pointer.
-   */
-  resize: (width: number, options?: { animate?: boolean }) => void;
+  /** Sets the width, clamped to `[minWidth, maxWidth]`, and remembers it. */
+  resize: (width: number) => void;
+  /** Starts a drag: widths follow `dragTo` without animation and are saved by `endDrag`. */
+  startDrag: () => void;
+  dragTo: (width: number) => void;
+  endDrag: () => void;
 }
 
 interface Preference {
@@ -111,6 +114,34 @@ export function fitColumns(
   );
 }
 
+/** Bookkeeping of the user's gestures. It never drives rendering, so it is not React state. */
+class Gestures {
+  /** When the last animated change started; `-Infinity` once nothing animates. */
+  private animatedAt = -Infinity;
+  /** Widths shown when the current drag started, and the last widths it set. */
+  drag: { start: number[]; widths: Map<number, number> } | null = null;
+
+  /**
+   * Whether a user change starting now may animate. Not when it interrupts one still running:
+   * CSS would then retarget or shorten each column's transition differently, and their sum
+   * could squeeze the middle column. Both columns jump to their new widths instead.
+   *
+   * Returns:
+   *   boolean: `true` to animate the change.
+   */
+  startChange(): boolean {
+    const now = performance.now();
+    const interrupts = now - this.animatedAt < TRANSITION_MS;
+    this.animatedAt = interrupts ? -Infinity : now;
+    return !interrupts;
+  }
+
+  /** Records that widths now change without animation, which ends any running one. */
+  stopAnimations() {
+    this.animatedAt = -Infinity;
+  }
+}
+
 /**
  * Collapsed state and widths of the two workspace side columns, fitted to their grid.
  *
@@ -138,6 +169,7 @@ export function useSideColumns(
   const [gridWidth, setGridWidth] = useState(0);
   // Only changes the user asks for animate: not the first fit nor refits to the window.
   const [animate, setAnimate] = useState(false);
+  const [gestures] = useState(() => new Gestures());
 
   useLayoutEffect(() => {
     const grid = gridRef.current;
@@ -149,6 +181,7 @@ export function useSideColumns(
       return;
     }
     const observer = new ResizeObserver(() => {
+      gestures.stopAnimations();
       // Render the refit before the next paint, so the grid and the columns change together.
       flushSync(() => {
         setAnimate(false);
@@ -157,7 +190,7 @@ export function useSideColumns(
     });
     observer.observe(grid);
     return () => observer.disconnect();
-  }, [gridRef]);
+  }, [gridRef, gestures]);
 
   const columns = preferences.map((preference, index) => ({
     ...preference,
@@ -165,19 +198,18 @@ export function useSideColumns(
   }));
   const widths = fitColumns(gridWidth, columns);
 
-  function save(changes: Map<number, Partial<Preference>>) {
-    setPreferences((current) =>
-      current.map((preference, index) => ({ ...preference, ...changes.get(index) })),
-    );
-    for (const [index, change] of changes) {
-      const { storageKey } = specs[index];
-      if (change.collapsed !== undefined) {
-        writeStored(`${storageKey}.collapsed`, String(change.collapsed));
-      }
-      if (change.width !== undefined) {
-        writeStored(`${storageKey}.width`, String(change.width));
-      }
+  function writeWidths(changes: Map<number, number>) {
+    for (const [index, width] of changes) {
+      writeStored(`${specs[index].storageKey}.width`, String(width));
     }
+  }
+
+  function applyWidths(changes: Map<number, number>) {
+    setPreferences((current) =>
+      current.map((preference, index) =>
+        changes.has(index) ? { ...preference, width: changes.get(index)! } : preference,
+      ),
+    );
   }
 
   const layouts = specs.map((spec, index): ColumnLayout => {
@@ -186,6 +218,30 @@ export function useSideColumns(
     // Room for this column once the other one is pushed to its minimum (or is a rail).
     const room = gridWidth - MIN_MAIN_WIDTH - (otherCollapsed ? RAIL_WIDTH : specs[other].minWidth);
     const maxWidth = gridWidth === 0 ? spec.maxWidth : clamp(room, spec.minWidth, spec.maxWidth);
+
+    /**
+     * Widths after setting this column to `width`. The other column keeps `otherWidth` (what
+     * it showed), minus what this one now takes. A width already shown changes nothing but,
+     * when it differs, this column's own preference.
+     */
+    function widthsFor(width: number, otherWidth: number): Map<number, number> {
+      const next = clamp(Math.round(width), spec.minWidth, maxWidth);
+      const changes = new Map<number, number>();
+      if (next !== preferences[index].width) {
+        changes.set(index, next);
+      }
+      if (next !== widths[index] && gridWidth > 0 && !otherCollapsed) {
+        const pushed = Math.max(
+          specs[other].minWidth,
+          Math.min(otherWidth, gridWidth - MIN_MAIN_WIDTH - next),
+        );
+        if (pushed !== preferences[other].width) {
+          changes.set(other, pushed);
+        }
+      }
+      return changes;
+    }
+
     return {
       collapsed: preferences[index].collapsed,
       width: widths[index],
@@ -194,22 +250,48 @@ export function useSideColumns(
       defaultWidth: Math.min(spec.defaultWidth, maxWidth),
       animate,
       toggle() {
-        setAnimate(true);
-        save(new Map([[index, { collapsed: !preferences[index].collapsed }]]));
+        const collapsed = !preferences[index].collapsed;
+        setAnimate(gestures.startChange());
+        setPreferences((current) =>
+          current.map((preference, at) =>
+            at === index ? { ...preference, collapsed } : preference,
+          ),
+        );
+        writeStored(`${spec.storageKey}.collapsed`, String(collapsed));
       },
-      resize(width, options = {}) {
-        setAnimate(options.animate ?? true);
-        const next = clamp(Math.round(width), spec.minWidth, maxWidth);
-        const changes = new Map<number, Partial<Preference>>([[index, { width: next }]]);
-        if (gridWidth > 0 && !otherCollapsed) {
-          // The other column keeps the width it shows, minus what this one now takes.
-          const available = gridWidth - MIN_MAIN_WIDTH - next;
-          const otherWidth = Math.max(specs[other].minWidth, Math.min(widths[other], available));
-          if (otherWidth !== preferences[other].width) {
-            changes.set(other, { width: otherWidth });
+      resize(width) {
+        const changes = widthsFor(width, widths[other]);
+        if (changes.size > 0) {
+          if (clamp(Math.round(width), spec.minWidth, maxWidth) !== widths[index]) {
+            setAnimate(gestures.startChange());
           }
+          applyWidths(changes);
+          writeWidths(changes);
         }
-        save(changes);
+      },
+      startDrag() {
+        gestures.stopAnimations();
+        setAnimate(false);
+        gestures.drag = { start: [...widths], widths: new Map() };
+      },
+      dragTo(width) {
+        const current = gestures.drag;
+        if (!current) {
+          return;
+        }
+        // The other column is pushed from where it was when the drag started, so it gets its
+        // width back when this one comes back.
+        const changes = widthsFor(width, current.start[other]);
+        for (const [at, value] of changes) {
+          current.widths.set(at, value);
+        }
+        applyWidths(changes);
+      },
+      endDrag() {
+        if (gestures.drag) {
+          writeWidths(gestures.drag.widths);
+          gestures.drag = null;
+        }
       },
     };
   });

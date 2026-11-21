@@ -50,17 +50,48 @@ describe("useSideColumns", () => {
     expect(result.current[1].maxWidth).toBe(800);
 
     act(() => result.current[0].resize(360));
-    act(() => result.current[1].resize(9999, { animate: false }));
+    expect(result.current[0].animate).toBe(true);
+    act(() => result.current[1].resize(9999));
     expect(result.current[1].width).toBe(800);
     expect(result.current[0].width).toBe(1440 - MIN_MAIN_WIDTH - 800);
-    expect(result.current[0].animate).toBe(false);
     expect(window.localStorage.getItem("t.right.width")).toBe("800");
     expect(window.localStorage.getItem("t.left.width")).toBe("280");
+    // The second resize interrupted the first one's animation: both jump instead.
+    expect(result.current[0].animate).toBe(false);
 
     act(() => result.current[0].toggle());
     expect(result.current[0].collapsed).toBe(true);
     expect(result.current[0].animate).toBe(true);
     expect(window.localStorage.getItem("t.left.collapsed")).toBe("true");
+  });
+
+  it("gives the pushed column its width back when a drag returns, and saves on release", () => {
+    const { result } = renderHook(() => useSideColumns(gridOf(1440), LEFT, RIGHT));
+    act(() => result.current[0].resize(360));
+    act(() => result.current[1].resize(540));
+    window.localStorage.clear();
+
+    act(() => result.current[1].startDrag());
+    expect(result.current[1].animate).toBe(false);
+    act(() => result.current[1].dragTo(800));
+    expect(result.current[0].width).toBe(280);
+    expect(window.localStorage.getItem("t.left.width")).toBeNull();
+    act(() => result.current[1].dragTo(540));
+    expect(result.current[0].width).toBe(360);
+    act(() => result.current[1].endDrag());
+    expect(window.localStorage.getItem("t.right.width")).toBe("540");
+    expect(window.localStorage.getItem("t.left.width")).toBe("360");
+  });
+
+  it("ignores a key at a bound, which would only overwrite the other column", () => {
+    window.localStorage.setItem("t.right.width", "800");
+    const { result } = renderHook(() => useSideColumns(gridOf(1024), LEFT, RIGHT));
+    act(() => result.current[0].resize(200));
+    const shown = result.current[1].width;
+    window.localStorage.removeItem("t.right.width");
+    act(() => result.current[0].resize(200));
+    expect(result.current[1].width).toBe(shown);
+    expect(window.localStorage.getItem("t.right.width")).toBeNull();
   });
 
   it("widens a column that was shrunk to fit the window", () => {
