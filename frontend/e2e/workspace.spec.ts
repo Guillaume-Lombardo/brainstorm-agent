@@ -413,6 +413,20 @@ test("the side columns resize by dragging their inner edge, within bounds", asyn
   await page.keyboard.press("ArrowLeft");
   await expect.poll(() => width("right")).toBe(fitted + 16);
   expect(await chatWidth()).toBeGreaterThanOrEqual(360);
+
+  // A drag cut short by a window too narrow for side columns keeps what it showed, and the
+  // pointer moves after that change nothing.
+  await resizeWindow(1440);
+  const before = await width("left");
+  const edge = (await page.getByRole("separator", { name: "Resize stages panel" }).boundingBox())!;
+  await page.mouse.move(edge.x + edge.width / 2, edge.y + 200);
+  await page.mouse.down();
+  await page.mouse.move(edge.x + edge.width / 2 + 30, edge.y + 200, { steps: 3 });
+  await resizeWindow(900);
+  await page.mouse.move(edge.x + edge.width / 2 - 200, edge.y + 200, { steps: 3 });
+  await page.mouse.up();
+  await resizeWindow(1440);
+  expect(await width("left")).toBe(before + 30);
 });
 
 test("a French pitch gets readable gate questions and a formatted reply", async ({ page }) => {

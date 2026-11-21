@@ -104,17 +104,26 @@ export function CollapsibleColumn({
     if (drag.current || event.button !== 0 || Math.abs(shown - width) > 1) {
       return;
     }
+    // Nor can a pointer on the other column's handle.
+    if (!layout.startDrag()) {
+      return;
+    }
     // No text selection while dragging.
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
     drag.current = { pointerId: event.pointerId, x: event.clientX, start: width };
     setResizing(true);
-    layout.startDrag();
   }
 
   function onPointerMove(event: PointerEvent<HTMLDivElement>) {
     const current = drag.current;
     if (current?.pointerId !== event.pointerId) {
+      return;
+    }
+    // Below the breakpoint the handle is gone: let go of the pointer.
+    if (!largeScreen) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+      endDrag();
       return;
     }
     const delta = side === "left" ? event.clientX - current.x : current.x - event.clientX;

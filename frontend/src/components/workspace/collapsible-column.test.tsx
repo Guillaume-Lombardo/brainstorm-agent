@@ -97,8 +97,15 @@ describe("CollapsibleColumn", () => {
       width: 300,
     } as DOMRect);
     HTMLElement.prototype.setPointerCapture = vi.fn();
+    // The handle only drags on large screens.
+    vi.stubGlobal("matchMedia", () => ({
+      matches: true,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }));
     onTestFinished(() => {
       vi.restoreAllMocks();
+      vi.unstubAllGlobals();
       delete (HTMLElement.prototype as Partial<HTMLElement>).setPointerCapture;
     });
     render(<Harness side="left" />);

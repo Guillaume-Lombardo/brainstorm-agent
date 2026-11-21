@@ -1,6 +1,12 @@
 "use client";
 
-import { useLayoutEffect, useState, type RefObject } from "react";
+import {
+  useLayoutEffect,
+  useState,
+  type Dispatch,
+  type RefObject,
+  type SetStateAction,
+} from "react";
 import { flushSync } from "react-dom";
 
 /** Width of a collapsed side column. */
@@ -33,8 +39,11 @@ export interface ColumnLayout {
   toggle: () => void;
   /** Sets the width, clamped to `[minWidth, maxWidth]`, and remembers it. */
   resize: (width: number) => void;
-  /** Starts a drag: widths follow `dragTo` without animation and are saved by `endDrag`. */
-  startDrag: () => void;
+  /**
+   * Starts a drag: widths follow `dragTo` without animation and are saved by `endDrag`.
+   * Returns `false`, and starts nothing, while another drag is running.
+   */
+  startDrag: () => boolean;
   dragTo: (width: number) => void;
   endDrag: () => void;
 }
@@ -118,8 +127,16 @@ export function fitColumns(
 class Gestures {
   /** When the last animated change started; `-Infinity` once nothing animates. */
   private animatedAt = -Infinity;
-  /** Widths shown when the current drag started, and the last widths it set. */
-  drag: { start: number[]; widths: Map<number, number> } | null = null;
+  /**
+   * The running drag: the column it moves, the widths shown and preferred when it started,
+   * and the last widths it set.
+   */
+  drag: {
+    index: number;
+    start: number[];
+    startPreferences: number[];
+    widths: Map<number, number>;
+  } | null = null;
 
   /**
    * Whether a user change starting now may animate. Not when it interrupts one still running:
@@ -139,6 +156,41 @@ class Gestures {
   /** Records that widths now change without animation, which ends any running one. */
   stopAnimations() {
     this.animatedAt = -Infinity;
+  }
+}
+
+/**
+ * Ends the running drag, if any, and saves its widths. A drag that comes back to where it
+ * started gives the columns back their preferences instead: the widths it showed may have
+ * been shrunk to fit the window, and must not replace wider preferences.
+ *
+ * Args:
+ *   gestures (Gestures): Gesture bookkeeping holding the drag.
+ *   specs (ColumnSpec[]): Column settings, for their storage keys.
+ *   setPreferences (Dispatch<SetStateAction<Preference[]>>): Preference state setter.
+ */
+function finishDrag(
+  gestures: Gestures,
+  specs: ColumnSpec[],
+  setPreferences: Dispatch<SetStateAction<Preference[]>>,
+) {
+  const drag = gestures.drag;
+  if (!drag) {
+    return;
+  }
+  gestures.drag = null;
+  const returned = [...drag.widths].every(([index, width]) => width === drag.start[index]);
+  if (returned) {
+    setPreferences((current) =>
+      current.map((preference, index) => ({
+        ...preference,
+        width: drag.startPreferences[index],
+      })),
+    );
+    return;
+  }
+  for (const [index, width] of drag.widths) {
+    writeStored(`${specs[index].storageKey}.width`, String(width));
   }
 }
 
@@ -182,6 +234,8 @@ export function useSideColumns(
     }
     const observer = new ResizeObserver(() => {
       gestures.stopAnimations();
+      // A new grid width (or layout mode) ends a drag: its pointer offsets no longer apply.
+      finishDrag(gestures, [left, right], setPreferences);
       // Render the refit before the next paint, so the grid and the columns change together.
       flushSync(() => {
         setAnimate(false);
@@ -190,7 +244,7 @@ export function useSideColumns(
     });
     observer.observe(grid);
     return () => observer.disconnect();
-  }, [gridRef, gestures]);
+  }, [gridRef, gestures, left, right]);
 
   const columns = preferences.map((preference, index) => ({
     ...preference,
@@ -251,7 +305,10 @@ export function useSideColumns(
       animate,
       toggle() {
         const collapsed = !preferences[index].collapsed;
-        setAnimate(gestures.startChange());
+        // Ending a drag first: the dragged column jumps, so this change must not animate.
+        const dragging = gestures.drag !== null;
+        finishDrag(gestures, specs, setPreferences);
+        setAnimate(!dragging && gestures.startChange());
         setPreferences((current) =>
           current.map((preference, at) =>
             at === index ? { ...preference, collapsed } : preference,
@@ -260,6 +317,10 @@ export function useSideColumns(
         writeStored(`${spec.storageKey}.collapsed`, String(collapsed));
       },
       resize(width) {
+        // Keys and double clicks wait for the pointer: the drag owns the widths until released.
+        if (gestures.drag) {
+          return;
+        }
         const changes = widthsFor(width, widths[other]);
         if (changes.size > 0) {
           if (clamp(Math.round(width), spec.minWidth, maxWidth) !== widths[index]) {
@@ -270,13 +331,22 @@ export function useSideColumns(
         }
       },
       startDrag() {
+        if (gestures.drag) {
+          return false;
+        }
         gestures.stopAnimations();
         setAnimate(false);
-        gestures.drag = { start: [...widths], widths: new Map() };
+        gestures.drag = {
+          index,
+          start: [...widths],
+          startPreferences: preferences.map((preference) => preference.width),
+          widths: new Map(),
+        };
+        return true;
       },
       dragTo(width) {
         const current = gestures.drag;
-        if (!current) {
+        if (current?.index !== index) {
           return;
         }
         // The other column is pushed from where it was when the drag started, so it gets its
@@ -288,9 +358,8 @@ export function useSideColumns(
         applyWidths(changes);
       },
       endDrag() {
-        if (gestures.drag) {
-          writeWidths(gestures.drag.widths);
-          gestures.drag = null;
+        if (gestures.drag?.index === index) {
+          finishDrag(gestures, specs, setPreferences);
         }
       },
     };

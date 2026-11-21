@@ -71,16 +71,50 @@ describe("useSideColumns", () => {
     act(() => result.current[1].resize(540));
     window.localStorage.clear();
 
-    act(() => result.current[1].startDrag());
+    act(() => void result.current[1].startDrag());
     expect(result.current[1].animate).toBe(false);
     act(() => result.current[1].dragTo(800));
     expect(result.current[0].width).toBe(280);
     expect(window.localStorage.getItem("t.left.width")).toBeNull();
-    act(() => result.current[1].dragTo(540));
+    act(() => result.current[1].dragTo(560));
     expect(result.current[0].width).toBe(360);
     act(() => result.current[1].endDrag());
-    expect(window.localStorage.getItem("t.right.width")).toBe("540");
+    expect(window.localStorage.getItem("t.right.width")).toBe("560");
     expect(window.localStorage.getItem("t.left.width")).toBe("360");
+  });
+
+  it("keeps wider preferences after a drag that comes back to where it started", () => {
+    window.localStorage.setItem("t.left.width", "480");
+    window.localStorage.setItem("t.right.width", "800");
+    const { result } = renderHook(() => useSideColumns(gridOf(1024), LEFT, RIGHT));
+    const shown = [result.current[0].width, result.current[1].width];
+
+    act(() => void result.current[1].startDrag());
+    act(() => result.current[1].dragTo(shown[1] + 40));
+    act(() => result.current[1].dragTo(shown[1]));
+    act(() => result.current[1].endDrag());
+    expect([result.current[0].width, result.current[1].width]).toEqual(shown);
+    expect(window.localStorage.getItem("t.left.width")).toBe("480");
+    expect(window.localStorage.getItem("t.right.width")).toBe("800");
+  });
+
+  it("runs one drag at a time, and holds keys back until it ends", () => {
+    const { result } = renderHook(() => useSideColumns(gridOf(1440), LEFT, RIGHT));
+    let started = false;
+    act(() => void (started = result.current[0].startDrag()));
+    expect(started).toBe(true);
+    act(() => void (started = result.current[1].startDrag()));
+    expect(started).toBe(false);
+    // The other column cannot end or move the running drag either.
+    act(() => result.current[1].dragTo(700));
+    act(() => result.current[1].endDrag());
+    expect(result.current[1].width).toBe(440);
+
+    act(() => result.current[1].resize(600));
+    expect(result.current[1].width).toBe(440);
+    act(() => result.current[0].endDrag());
+    act(() => result.current[1].resize(600));
+    expect(result.current[1].width).toBe(600);
   });
 
   it("ignores a key at a bound, which would only overwrite the other column", () => {
