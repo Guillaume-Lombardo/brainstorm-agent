@@ -82,18 +82,24 @@ export function CollapsibleColumn({
   const toggleRef = useRef<HTMLButtonElement>(null);
   const drag = useRef<{ pointerId: number; x: number; start: number } | null>(null);
 
-  function endDrag() {
+  /** Forgets the pointer locally; the layout's drag may already be over. */
+  function clearDrag() {
     if (drag.current) {
       drag.current = null;
       setResizing(false);
-      layout.endDrag();
     }
   }
 
+  function endDrag() {
+    clearDrag();
+    layout.endDrag();
+  }
+
   function toggle() {
-    // A drag never outlives its handle, which is not rendered once collapsed.
-    endDrag();
+    // The layout ends a running drag itself (without animating the toggle); the handle goes
+    // away with the open column.
     layout.toggle();
+    clearDrag();
   }
 
   function onPointerDown(event: PointerEvent<HTMLDivElement>) {
@@ -120,8 +126,9 @@ export function CollapsibleColumn({
     if (current?.pointerId !== event.pointerId) {
       return;
     }
-    // Below the breakpoint the handle is gone: let go of the pointer.
-    if (!largeScreen) {
+    // Below the breakpoint the handle is gone, and a new grid width ends the drag: let go of
+    // the pointer.
+    if (!largeScreen || !layout.isDragging()) {
       event.currentTarget.releasePointerCapture(event.pointerId);
       endDrag();
       return;

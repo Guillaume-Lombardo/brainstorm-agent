@@ -98,6 +98,28 @@ describe("useSideColumns", () => {
     expect(window.localStorage.getItem("t.right.width")).toBe("800");
   });
 
+  it("leaves fitted preferences alone when asked for the width already shown", () => {
+    window.localStorage.setItem("t.left.width", "480");
+    window.localStorage.setItem("t.right.width", "800");
+    const { result } = renderHook(() => useSideColumns(gridOf(1024), LEFT, RIGHT));
+    const shown = [result.current[0].width, result.current[1].width];
+
+    // A vertical pointer move asks for the shown width.
+    act(() => void result.current[1].startDrag());
+    act(() => result.current[1].dragTo(shown[1]));
+    expect([result.current[0].width, result.current[1].width]).toEqual(shown);
+    act(() => result.current[1].endDrag());
+    act(() => result.current[1].resize(shown[1]));
+    expect([result.current[0].width, result.current[1].width]).toEqual(shown);
+
+    // A reset shows the default width, pushing the other column.
+    act(() => result.current[0].resize(260));
+    expect(result.current[0].width).toBe(260);
+    expect(result.current[0].width + result.current[1].width).toBeLessThanOrEqual(
+      1024 - MIN_MAIN_WIDTH,
+    );
+  });
+
   it("runs one drag at a time, and holds keys back until it ends", () => {
     const { result } = renderHook(() => useSideColumns(gridOf(1440), LEFT, RIGHT));
     let started = false;

@@ -46,6 +46,8 @@ export interface ColumnLayout {
   startDrag: () => boolean;
   dragTo: (width: number) => void;
   endDrag: () => void;
+  /** Whether this column's drag still runs: a new grid width or a toggle may have ended it. */
+  isDragging: () => boolean;
 }
 
 interface Preference {
@@ -228,18 +230,24 @@ export function useSideColumns(
     if (!grid) {
       return;
     }
-    setGridWidth(grid.clientWidth);
+    let measured = grid.clientWidth;
+    setGridWidth(measured);
     if (typeof ResizeObserver === "undefined") {
       return;
     }
     const observer = new ResizeObserver(() => {
+      // Height changes (a banner above the grid) leave the columns alone.
+      if (grid.clientWidth === measured) {
+        return;
+      }
+      measured = grid.clientWidth;
       gestures.stopAnimations();
       // A new grid width (or layout mode) ends a drag: its pointer offsets no longer apply.
       finishDrag(gestures, [left, right], setPreferences);
       // Render the refit before the next paint, so the grid and the columns change together.
       flushSync(() => {
         setAnimate(false);
-        setGridWidth(grid.clientWidth);
+        setGridWidth(measured);
       });
     });
     observer.observe(grid);
@@ -275,16 +283,19 @@ export function useSideColumns(
 
     /**
      * Widths after setting this column to `width`. The other column keeps `otherWidth` (what
-     * it showed), minus what this one now takes. A width already shown changes nothing but,
-     * when it differs, this column's own preference.
+     * it showed), minus what this one now takes. A width already shown changes nothing.
      */
     function widthsFor(width: number, otherWidth: number): Map<number, number> {
       const next = clamp(Math.round(width), spec.minWidth, maxWidth);
       const changes = new Map<number, number>();
+      if (next === widths[index]) {
+        // Already shown: its preference may be wider, shrunk to fit the window. Keep it.
+        return changes;
+      }
       if (next !== preferences[index].width) {
         changes.set(index, next);
       }
-      if (next !== widths[index] && gridWidth > 0 && !otherCollapsed) {
+      if (gridWidth > 0 && !otherCollapsed) {
         const pushed = Math.max(
           specs[other].minWidth,
           Math.min(otherWidth, gridWidth - MIN_MAIN_WIDTH - next),
@@ -361,6 +372,9 @@ export function useSideColumns(
         if (gestures.drag?.index === index) {
           finishDrag(gestures, specs, setPreferences);
         }
+      },
+      isDragging() {
+        return gestures.drag?.index === index;
       },
     };
   });
