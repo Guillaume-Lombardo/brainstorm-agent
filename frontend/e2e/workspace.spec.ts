@@ -242,6 +242,7 @@ test("the stages column collapses to a rail and stays collapsed after a reload",
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.getByRole("button", { name: "Collapse stages panel" }).click();
   expect(await railWidth()).toBe(48);
+  await expect(stages).toBeHidden();
 });
 
 test("a French pitch gets readable gate questions and a formatted reply", async ({ page }) => {

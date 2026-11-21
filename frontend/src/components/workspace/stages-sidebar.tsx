@@ -7,6 +7,9 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const STORAGE_KEY = "workspace.stages-sidebar.collapsed";
+// Open column width (`lg:w-[260px]` below) minus its 1px right border: the content keeps this
+// width while the column animates, so its text never re-wraps.
+const CONTENT_WIDTH = "lg:w-[259px]";
 
 function readCollapsed(): boolean {
   try {
@@ -54,7 +57,6 @@ export function StagesSidebar({ children }: { children: ReactNode }) {
       className={cn(
         "flex min-h-0 flex-col overflow-hidden border-r",
         "lg:motion-safe:transition-[width] lg:motion-safe:duration-300 lg:motion-safe:ease-[cubic-bezier(0.32,0.72,0,1)]",
-        // Keep in sync with the inner `lg:w-[259px]` (open width minus the 1px border).
         collapsed ? "lg:w-12" : "lg:w-[260px]",
       )}
     >
@@ -63,7 +65,7 @@ export function StagesSidebar({ children }: { children: ReactNode }) {
           type="button"
           variant="ghost"
           size="icon"
-          className="absolute top-3 right-2 text-muted-foreground"
+          className="absolute top-3 right-2 z-10 text-muted-foreground"
           aria-controls="stages-panel"
           aria-expanded={!collapsed}
           aria-label={label}
@@ -75,7 +77,8 @@ export function StagesSidebar({ children }: { children: ReactNode }) {
         <p
           aria-hidden
           className={cn(
-            "mt-3 flex h-8 w-[259px] items-center px-5 text-xs font-medium tracking-wide text-muted-foreground uppercase",
+            "mt-3 flex h-8 items-center px-5 text-xs font-medium tracking-wide text-muted-foreground uppercase",
+            CONTENT_WIDTH,
             fade,
           )}
         >
@@ -85,7 +88,8 @@ export function StagesSidebar({ children }: { children: ReactNode }) {
       <div
         id="stages-panel"
         className={cn(
-          "flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-3 lg:w-[259px] lg:pt-4",
+          "flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-3 lg:pt-4",
+          CONTENT_WIDTH,
           fade,
         )}
       >
