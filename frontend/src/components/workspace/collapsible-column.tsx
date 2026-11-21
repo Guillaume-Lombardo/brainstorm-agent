@@ -97,7 +97,8 @@ export function CollapsibleColumn({
     // While the column still animates open, its shown width is not `width` yet: grabbing it
     // then would make it jump. The keyboard works at once.
     const shown = columnRef.current?.getBoundingClientRect().width ?? width;
-    if (event.button !== 0 || Math.abs(shown - width) > 1) {
+    // One pointer at a time: a second one cannot take over a drag.
+    if (drag.current || event.button !== 0 || Math.abs(shown - width) > 1) {
       return;
     }
     // No text selection while dragging.
@@ -113,7 +114,7 @@ export function CollapsibleColumn({
       return;
     }
     const delta = side === "left" ? event.clientX - current.x : current.x - event.clientX;
-    layout.resize(current.start + delta);
+    layout.resize(current.start + delta, { animate: false });
   }
 
   function onPointerEnd(event: PointerEvent<HTMLDivElement>) {
@@ -160,8 +161,9 @@ export function CollapsibleColumn({
       className={cn(
         "relative flex min-h-0 flex-col",
         side === "left" ? "border-r" : "border-l",
-        // A drag follows the pointer; collapse, expand, key steps and refits animate.
-        !resizing &&
+        // Collapse, expand, key steps and resets animate; drags and refits to the window do not.
+        layout.animate &&
+          !resizing &&
           "lg:motion-safe:transition-[width] lg:motion-safe:duration-300 lg:motion-safe:ease-[cubic-bezier(0.32,0.72,0,1)]",
         collapsed ? "lg:w-12" : "lg:w-(--open-width)",
       )}

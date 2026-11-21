@@ -1,6 +1,7 @@
 "use client";
 
 import { useLayoutEffect, useState, type RefObject } from "react";
+import { flushSync } from "react-dom";
 
 /** Width of a collapsed side column. */
 export const RAIL_WIDTH = 48;
@@ -22,12 +23,17 @@ export interface ColumnLayout {
   /** Width shown when open: the preferred width, reduced to fit the grid. */
   width: number;
   minWidth: number;
-  /** Largest width the column can take now without squeezing the middle column. */
+  /** Largest width the column can take now, pushing the other one to its minimum. */
   maxWidth: number;
   defaultWidth: number;
+  /** Whether width changes should animate: only after the user's own toggles and resizes. */
+  animate: boolean;
   toggle: () => void;
-  /** Sets the preferred width, clamped to `[minWidth, maxWidth]`, and remembers it. */
-  resize: (width: number) => void;
+  /**
+   * Sets the width, clamped to `[minWidth, maxWidth]`, and remembers it. `animate: false`
+   * for a drag, which follows the pointer.
+   */
+  resize: (width: number, options?: { animate?: boolean }) => void;
 }
 
 interface Preference {
@@ -109,7 +115,10 @@ export function fitColumns(
  * Collapsed state and widths of the two workspace side columns, fitted to their grid.
  *
  * Preferences come from and go to `localStorage`. The grid width is observed, so the shown
- * widths shrink when the window narrows and grow back (up to the preferences) when it widens.
+ * widths shrink when the window narrows and grow back (up to the preferences) when it widens;
+ * those refits apply at once, without animation, so the middle column never gets squeezed
+ * while the columns catch up. Widening a column pushes the other one, down to its minimum;
+ * after an explicit resize both columns remember the widths they show.
  *
  * Args:
  *   gridRef (RefObject<HTMLElement | null>): The grid holding both columns and the middle one.
@@ -127,6 +136,8 @@ export function useSideColumns(
   const specs = [left, right];
   const [preferences, setPreferences] = useState(() => specs.map(readPreference));
   const [gridWidth, setGridWidth] = useState(0);
+  // Only changes the user asks for animate: not the first fit nor refits to the window.
+  const [animate, setAnimate] = useState(false);
 
   useLayoutEffect(() => {
     const grid = gridRef.current;
@@ -137,7 +148,13 @@ export function useSideColumns(
     if (typeof ResizeObserver === "undefined") {
       return;
     }
-    const observer = new ResizeObserver(() => setGridWidth(grid.clientWidth));
+    const observer = new ResizeObserver(() => {
+      // Render the refit before the next paint, so the grid and the columns change together.
+      flushSync(() => {
+        setAnimate(false);
+        setGridWidth(grid.clientWidth);
+      });
+    });
     observer.observe(grid);
     return () => observer.disconnect();
   }, [gridRef]);
@@ -148,34 +165,51 @@ export function useSideColumns(
   }));
   const widths = fitColumns(gridWidth, columns);
 
-  function update(index: number, change: Partial<Preference>) {
+  function save(changes: Map<number, Partial<Preference>>) {
     setPreferences((current) =>
-      current.map((preference, at) => (at === index ? { ...preference, ...change } : preference)),
+      current.map((preference, index) => ({ ...preference, ...changes.get(index) })),
     );
+    for (const [index, change] of changes) {
+      const { storageKey } = specs[index];
+      if (change.collapsed !== undefined) {
+        writeStored(`${storageKey}.collapsed`, String(change.collapsed));
+      }
+      if (change.width !== undefined) {
+        writeStored(`${storageKey}.width`, String(change.width));
+      }
+    }
   }
 
   const layouts = specs.map((spec, index): ColumnLayout => {
     const other = 1 - index;
-    const otherWidth = preferences[other].collapsed ? RAIL_WIDTH : widths[other];
-    const maxWidth =
-      gridWidth === 0
-        ? spec.maxWidth
-        : clamp(gridWidth - MIN_MAIN_WIDTH - otherWidth, spec.minWidth, spec.maxWidth);
+    const otherCollapsed = preferences[other].collapsed;
+    // Room for this column once the other one is pushed to its minimum (or is a rail).
+    const room = gridWidth - MIN_MAIN_WIDTH - (otherCollapsed ? RAIL_WIDTH : specs[other].minWidth);
+    const maxWidth = gridWidth === 0 ? spec.maxWidth : clamp(room, spec.minWidth, spec.maxWidth);
     return {
       collapsed: preferences[index].collapsed,
       width: widths[index],
       minWidth: spec.minWidth,
       maxWidth,
       defaultWidth: Math.min(spec.defaultWidth, maxWidth),
+      animate,
       toggle() {
-        const collapsed = !preferences[index].collapsed;
-        update(index, { collapsed });
-        writeStored(`${spec.storageKey}.collapsed`, String(collapsed));
+        setAnimate(true);
+        save(new Map([[index, { collapsed: !preferences[index].collapsed }]]));
       },
-      resize(width) {
+      resize(width, options = {}) {
+        setAnimate(options.animate ?? true);
         const next = clamp(Math.round(width), spec.minWidth, maxWidth);
-        update(index, { width: next });
-        writeStored(`${spec.storageKey}.width`, String(next));
+        const changes = new Map<number, Partial<Preference>>([[index, { width: next }]]);
+        if (gridWidth > 0 && !otherCollapsed) {
+          // The other column keeps the width it shows, minus what this one now takes.
+          const available = gridWidth - MIN_MAIN_WIDTH - next;
+          const otherWidth = Math.max(specs[other].minWidth, Math.min(widths[other], available));
+          if (otherWidth !== preferences[other].width) {
+            changes.set(other, { width: otherWidth });
+          }
+        }
+        save(changes);
       },
     };
   });

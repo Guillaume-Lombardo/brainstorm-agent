@@ -313,6 +313,13 @@ test("the side columns resize by dragging their inner edge, within bounds", asyn
     await page.mouse.move(box.x + box.width / 2 + dx, box.y + box.height / 2, { steps: 5 });
     await page.mouse.up();
   }
+  /** Measures after a full frame: layout and resize observers have run, as on screen. */
+  const resizeWindow = async (width: number) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.evaluate(
+      () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))),
+    );
+  };
   const openChat = await chatWidth();
 
   await drag("Resize stages panel", 100);
@@ -321,44 +328,66 @@ test("the side columns resize by dragging their inner edge, within bounds", asyn
   expect(await width("right")).toBe(540);
   expect(await chatWidth()).toBe(openChat - 200);
 
-  // Widening stops where the conversation would get narrower than 360px.
-  // With the stages column at 360px, the 1440px viewport leaves room for 720px.
+  // Widening pushes the other column down to its minimum, never the conversation below 360px.
   await drag("Resize document panel", -1000);
-  expect(await width("right")).toBe(720);
+  expect(await width("right")).toBe(800);
+  expect(await width("left")).toBe(280);
   expect(await chatWidth()).toBe(360);
   await page.screenshot({ path: `${SCREENSHOTS}/09-resized.png` });
 
   await page.reload();
   await expect(page.getByRole("separator", { name: "Resize stages panel" })).toBeVisible();
-  expect(await width("left")).toBe(360);
-  expect(await width("right")).toBe(720);
+  expect(await width("left")).toBe(280);
+  expect(await width("right")).toBe(800);
 
   // Double click restores the default width; arrow keys step it.
   await page.getByRole("separator", { name: "Resize stages panel" }).dblclick();
   await expect.poll(() => width("left")).toBe(260);
   await page.getByRole("separator", { name: "Resize document panel" }).focus();
   await page.keyboard.press("ArrowRight");
-  await expect.poll(() => width("right")).toBe(704);
+  await expect.poll(() => width("right")).toBe(784);
 
-  // A narrower window shrinks both columns so the conversation keeps 360px, and a wider one
-  // brings back the chosen widths.
-  await page.setViewportSize({ width: 1024, height: 900 });
-  await expect.poll(chatWidth).toBeGreaterThanOrEqual(360);
+  // A narrower window shrinks both columns in the same frame, without animation, so the
+  // conversation keeps 360px; a wider one brings back the chosen widths.
+  await resizeWindow(1024);
+  expect(await chatWidth()).toBeGreaterThanOrEqual(360);
   expect(await chatWidth()).toBeLessThan(380);
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await expect.poll(() => width("right")).toBe(704);
+  await resizeWindow(1440);
+  expect(await width("right")).toBe(784);
   expect(await width("left")).toBe(260);
 
   // The widest stages column, set while the document column is collapsed, still leaves room
-  // for the conversation once the document column reopens.
+  // for the conversation once the document column reopens, during the animation too.
   await page.getByRole("button", { name: "Collapse document panel" }).click();
   await expect.poll(() => width("right")).toBe(48);
   await drag("Resize stages panel", 1000);
   expect(await width("left")).toBe(480);
   await page.getByRole("button", { name: "Expand document panel" }).click();
-  await expect.poll(() => width("right")).toBeGreaterThan(600);
-  await expect.poll(chatWidth).toBeGreaterThanOrEqual(360);
-  expect(await chatWidth()).toBeLessThan(380);
+  const narrowest = await page.evaluate(
+    () =>
+      new Promise<number>((resolve) => {
+        const chat = document.querySelector('[aria-label="Conversation"]')!;
+        let min = Infinity;
+        const start = performance.now();
+        const tick = () => {
+          min = Math.min(min, chat.getBoundingClientRect().width);
+          if (performance.now() - start < 500) requestAnimationFrame(tick);
+          else resolve(min);
+        };
+        requestAnimationFrame(tick);
+      }),
+  );
+  expect(narrowest).toBeGreaterThanOrEqual(360);
+  expect(await width("right")).toBeGreaterThan(600);
+
+  // Widening a column that was shrunk to fit the window widens it.
+  await resizeWindow(1024);
+  const separator = page.getByRole("separator", { name: "Resize document panel" });
+  const fitted = await width("right");
+  await separator.focus();
+  await page.keyboard.press("ArrowLeft");
+  await expect.poll(() => width("right")).toBe(fitted + 16);
+  expect(await chatWidth()).toBeGreaterThanOrEqual(360);
 });
 
 test("a French pitch gets readable gate questions and a formatted reply", async ({ page }) => {

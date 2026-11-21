@@ -105,6 +105,8 @@ describe("CollapsibleColumn", () => {
 
     fireEvent.pointerDown(handle(), { button: 0, pointerId: 1, clientX: 100 });
     expect(handle()).toHaveAttribute("data-resizing", "true");
+    // A second pointer neither takes over nor moves the handle.
+    fireEvent.pointerDown(handle(), { button: 0, pointerId: 2, clientX: 400 });
     fireEvent.pointerMove(handle(), { pointerId: 2, clientX: 400 });
     expect(handle()).toHaveAttribute("aria-valuenow", "300");
     fireEvent.pointerMove(handle(), { pointerId: 1, clientX: 140 });

@@ -43,19 +43,37 @@ describe("fitColumns", () => {
 describe("useSideColumns", () => {
   afterEach(() => window.localStorage.clear());
 
-  it("limits a column to the room the other one leaves, and remembers preferences", () => {
+  it("pushes the other column down to its minimum, and remembers both widths", () => {
     const { result } = renderHook(() => useSideColumns(gridOf(1440), LEFT, RIGHT));
-    // 1440 - 360 - 260 leaves 820, above the column's own maximum.
+    expect(result.current[0].animate).toBe(false);
+    // 1440 - 360 - 200 leaves 880, above the right column's own maximum.
     expect(result.current[1].maxWidth).toBe(800);
 
-    act(() => result.current[1].resize(9999));
+    act(() => result.current[0].resize(360));
+    act(() => result.current[1].resize(9999, { animate: false }));
     expect(result.current[1].width).toBe(800);
-    expect(result.current[0].maxWidth).toBe(1440 - MIN_MAIN_WIDTH - 800);
+    expect(result.current[0].width).toBe(1440 - MIN_MAIN_WIDTH - 800);
+    expect(result.current[0].animate).toBe(false);
     expect(window.localStorage.getItem("t.right.width")).toBe("800");
+    expect(window.localStorage.getItem("t.left.width")).toBe("280");
 
     act(() => result.current[0].toggle());
     expect(result.current[0].collapsed).toBe(true);
+    expect(result.current[0].animate).toBe(true);
     expect(window.localStorage.getItem("t.left.collapsed")).toBe("true");
+  });
+
+  it("widens a column that was shrunk to fit the window", () => {
+    window.localStorage.setItem("t.left.width", "480");
+    window.localStorage.setItem("t.right.width", "800");
+    const { result } = renderHook(() => useSideColumns(gridOf(1024), LEFT, RIGHT));
+    const [leftShown, rightShown] = [result.current[0].width, result.current[1].width];
+
+    act(() => result.current[1].resize(rightShown + 16));
+    expect(result.current[1].width).toBe(rightShown + 16);
+    expect(result.current[0].width).toBe(
+      Math.min(leftShown, 1024 - MIN_MAIN_WIDTH - rightShown - 16),
+    );
   });
 
   it("shrinks stored widths that no longer fit, without forgetting them", () => {
