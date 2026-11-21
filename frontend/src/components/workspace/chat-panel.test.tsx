@@ -1,7 +1,7 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, onTestFinished, vi } from "vitest";
 
 import { ChatPanel } from "./chat-panel";
 import type { StreamingTurn, TurnFailure } from "./state";
@@ -123,5 +123,55 @@ describe("ChatPanel", () => {
       '[data-testid="streaming-turn"] [data-role="assistant"]',
     );
     expect(bubble?.querySelector("li")).toHaveTextContent("First *(recomm");
+  });
+
+  it("continues a list with Enter and leaves it with a second Enter", async () => {
+    const onSend = vi.fn();
+    render(<Harness onSend={onSend} />);
+    const input = screen.getByRole("textbox", { name: "Message" });
+    await userEvent.click(screen.getByRole("button", { name: "Numbered list" }));
+    await userEvent.type(input, "milk{Enter}eggs{Enter}{Enter}");
+    expect(input).toHaveValue("1. milk\n2. eggs\n");
+    expect(onSend).not.toHaveBeenCalled();
+
+    await userEvent.type(input, "Thanks{Enter}");
+    expect(onSend).toHaveBeenCalledWith("1. milk\n2. eggs\nThanks");
+  });
+
+  it("turns the current line into a bulleted list", async () => {
+    render(<Harness onSend={vi.fn()} />);
+    const input = screen.getByRole("textbox", { name: "Message" });
+    await userEvent.type(input, "milk");
+    await userEvent.click(screen.getByRole("button", { name: "Bulleted list" }));
+    await userEvent.type(input, "{Enter}eggs");
+    expect(input).toHaveValue("• milk\n• eggs");
+  });
+
+  it("stops following a reply once the reader scrolls up", () => {
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    onTestFinished(() => {
+      delete (Element.prototype as Partial<Element>).scrollIntoView;
+    });
+    const view = (text: string) => (
+      <Harness onSend={vi.fn()} streaming={{ turnId: "t", status: null, text }} />
+    );
+    const { container, rerender } = render(view("First"));
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+
+    const log = container.querySelector('[aria-live="polite"]')!;
+    Object.defineProperties(log, {
+      scrollHeight: { value: 2000 },
+      clientHeight: { value: 500 },
+      scrollTop: { value: 200, writable: true },
+    });
+    fireEvent.scroll(log);
+    rerender(view("First words"));
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+
+    (log as HTMLElement).scrollTop = 1490;
+    fireEvent.scroll(log);
+    rerender(view("First words, more"));
+    expect(scrollIntoView).toHaveBeenCalledTimes(2);
   });
 });

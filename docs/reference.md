@@ -96,7 +96,8 @@ uv run brainstorm-agent hash-api-key "replace-me" --pepper "server-side-secret"
 ## Frontend
 
 `frontend/` is a Next.js (App Router) workspace: login (password, plus SSO when OIDC is
-configured), sessions list and the framing workspace (streamed chat, versioned stage documents
+configured), sessions list and the framing workspace (streamed chat that stops following the reply
+when the reader scrolls up, a composer with bulleted and numbered lists, versioned stage documents
 with diff, 8-stage stepper with readiness and coverage in a left column that collapses to a rail
 and remembers the choice, open questions, review bar, delivery
 slicing view, exports). The browser only calls the Next.js server, which proxies to the backend
