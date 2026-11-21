@@ -212,6 +212,39 @@ test("a long conversation scrolls inside its panel, not the page", async ({ page
   await expect(page.getByLabel("Message")).toBeInViewport();
 });
 
+test("the stages column collapses to a rail and stays collapsed after a reload", async ({
+  page,
+}) => {
+  await signIn(page, "sidebar@example.com");
+  await createSession(page, `Sidebar ${Date.now()}`);
+  const stages = page.getByRole("navigation", { name: "Stages" });
+  const conversation = page.getByRole("region", { name: "Conversation" });
+  const railWidth = async () => (await page.locator("aside[data-collapsed]").boundingBox())!.width;
+  const chatWidth = async () => (await conversation.boundingBox())!.width;
+  expect(await railWidth()).toBe(260);
+  const openChat = await chatWidth();
+
+  await page.getByRole("button", { name: "Collapse stages panel" }).click();
+  await expect(stages).toBeHidden();
+  await expect.poll(railWidth).toBe(48);
+  expect(await chatWidth()).toBe(openChat + 212);
+  await page.screenshot({ path: `${SCREENSHOTS}/07-stages-collapsed.png` });
+
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Expand stages panel" })).toBeVisible();
+  await expect(stages).toBeHidden();
+
+  await page.getByRole("button", { name: "Expand stages panel" }).click();
+  await expect(stages).toBeVisible();
+  await expect.poll(railWidth).toBe(260);
+
+  // With reduced motion the column snaps to its new width instead of animating.
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.getByRole("button", { name: "Collapse stages panel" }).click();
+  expect(await railWidth()).toBe(48);
+  expect(await stages.isVisible()).toBe(false);
+});
+
 test("a French pitch gets readable gate questions and a formatted reply", async ({ page }) => {
   await signIn(page, "francais@example.com");
   await createSession(page, `Cadrage ${Date.now()}`);

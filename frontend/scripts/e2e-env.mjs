@@ -24,4 +24,5 @@ export const E2E_USERS = [
   { email: "wrong@example.com", displayName: "Wrong password" },
   { email: "layout@example.com", displayName: "Layout" },
   { email: "francais@example.com", displayName: "Français" },
+  { email: "sidebar@example.com", displayName: "Sidebar" },
 ];

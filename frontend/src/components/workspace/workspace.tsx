@@ -26,6 +26,7 @@ import { ResearchPanel } from "./research-panel";
 import { ReviewBar } from "./review-bar";
 import { StageDetails } from "./stage-details";
 import { StageStepper } from "./stage-stepper";
+import { StagesSidebar } from "./stages-sidebar";
 import { initialWorkspaceState, workspaceReducer } from "./state";
 import { errorToFailure } from "./turn";
 import { answerMessage, currentQuestions } from "./view-model";
@@ -187,8 +188,8 @@ function WorkspaceView({ initialSnapshot }: { initialSnapshot: SessionSnapshot }
           <ErrorState error={actionError} />
         </div>
       ) : null}
-      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)_440px] lg:grid-rows-[minmax(0,1fr)]">
-        <aside className="flex flex-col gap-4 overflow-y-auto border-r p-3">
+      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[auto_minmax(0,1fr)_440px] lg:grid-rows-[minmax(0,1fr)]">
+        <StagesSidebar>
           <StageStepper
             session={session}
             selected={stage}
@@ -200,7 +201,7 @@ function WorkspaceView({ initialSnapshot }: { initialSnapshot: SessionSnapshot }
             readOnly={busy || archived}
             onEditField={(field, value) => act(() => api.editField(sessionId, stage, field, value))}
           />
-        </aside>
+        </StagesSidebar>
         <section className="flex min-h-[60vh] flex-col lg:min-h-0" aria-label="Conversation">
           <ResearchPanel
             sessionId={sessionId}
