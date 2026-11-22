@@ -20,7 +20,7 @@ describe("describeError", () => {
 
   it("gives the retry delay for rate limits", () => {
     expect(describeError(new ApiError(429, "rate_limited", "x", 30)).description).toBe(
-      "Try again in 30 seconds.",
+      "Try again in 30 s.",
     );
   });
 });

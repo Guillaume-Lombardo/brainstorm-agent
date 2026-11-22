@@ -74,8 +74,8 @@ A planner.
 - Wave 0: slice-0`;
 
 describe("readableDocument", () => {
-  it("drops the parts shown elsewhere in the workspace and the empty ones", () => {
-    const shown = readableDocument(DOCUMENT);
+  it("drops the repeated and empty parts, and sets the assessment apart", () => {
+    const { body: shown, record } = readableDocument(DOCUMENT);
     expect(shown.split("\n").filter((line) => line.startsWith("#"))).toEqual([
       "# Structured Summary",
       "## Pitch",
@@ -90,6 +90,15 @@ describe("readableDocument", () => {
     expect(shown).toContain("A planner.");
     expect(shown).toContain("- Wave 0: slice-0");
     expect(shown).not.toContain("passed/total");
+    expect(record).toContain("### Readiness\n\n- 1/2 passed/total");
+    expect(record).toContain("- Stage clear enough: no");
+  });
+
+  it("leaves code blocks as they are", () => {
+    const code = "# A\n\n```sh\n# Questions to Continue\n## Facts\n- None.\n```";
+    expect(readableDocument(code)).toEqual({ body: code, record: "" });
+    expect(splitSections(code)).toHaveLength(1);
+    expect(translateDocument(code, MESSAGES.fr.document)).toBe(code);
   });
 });
 
@@ -101,10 +110,52 @@ describe("translateDocument", () => {
     expect(shown).toContain("- None of this is a placeholder.");
     expect(shown).toContain("- Weekly use (à confirmer)");
     expect(shown).toContain("A planner.");
+    expect(shown).toContain("- Vague 0\u00a0: slice-0");
+    expect(shown).toContain("(bloquante)\u00a0: It changes the scope. | Options\u00a0: [");
   });
 
-  it("leaves the options of a question to the questions panel", () => {
-    expect(translateDocument(DOCUMENT, MESSAGES.en.document)).toContain(
+  it("only rewrites template words in their own section", () => {
+    const said = "### Facts\n\n- toString\n- Wave 2: later | Options: [a, b]\n\nGiven up.";
+    expect(translateDocument(said, MESSAGES.fr.document, { hideOptions: true })).toBe(
+      said.replace("Facts", "Faits"),
+    );
+  });
+
+  it("translates the delivery plan", () => {
+    const plan = `| Slice | Goal | Backlog |
+| --- | --- | --- |
+| slice-0 | Goal | A |
+
+## Slice slice-0
+
+### Owned domain
+
+Cross-cutting foundation
+
+### Integration scenarios
+
+Given a user
+When they book
+Then it is saved`;
+    expect(translateDocument(plan, MESSAGES.fr.document)).toBe(`| Lot | Objectif | Backlog |
+| --- | --- | --- |
+| slice-0 | Goal | A |
+
+## Lot slice-0
+
+### Domaine porté
+
+Socle transverse
+
+### Scénarios d'intégration
+
+Étant donné a user
+Quand they book
+Alors it is saved`);
+  });
+
+  it("leaves the options of the current questions to the questions panel", () => {
+    expect(translateDocument(DOCUMENT, MESSAGES.en.document, { hideOptions: true })).toContain(
       "- Who pays? (blocking): It changes the scope.\n",
     );
   });

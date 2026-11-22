@@ -114,11 +114,10 @@ test("login, new session, streamed turn, updated document, review and approval",
   );
   const details = page.getByTestId("stage-details");
   await expect(details.locator('[data-field="pitch_summary"]')).toContainText("clear");
-  await expect(details).toContainText(/Readiness \d+\/\d+/);
 
   // A complete pitch requires human validation: input pauses until the review.
-  await expect(page.getByText("Pitch is ready for your review.")).toBeVisible();
-  await expect(page.getByPlaceholder(/^Input paused/)).toBeVisible();
+  await expect(page.getByText("Pitch: to review")).toBeVisible();
+  await expect(page.getByPlaceholder("Review the stage to continue.")).toBeVisible();
   await expect(page.getByLabel("Message")).toBeDisabled();
   await expect(page.getByTestId("stage-document")).toContainText("weekly meal planner");
   await page.screenshot({ path: `${SCREENSHOTS}/03-review-required.png` });
@@ -151,7 +150,7 @@ test("login, new session, streamed turn, updated document, review and approval",
   await page.screenshot({ path: `${SCREENSHOTS}/04-stage-opened.png` });
   // The approved stage stays readable, validated and reopenable.
   await page.getByRole("button", { name: /0\. Pitch/ }).click();
-  await expect(page.getByTestId("stage-details")).toContainText("Validated");
+  await expect(page.getByRole("button", { name: /0\. Pitch Validated/ })).toBeVisible();
   await expect(page.getByTestId("stage-document")).toContainText("weekly meal planner");
   await expect(page.getByRole("button", { name: "Reopen Pitch" })).toBeVisible();
   await page.screenshot({ path: `${SCREENSHOTS}/04-approved.png` });
@@ -182,7 +181,7 @@ test("a stage whose opening failed can be started by hand, once", async ({ page 
   await signIn(page, "opening@example.com");
   const sessionId = await createSession(page, `Opening ${Date.now()}`);
   await send(page, PITCH);
-  await expect(page.getByPlaceholder(/^Input paused/)).toBeVisible();
+  await expect(page.getByPlaceholder("Review the stage to continue.")).toBeVisible();
   const openings = `**/api/backend/sessions/${sessionId}/stages/*/opening`;
   await page.route(openings, (route) =>
     route.fulfill({
@@ -238,7 +237,7 @@ test("model failure, rate limit and expired session are explained", async ({ pag
   );
   await page.getByRole("button", { name: "Send" }).click();
   await expect(page.getByText("Too many requests")).toBeVisible();
-  await expect(page.getByText("Try again in 30 seconds.")).toBeVisible();
+  await expect(page.getByText("Try again in 30 s.")).toBeVisible();
   await page.unroute(turns);
 
   // Expired session: the real proxy answers 401 and the UI offers to sign in again.
@@ -655,13 +654,13 @@ test("the theme follows the system until one is chosen, and the choice is kept",
   const dark = await background();
 
   await page.getByRole("radio", { name: "Light theme" }).click();
-  expect(await background()).toBe(light);
+  await expect.poll(background).toBe(light);
   await page.reload();
   expect(await background()).toBe(light);
   await expect(page.getByRole("radio", { name: "Light theme" })).toBeChecked();
 
   await page.getByRole("radio", { name: "System theme" }).click();
-  expect(await background()).toBe(dark);
+  await expect.poll(background).toBe(dark);
   await page.reload();
   expect(await background()).toBe(dark);
 });
@@ -682,6 +681,30 @@ test("the interface switches language in place and remembers it", async ({ page 
   await expect(page.getByRole("button", { name: "Exporter" })).toBeVisible();
   await page.getByRole("button", { name: "Switch to English" }).click();
   await expect(page.getByRole("button", { name: "Export", exact: true })).toBeVisible();
+});
+
+test("on a phone the questions and the send button stay within reach", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 667 });
+  await signIn(page, "layout@example.com");
+  await createSession(page, `Phone ${Date.now()}`);
+  const turn = page.waitForResponse((response) => response.url().endsWith("/turns"));
+  await send(page, Array.from({ length: 60 }, (_, line) => `Idea line ${line + 1}`).join("\n"));
+  await (await turn).text();
+
+  await page.getByLabel("Message").fill("Line\n".repeat(40));
+  const button = page.getByRole("button", { name: "Send", exact: true });
+  await button.scrollIntoViewIfNeeded();
+  await expect(button).toBeInViewport({ ratio: 1 });
+
+  await page
+    .getByRole("navigation", { name: "Panels" })
+    .getByRole("link", { name: /Questions/ })
+    .click();
+  await expect(page.getByRole("tab", { name: /Questions/ })).toBeInViewport();
+  await expect(page.getByRole("tab", { name: /Questions/ })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
 });
 
 test("a French browser gets the French interface by default", async ({ browser }) => {

@@ -60,25 +60,25 @@ export const en = {
   },
   stages,
   /** Field labels that differ from the ones generated with the backend contract. */
-  fields: {} as Record<string, string>,
+  fields: { actors_personas: "Actors and personas" } as Record<string, string>,
   stageStatus: {
     locked: "Locked",
     active: "In progress",
-    awaiting_review: "Awaiting review",
+    awaiting_review: "To review",
     validated: "Validated",
     stale: "Stale",
   },
   workspace: {
     title: "Session",
     loading: "Loading workspace",
-    back: "Back to sessions",
     archived: "Archived",
     stagesPanel: "Stages",
     conversation: "Conversation",
+    panels: "Panels",
     tabs: { document: "Document", questions: "Questions", delivery: "Delivery" },
     blocked: {
-      archived: "This session is archived and read-only.",
-      review: (stage: string) => `Input paused: ${stage} is waiting for your review.`,
+      archived: "Archived session, read-only.",
+      review: "Review the stage to continue.",
     },
   },
   columns: {
@@ -90,6 +90,7 @@ export const en = {
   },
   stageDetails: {
     stale: "An earlier stage was reopened. Revalidate this stage before relying on it.",
+    required: "required",
     readiness: "Readiness",
     coverage: { clear: "clear", partial: "partial", missing: "missing" },
     edit: (field: string) => `Edit ${field}`,
@@ -102,7 +103,7 @@ export const en = {
   },
   review: {
     region: "Review",
-    ready: (stage: string) => `${stage} is ready for your review.`,
+    ready: (stage: string) => `${stage}: to review`,
     approve: "Approve",
     requestChanges: "Request changes",
     reject: "Reject",
@@ -142,14 +143,16 @@ export const en = {
     loadingDiff: "Loading diff",
     noChange: "No change between these versions.",
     reviewNotes: "Review notes",
+    record: "Fields and checks",
     commentOn: (heading: string) => `Comment on ${heading}`,
     addComment: "Add comment",
     consumed: "(taken into account)",
     pending: "(used by the next answer)",
     /** Display text of the fixed lines of the backend document template. */
     lines: {} as Record<string, string>,
-    /** The same for labels inside these lines. */
-    labels: {} as Record<string, string>,
+    /** The same for the heading of a slice and for words inside the lines of one section. */
+    slice: "Slice ",
+    sections: {} as Record<string, readonly (readonly [RegExp, string])[]>,
   },
   questions: {
     none: "No open question.",
@@ -177,7 +180,7 @@ export const en = {
     price: "Price",
     priceUnknown: "unknown",
     source: "Source",
-    toConfirm: "Features to keep (recommendations to confirm)",
+    choose: "Features to keep",
     recommendation: { adopt: "adopt", adapt: "adapt", skip: "skip" },
     save: "Keep selected features",
   },
@@ -226,7 +229,7 @@ export const en = {
     reviewPendingHint: "Approve the stage or request changes before sending a new message.",
     rate_limited: "Too many requests",
     rateLimitedHint: "Slow down and try again in a moment.",
-    retryIn: (seconds: number) => `Try again in ${seconds} seconds.`,
+    retryIn: (seconds: number) => `Try again in ${seconds} s.`,
     llm_error: "The assistant failed",
     validation_error: "Invalid request",
     backend_unavailable: "Service unavailable",

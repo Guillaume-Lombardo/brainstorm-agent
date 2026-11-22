@@ -126,7 +126,7 @@ export function SessionsList() {
                   {/* The whole row opens the session; its buttons stay above. */}
                   <Link
                     href={`/sessions/${session.session_id}`}
-                    className="truncate font-semibold after:absolute after:inset-0"
+                    className="line-clamp-2 font-semibold after:absolute after:inset-0 sm:line-clamp-1"
                   >
                     {session.title}
                   </Link>
@@ -196,7 +196,7 @@ function StageProgress({ stage }: { stage: Stage }) {
           <span
             key={id}
             className={cn(
-              "h-1.5 flex-1 rounded-sm bg-muted",
+              "h-1.5 flex-1 rounded-sm bg-border",
               index < current && "bg-good",
               index === current && "bg-primary",
             )}

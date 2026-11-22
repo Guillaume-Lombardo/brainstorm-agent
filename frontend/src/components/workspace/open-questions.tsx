@@ -48,8 +48,7 @@ export function OpenQuestions({
                       // Options are model-written sentences: they wrap within the panel.
                       className={cn(
                         "max-w-full cursor-pointer rounded-md border bg-card px-2.5 py-1.5 text-left text-[13px] hover:border-primary disabled:pointer-events-none disabled:opacity-50",
-                        recommended &&
-                          "border-primary bg-accent shadow-[inset_0_0_0_1px_var(--primary)]",
+                        recommended && "border-primary",
                       )}
                       disabled={disabled}
                       onClick={() => onAnswer(question, option)}

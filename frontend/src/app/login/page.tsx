@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { LoginForm } from "@/components/auth/login-form";
 import { PreferenceControls } from "@/components/preferences/preference-controls";
-import { signInErrorMessage } from "@/lib/auth/messages";
+import { signInError } from "@/lib/auth/messages";
 import { readOidcSettings } from "@/lib/auth/oidc";
 import { safeCallbackPath } from "@/lib/auth/redirect";
 import { getMessages } from "@/lib/preferences";
@@ -23,7 +23,6 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
     redirect(target);
   }
   const oidc = readOidcSettings(process.env);
-  const messages = await getMessages();
 
   return (
     <main className="flex flex-1 flex-col">
@@ -35,7 +34,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
         <div className="rounded-lg border bg-card p-4">
           <LoginForm
             callbackUrl={target}
-            initialError={signInErrorMessage(Array.isArray(error) ? error[0] : error, messages)}
+            initialError={signInError(Array.isArray(error) ? error[0] : error)}
             passwordAction={loginWithPassword}
             sso={oidc ? { label: oidc.name, action: loginWithSso } : null}
           />

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 
 import { MESSAGES, type Messages } from "@/lib/i18n";
 import { LOCALE_COOKIE, type Locale } from "@/lib/i18n/locale";
@@ -38,13 +38,17 @@ export function PreferencesProvider({
   function setTheme(next: Theme) {
     setThemeState(next);
     writePreferenceCookie(THEME_COOKIE, next === "system" ? null : next);
-    // The server set this attribute on the first load; the stylesheet follows it at once.
-    if (next === "system") {
+  }
+
+  // The server sets this attribute on each load; a refresh that left before the last choice
+  // must not undo it.
+  useEffect(() => {
+    if (theme === "system") {
       delete document.documentElement.dataset.theme;
     } else {
-      document.documentElement.dataset.theme = next;
+      document.documentElement.dataset.theme = theme;
     }
-  }
+  });
 
   function setLocale(next: Locale) {
     writePreferenceCookie(LOCALE_COOKIE, next);

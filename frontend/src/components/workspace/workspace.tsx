@@ -37,6 +37,11 @@ import { answerMessage, canOpen, currentQuestions, lastUserTurnId } from "./view
 /** What a turn starts from: a message, or the assistant opening a new stage. */
 type TurnInput = { message: string; stage: Stage } | { opening: Stage };
 
+/** Tabs of the document column. */
+const TABS = ["document", "questions", "delivery"] as const;
+const PANEL_LINK =
+  "flex items-center gap-1.5 rounded-sm px-2 py-1.5 text-[13px] text-muted-foreground hover:text-foreground";
+
 type Loaded =
   { sessionId: string; snapshot: SessionSnapshot } | { sessionId: string; error: unknown };
 
@@ -121,6 +126,7 @@ const DOCUMENT_COLUMN: ColumnSpec = {
 function WorkspaceView({ initialSnapshot }: { initialSnapshot: SessionSnapshot }) {
   const t = useMessages();
   const [state, dispatch] = useReducer(workspaceReducer, initialSnapshot, initialWorkspaceState);
+  const [tab, setTab] = useState<(typeof TABS)[number]>("document");
   const [selectedStage, setSelectedStage] = useState<Stage | null>(null);
   const [actionError, setActionError] = useState<unknown>(null);
   const [acting, setActing] = useState(false);
@@ -289,7 +295,7 @@ function WorkspaceView({ initialSnapshot }: { initialSnapshot: SessionSnapshot }
   const blockedReason = archived
     ? t.workspace.blocked.archived
     : pendingReview
-      ? t.workspace.blocked.review(t.stages[pendingReview.from_stage])
+      ? t.workspace.blocked.review
       : null;
   const questions = currentQuestions(session, [...answeringIds, ...queuedQuestionIds(queue)]);
 
@@ -334,6 +340,20 @@ function WorkspaceView({ initialSnapshot }: { initialSnapshot: SessionSnapshot }
           <ErrorState error={actionError} />
         </div>
       ) : null}
+      {/* The panels stack below the conversation on small screens. */}
+      <nav aria-label={t.workspace.panels} className="flex gap-1 px-2 pb-2 lg:hidden">
+        <a href="#stages-panel" className={PANEL_LINK}>
+          {t.workspace.stagesPanel}
+        </a>
+        {TABS.map((id) => (
+          <a key={id} href="#document-panel" className={PANEL_LINK} onClick={() => setTab(id)}>
+            {t.workspace.tabs[id]}
+            {id === "questions" && questions.length > 0 ? (
+              <Badge variant="accent">{questions.length}</Badge>
+            ) : null}
+          </a>
+        ))}
+      </nav>
       <div
         ref={gridRef}
         className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:grid-rows-[minmax(0,1fr)]"
@@ -364,7 +384,7 @@ function WorkspaceView({ initialSnapshot }: { initialSnapshot: SessionSnapshot }
           </div>
         </CollapsibleColumn>
         <section
-          className="order-first flex h-[calc(100dvh-7rem)] min-h-96 flex-col px-3 pb-3 lg:order-none lg:h-auto lg:min-h-0 lg:px-1.5"
+          className="order-first flex min-h-0 flex-col px-3 pb-3 lg:order-none lg:px-1.5"
           aria-label={t.workspace.conversation}
         >
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border bg-card">
@@ -404,14 +424,16 @@ function WorkspaceView({ initialSnapshot }: { initialSnapshot: SessionSnapshot }
           layout={documentColumn}
         >
           {/* Only the tab content scrolls: the tab row stays clear of the collapse toggle. */}
-          <Tabs defaultValue="document" className="min-h-0 flex-1">
+          <Tabs value={tab} onValueChange={setTab} className="min-h-0 flex-1">
             <TabsList className="lg:pl-9">
-              <TabsTrigger value="document">{t.workspace.tabs.document}</TabsTrigger>
-              <TabsTrigger value="questions">
-                {t.workspace.tabs.questions}
-                {questions.length > 0 ? <Badge variant="accent">{questions.length}</Badge> : null}
-              </TabsTrigger>
-              <TabsTrigger value="delivery">{t.workspace.tabs.delivery}</TabsTrigger>
+              {TABS.map((id) => (
+                <TabsTrigger key={id} value={id}>
+                  {t.workspace.tabs[id]}
+                  {id === "questions" && questions.length > 0 ? (
+                    <Badge variant="accent">{questions.length}</Badge>
+                  ) : null}
+                </TabsTrigger>
+              ))}
             </TabsList>
             <TabsContent value="document" className="min-h-0 overflow-y-auto">
               <DocumentPanel

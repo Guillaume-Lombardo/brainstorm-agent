@@ -6,15 +6,16 @@ import { useMessages } from "@/components/preferences/provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import type { SignInError } from "@/lib/auth/messages";
 
 export interface LoginFormProps {
   callbackUrl: string;
   /** Error carried by an Auth.js redirect (`/login?error=`). */
-  initialError?: string | null;
+  initialError?: SignInError | null;
   passwordAction: (
-    previous: { error: string | null },
+    previous: { error: SignInError | null },
     formData: FormData,
-  ) => Promise<{ error: string | null }>;
+  ) => Promise<{ error: SignInError | null }>;
   /** Present only when an OIDC provider is configured. */
   sso: { label: string; action: (formData: FormData) => Promise<void> } | null;
 }
@@ -48,7 +49,7 @@ export function LoginForm({
         </div>
         {state.error ? (
           <p role="alert" className="text-sm text-destructive">
-            {state.error}
+            {t.errors[state.error]}
           </p>
         ) : null}
         <Button type="submit" disabled={pending}>

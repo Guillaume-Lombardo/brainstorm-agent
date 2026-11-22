@@ -27,7 +27,7 @@ describe("serverText", () => {
   it("translates known texts, keeps their details and leaves the rest as received", () => {
     expect(serverText("Unexpected error.", MESSAGES.fr)).toBe("Erreur inattendue.");
     expect(serverText("Unresolved contradictions: A / B", MESSAGES.fr)).toBe(
-      "Contradictions non résolues : A / B",
+      "Contradictions non résolues\u00a0: A / B",
     );
     expect(serverText("Something new: A", MESSAGES.fr)).toBe("Something new: A");
     expect(serverText("Unexpected error.", MESSAGES.en)).toBe("Unexpected error.");

@@ -206,7 +206,7 @@ export function ResearchPanel({
           )}
           <fieldset className="flex flex-col gap-2">
             <legend className="mb-2 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
-              {t.toConfirm}
+              {t.choose}
             </legend>
             {latest.synthesis.features.map((feature) => {
               const id = feature.id;

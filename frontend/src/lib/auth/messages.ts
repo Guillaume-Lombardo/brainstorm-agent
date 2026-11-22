@@ -1,20 +1,21 @@
 import type { Messages } from "@/lib/i18n";
 
+export type SignInError = keyof Messages["login"]["errors"];
+
 /**
- * Message shown on `/login?error=<type>` after an Auth.js redirect (SSO refused or
+ * Error shown on `/login?error=<type>` after an Auth.js redirect (SSO refused or
  * failed). Unknown values get a generic text: the query string is user-controlled.
  */
-export function signInErrorMessage(value: unknown, messages: Messages): string | null {
+export function signInError(value: unknown): SignInError | null {
   if (typeof value !== "string" || value.length === 0) {
     return null;
   }
-  const { errors } = messages.login;
   switch (value) {
     case "AccessDenied":
-      return errors.refused;
+      return "refused";
     case "CredentialsSignin":
-      return errors.invalid;
+      return "invalid";
     default:
-      return errors.failed;
+      return "failed";
   }
 }

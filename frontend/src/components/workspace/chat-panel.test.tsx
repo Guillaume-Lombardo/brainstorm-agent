@@ -194,9 +194,11 @@ describe("ChatPanel", () => {
         error={{ code: "rate_limited", message: "Slow", status: 429, retryAfterSeconds: 5 }}
       />,
     );
-    expect(screen.getByRole("textbox", { name: "Message" })).toBeDisabled();
+    const input = screen.getByRole("textbox", { name: "Message" });
+    expect(input).toBeDisabled();
+    expect(input).toHaveAccessibleDescription("Pitch is waiting for your review.");
     expect(screen.getByPlaceholderText("Pitch is waiting for your review.")).toBeInTheDocument();
-    expect(screen.getByText("Try again in 5 seconds.")).toBeInTheDocument();
+    expect(screen.getByText("Try again in 5 s.")).toBeInTheDocument();
   });
 
   it("renders assistant Markdown without interpreting raw HTML", () => {

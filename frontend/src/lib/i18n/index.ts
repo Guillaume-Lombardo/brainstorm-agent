@@ -11,11 +11,12 @@ export const MESSAGES: Record<Locale, Messages> = { en, fr };
  * A text with details after a colon ("Unresolved contradictions: …") keeps them as they are.
  */
 export function serverText(text: string, messages: Messages): string {
-  const exact = messages.server[text];
-  if (exact) {
-    return exact;
+  const { server } = messages;
+  if (Object.hasOwn(server, text)) {
+    return server[text];
   }
-  const colon = text.indexOf(": ");
-  const label = colon > 0 ? messages.server[text.slice(0, colon)] : undefined;
-  return label ? `${label} : ${text.slice(colon + 2)}` : text;
+  const label = text.slice(0, Math.max(0, text.indexOf(": ")));
+  return Object.hasOwn(server, label)
+    ? `${server[label]}\u00a0: ${text.slice(label.length + 2)}`
+    : text;
 }

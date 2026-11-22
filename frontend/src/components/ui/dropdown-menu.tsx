@@ -13,7 +13,7 @@ function DropdownMenuContent({ className, ...props }: MenuPrimitive.Popup.Props)
         <MenuPrimitive.Popup
           data-slot="dropdown-menu-content"
           className={cn(
-            "max-h-(--available-height) min-w-40 overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-lg outline-none",
+            "max-h-(--available-height) min-w-40 overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground outline-none",
             className,
           )}
           {...props}

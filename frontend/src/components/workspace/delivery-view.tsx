@@ -213,7 +213,7 @@ function DependencyGraph({ slices, waves }: { slices: DeliverySlice[]; waves: st
   });
   const rows = Math.max(1, ...ordered.map((wave) => wave.sliceIds.length));
   const width = Math.max(1, ordered.length) * (NODE_WIDTH + COLUMN_GAP) - COLUMN_GAP;
-  const height = 20 + rows * (NODE_HEIGHT + ROW_GAP);
+  const height = 21 + rows * (NODE_HEIGHT + ROW_GAP) - ROW_GAP;
   const names = new Map(slices.map((slice) => [slice.id, slice.goal]));
 
   return (

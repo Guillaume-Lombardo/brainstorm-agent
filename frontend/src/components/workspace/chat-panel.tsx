@@ -159,7 +159,7 @@ export function ChatPanel({
     <div className="flex min-h-0 flex-1 flex-col">
       <div
         ref={logRef}
-        className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-5 py-4"
+        className="flex h-[calc(100dvh-17rem)] min-h-60 flex-col gap-3 overflow-y-auto px-5 py-4 lg:h-auto lg:min-h-0 lg:flex-1"
         aria-live="polite"
         onScroll={(event) => {
           const { scrollHeight, scrollTop, clientHeight } = event.currentTarget;
@@ -244,6 +244,12 @@ export function ChatPanel({
             </ul>
           </section>
         ) : null}
+        {blockedReason === null ? null : (
+          // The placeholder says it too, unless a draft hides it.
+          <p id="blocked-reason" className={draft ? "text-xs text-muted-foreground" : "sr-only"}>
+            {blockedReason}
+          </p>
+        )}
         <form
           className="flex items-end gap-2"
           onSubmit={(event) => {
@@ -254,6 +260,7 @@ export function ChatPanel({
           <Textarea
             ref={inputRef}
             aria-label={t.message}
+            aria-describedby={blockedReason === null ? undefined : "blocked-reason"}
             placeholder={blockedReason ?? t.placeholder}
             value={draft}
             rows={2}

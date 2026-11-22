@@ -21,7 +21,7 @@
   --color-destructive-soft: var(--destructive-soft);
   --color-star: var(--star);
   --color-border: var(--border);
-  --color-input: var(--border);
+  --color-input: var(--input);
   --color-ring: var(--primary);
   --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -41,6 +41,7 @@
   --background: light-dark(#f6f7f9, #0f1216);
   --card: light-dark(#ffffff, #171b21);
   --border: light-dark(#e2e5ea, #2a3039);
+  --input: light-dark(#8b94a1, #616b79);
   --foreground: light-dark(#1b1f24, #e6e9ee);
   --muted: light-dark(#eef2f7, #1b222c);
   --muted-foreground: light-dark(#5f6875, #8d97a5);
@@ -53,7 +54,7 @@
   --warn-soft: light-dark(#fff4e0, #33270f);
   --destructive: light-dark(#c62f2f, #ff6b6b);
   --destructive-soft: light-dark(#fcebeb, #341a1c);
-  --star: light-dark(#e2a600, #f0c040);
+  --star: light-dark(#b07a00, #f0c040);
 }
 :root[data-theme="light"] {
   color-scheme: light;
@@ -85,7 +86,6 @@
   /* Minimal typography for rendered Markdown. */
   .prose-document {
     overflow-wrap: anywhere;
-    text-wrap: pretty;
   }
   .prose-document h1 {
     @apply mt-5 mb-1.5 border-b pb-1.5 text-base font-semibold;

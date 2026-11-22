@@ -25,11 +25,11 @@ export function AppHeader({ children }: { children: ReactNode }) {
   const account = useContext(AccountContext);
   const t = useMessages().preferences;
   return (
-    <header className="flex shrink-0 flex-wrap items-center justify-end gap-x-3 gap-y-2 px-3 py-2.5">
+    <header className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2.5 sm:justify-end">
       {children}
       <PreferenceControls />
       {account ? (
-        <form action={account.signOut}>
+        <form action={account.signOut} className="ml-auto sm:ml-0">
           <Button
             type="submit"
             variant="ghost"

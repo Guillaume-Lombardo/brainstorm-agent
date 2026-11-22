@@ -1,6 +1,6 @@
 "use client";
 
-import { MessageSquarePlusIcon } from "lucide-react";
+import { ChevronDownIcon, MessageSquarePlusIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { ErrorState } from "@/components/error-state";
@@ -79,7 +79,8 @@ export function DocumentPanel({
       ? (versions.find((version) => version.version === selection.version) ?? latest)
       : latest;
   const previous = versions.find((version) => version.version === selectedVersion.version - 1);
-  const sections = splitSections(readableDocument(selectedVersion.markdown));
+  const { body, record } = readableDocument(selectedVersion.markdown);
+  const sections = splitSections(body);
   const headings = new Set(sections.map((section) => section.heading));
   const otherComments = comments.filter(
     (comment) => comment.stage === stage && !headings.has(comment.section),
@@ -88,19 +89,25 @@ export function DocumentPanel({
   return (
     <div className="flex flex-col gap-3 p-4">
       <div className="flex flex-wrap items-center gap-2">
-        <select
-          aria-label={t.version}
-          className="h-7 cursor-pointer rounded-md border bg-card px-1.5 text-[13px]"
-          value={selectedVersion.version}
-          onChange={(event) => setSelection({ key, version: Number(event.target.value) })}
-        >
-          {versions.map((version) => (
-            <option key={version.version} value={version.version}>
-              v{version.version}
-              {version.version === latest.version ? ` (${t.latest})` : ""}
-            </option>
-          ))}
-        </select>
+        <div className="relative">
+          <select
+            aria-label={t.version}
+            className="h-7 cursor-pointer appearance-none rounded-md border border-input bg-card pr-7 pl-2.5 text-[13px]"
+            value={selectedVersion.version}
+            onChange={(event) => setSelection({ key, version: Number(event.target.value) })}
+          >
+            {versions.map((version) => (
+              <option key={version.version} value={version.version}>
+                v{version.version}
+                {version.version === latest.version ? ` (${t.latest})` : ""}
+              </option>
+            ))}
+          </select>
+          <ChevronDownIcon
+            aria-hidden
+            className="pointer-events-none absolute top-1.5 right-2 size-4 text-muted-foreground"
+          />
+        </div>
         {previous ? (
           <Button
             size="sm"
@@ -129,10 +136,19 @@ export function DocumentPanel({
               comments={comments.filter(
                 (comment) => comment.stage === stage && comment.section === section.heading,
               )}
+              current={selectedVersion === latest}
               readOnly={readOnly}
               onComment={onComment}
             />
           ))}
+          {record ? (
+            <details className="mt-4 border-t pt-3">
+              <summary className="cursor-pointer text-[13px] text-muted-foreground">
+                {t.record}
+              </summary>
+              <Markdown>{translateDocument(record, t)}</Markdown>
+            </details>
+          ) : null}
           {otherComments.length > 0 ? (
             <section aria-label={t.reviewNotes} className="mt-4 flex flex-col gap-2 border-t pt-3">
               <h3 className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
@@ -153,11 +169,14 @@ function DocumentSection({
   heading,
   markdown,
   comments,
+  current,
   readOnly,
   onComment,
 }: {
   heading: string | null;
   markdown: string;
+  /** Section of the latest version. */
+  current: boolean;
   comments: SectionComment[];
   readOnly: boolean;
   onComment: (section: string, body: string) => Promise<boolean>;
@@ -185,7 +204,7 @@ function DocumentSection({
           <MessageSquarePlusIcon />
         </Button>
       ) : null}
-      <Markdown>{translateDocument(text, t)}</Markdown>
+      <Markdown>{translateDocument(text, t, { hideOptions: current })}</Markdown>
       {comments.length > 0 || draft !== null ? (
         <div className="my-2 flex flex-col gap-2">
           {comments.map((comment, index) => (

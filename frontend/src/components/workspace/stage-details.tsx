@@ -4,7 +4,6 @@ import { CheckIcon, CircleDashedIcon, CircleDotIcon, PencilIcon, XIcon } from "l
 import { useState } from "react";
 
 import { useMessages } from "@/components/preferences/provider";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import type { CoverageStatus, SessionOverview, Stage } from "@/lib/backend/types";
@@ -19,7 +18,6 @@ import {
   stageStatus,
   valueFromDraft,
   type FieldView,
-  type StageStatus,
 } from "./view-model";
 
 const COVERAGE_ICON = {
@@ -27,14 +25,6 @@ const COVERAGE_ICON = {
   partial: [CircleDotIcon, "text-warn"],
   missing: [CircleDashedIcon, "text-muted-foreground"],
 } as const satisfies Record<CoverageStatus, unknown>;
-
-const STATUS_BADGE = {
-  locked: "muted",
-  active: "accent",
-  awaiting_review: "warn",
-  validated: "good",
-  stale: "warn",
-} as const satisfies Record<StageStatus, string>;
 
 /** Readiness checklist and per-field coverage of one stage, with inline edit. */
 export function StageDetails({
@@ -52,7 +42,9 @@ export function StageDetails({
   const t = useMessages();
   const status = stageStatus(session, stage);
   const readiness = stageState(session, stage)?.readiness ?? [];
-  const passed = readiness.filter((check) => check.passed).length;
+  const missing = new Set(
+    readiness.filter((check) => !check.passed).map((check) => check.id.replace("field:", "")),
+  );
   // Field rules show on the fields below: only the other failing rules need their text.
   const failing = readiness.filter((check) => !check.passed && !check.id.startsWith("field:"));
   // The backend edits the active stage only; earlier stages must be reopened first.
@@ -60,17 +52,9 @@ export function StageDetails({
 
   return (
     <div className="flex flex-col border-t" data-testid="stage-details">
-      <div className="flex flex-col gap-2 px-3 py-3">
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="font-semibold">{t.stages[stage]}</h2>
-          <Badge variant={STATUS_BADGE[status]}>{t.stageStatus[status]}</Badge>
-        </div>
+      <h2 className="sr-only">{t.stages[stage]}</h2>
+      <div className="flex flex-col gap-2 border-b px-3 py-3 empty:hidden">
         {status === "stale" ? <p className="text-xs text-warn">{t.stageDetails.stale}</p> : null}
-        {readiness.length > 0 ? (
-          <p className="text-xs text-muted-foreground tabular-nums">
-            {`${t.stageDetails.readiness} ${passed}/${readiness.length}`}
-          </p>
-        ) : null}
         {failing.length > 0 ? (
           <ul className="flex flex-col gap-1.5 text-xs">
             {failing.map((check) => (
@@ -82,11 +66,12 @@ export function StageDetails({
           </ul>
         ) : null}
       </div>
-      <ul className="divide-y border-t">
+      <ul className="divide-y">
         {stageFields(session, stage, t).map((field) => (
           <FieldRow
             key={field.name}
             field={field}
+            required={missing.has(field.name)}
             editable={editable && isEditable(field.kind)}
             readOnly={readOnly}
             onSave={onEditField}
@@ -99,11 +84,14 @@ export function StageDetails({
 
 function FieldRow({
   field,
+  required,
   editable,
   readOnly,
   onSave,
 }: {
   field: FieldView;
+  /** The stage still needs this field. */
+  required: boolean;
   editable: boolean;
   readOnly: boolean;
   onSave: (field: string, value: unknown) => Promise<boolean>;
@@ -140,6 +128,7 @@ function FieldRow({
         <span className={cn("flex-1", field.lines.length > 0 && "font-semibold")}>
           {field.label}
         </span>
+        {required ? <span className="text-xs text-warn">{t.stageDetails.required}</span> : null}
         {editable && !readOnly && draft === null ? (
           <Button
             variant="ghost"
@@ -172,7 +161,7 @@ function FieldRow({
           {field.kind === "boolean" ? (
             <select
               aria-label={t.stageDetails.value(field.label)}
-              className="h-8 rounded-md border bg-card px-2"
+              className="h-8 rounded-md border border-input bg-card px-2"
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
             >

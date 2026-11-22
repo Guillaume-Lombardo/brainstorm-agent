@@ -89,8 +89,8 @@ language renders the server components again and keeps the client state, a runni
 The language of the interface does not change the conversation, which follows the language the user
 writes in, nor stored documents and exports. The workspace translates on display what the backend
 writes in English: fixed lines of the document template, readiness messages and errors, by exact
-text. An unknown text is shown as received. The document tab also leaves out the parts shown next to
-it (fields, readiness, transition); exports keep them.
+text. An unknown text is shown as received. The document tab also leaves out the repeated question
+lists and folds the assessment of the stage (fields, readiness, transition); exports keep everything.
 
 **Errors.** Every proxy error is `{"error": {"code", "message", "retryAfterSeconds?"}}` with the
 status relayed:
