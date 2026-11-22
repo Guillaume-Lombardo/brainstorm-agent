@@ -7,9 +7,10 @@ from typing import TYPE_CHECKING
 import pytest
 from pydantic import ValidationError
 
+from brainstorm_agent.core.application import TURN_LOCKED_MESSAGE, TurnError
 from brainstorm_agent.core.enums import LLMMode, MessageRole, Stage
 from brainstorm_agent.core.models import AssistantAnalysis, OpenQuestionItem, QuestionPriority
-from brainstorm_agent.exceptions import ConflictError, LLMResponseError
+from brainstorm_agent.exceptions import ConflictError, LLMResponseError, LockAcquisitionError
 from brainstorm_agent.persistence.session import (
     create_all,
     create_engine_from_settings,
@@ -382,3 +383,27 @@ def test_stream_turn_logs_the_failure_it_hides_from_the_client(
     assert expected in failure.getMessage()
     # Model output may quote the user: it never reaches the logs.
     assert "SECRET-USER-CONTENT" not in caplog.text
+
+
+def test_stream_turn_tells_a_busy_session_apart_from_a_failure(
+    tmp_path: Path,
+    mocker: MockerFixture,
+) -> None:
+    settings = _build_settings(tmp_path)
+    engine = create_engine_from_settings(settings)
+    create_all(engine)
+
+    async def last_event(service: SessionService, session_id: str) -> object:
+        return [event async for event in service.stream_turn(session_id, "hello")][-1]
+
+    with create_session_factory(engine)() as db_session:
+        service = SessionService(db_session=db_session, settings=settings)
+        session_id = service.create_session().session_id
+        mocker.patch.object(
+            service.lock_manager,
+            "lock",
+            side_effect=LockAcquisitionError(session_id=session_id),
+        )
+        event = asyncio.run(last_event(service, session_id))
+
+    assert event == TurnError(message=TURN_LOCKED_MESSAGE)

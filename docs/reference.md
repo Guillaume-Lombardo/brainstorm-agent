@@ -507,7 +507,9 @@ OpenWebUI can use LiteLLM as an OpenAI-compatible backend. The Open WebUI docs f
   the question), and the workspace shows at most three questions.
 - Each turn creates a versioned Markdown document for the processed stage.
 - The current session state is persisted as structured JSON plus normalized history tables.
-- Redis is used only for non-critical session locking.
+- Redis is used only for non-critical session locking. A lock is a 30-second lease renewed while
+  its request runs, so a process killed mid-turn (a redeployment) blocks its session for at most
+  30 seconds; a stream that cannot get the lock says the session is still busy.
 
 ## Validation
 
@@ -587,7 +589,7 @@ what the user typed (then from earlier turns), never from the benchmark candidat
 along, and is stated to the provider. Content follows the user's language, while headings
 and schema keys remain English. Prompt `v1` remains available; `v2` is the default.
 
-`REDIS_LOCK_TIMEOUT_SECONDS` must exceed `OPENAI_TIMEOUT_SECONDS` times 3 (challenge off)
+`REDIS_LOCK_TIMEOUT_SECONDS` bounds how long one request may hold its session and must exceed `OPENAI_TIMEOUT_SECONDS` times 3 (challenge off)
 or 5 (findings). SDK transport retries are disabled. The default 180 seconds covers the 30-second
 per-call timeout in both modes. See [LiteLLM aliases](../examples/litellm-models.yaml).
 

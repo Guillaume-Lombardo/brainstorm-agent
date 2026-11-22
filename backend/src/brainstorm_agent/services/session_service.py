@@ -14,6 +14,7 @@ from sqlalchemy import select
 
 from brainstorm_agent.async_runner import run_async
 from brainstorm_agent.core.application import (
+    TURN_LOCKED_MESSAGE,
     AnalysisStatus,
     BacklogExport,
     CommentInput,
@@ -52,7 +53,12 @@ from brainstorm_agent.core.models import (
 )
 from brainstorm_agent.core.research import Benchmark, FeatureSelection, escape_markdown, render_benchmark
 from brainstorm_agent.core.stage_contracts import DeliveryFields
-from brainstorm_agent.exceptions import ConflictError, LLMResponseError, NotFoundError
+from brainstorm_agent.exceptions import (
+    ConflictError,
+    LLMResponseError,
+    LockAcquisitionError,
+    NotFoundError,
+)
 from brainstorm_agent.graph.builder import build_turn_graph
 from brainstorm_agent.graph.nodes import apply_stage_rules
 from brainstorm_agent.logging import get_logger
@@ -1042,7 +1048,11 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
                 )
             else:
                 logger.exception("turn_failed", session_id=session_id, turn_id=turn_id)
-            yield TurnError()
+            yield (
+                TurnError(message=TURN_LOCKED_MESSAGE)
+                if isinstance(exc, LockAcquisitionError)
+                else TurnError()
+            )
         finally:
             if waiter is not None and not waiter.done():
                 waiter.cancel()

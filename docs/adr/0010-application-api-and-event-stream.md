@@ -32,7 +32,7 @@ The turn endpoint streams named SSE events containing discriminated JSON payload
 optional `stage.changed` and `review.required`, then `turn.completed`.
 A dedicated worker thread owns each turn's synchronous SQL/Redis operations and provider loop,
 relaying events to the HTTP loop without blocking other requests.
-Failures terminate with a sanitized `error`. Deltas come from the conversational provider stream
+Failures terminate with a sanitized `error`, whose message says so when another request still holds the session. Deltas come from the conversational provider stream
 and remain tentative until commit. Cancellation of the stream generator cancels its turn task. Transport disconnect detection is
 best effort; a turn already entering persistence can commit in full after a disconnect. There is no event replay,
 Last-Event-ID recovery or automatic retry contract. HTTP authorization and pending-review errors
