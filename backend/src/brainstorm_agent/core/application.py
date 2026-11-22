@@ -167,6 +167,9 @@ class TurnCompleted(BaseModel):
     output: AssistantTurnOutput
 
 
+TURN_LOCKED_MESSAGE = "This session is still busy with another request; retry in a moment."
+
+
 class TurnError(BaseModel):
     """Terminal failure; tentative deltas must be discarded."""
 
