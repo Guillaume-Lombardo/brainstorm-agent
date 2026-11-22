@@ -4,7 +4,7 @@ from collections.abc import AsyncIterator  # noqa: TC003
 from contextlib import aclosing
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from fastapi.responses import StreamingResponse
 from starlette.concurrency import run_in_threadpool
 
@@ -229,6 +229,28 @@ def export_specs(session_id: str, service: Service) -> SliceSpecsExport:
         SliceSpecsExport: Application service result.
     """
     return service.export_slice_specs(session_id)
+
+
+@router.get(
+    "/{session_id}/export/archive",
+    response_class=Response,
+    responses={200: {"content": {"application/zip": {"schema": {"type": "string", "format": "binary"}}}}},
+)
+def export_archive(session_id: str, service: Service) -> Response:
+    """Download every session document as one ZIP archive.
+
+    Args:
+        session_id (str): Request parameter or session service.
+        service (Service): Request parameter or session service.
+
+    Returns:
+        Response: ZIP attachment.
+    """
+    return Response(
+        service.export_archive(session_id),
+        media_type="application/zip",
+        headers={"Content-Disposition": 'attachment; filename="brainstorm-documents.zip"'},
+    )
 
 
 TURN_STREAM_RESPONSES: dict[int | str, dict[str, Any]] = {

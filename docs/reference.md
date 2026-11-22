@@ -768,6 +768,11 @@ OpenAI-compatible facade do not: there, a new stage starts with the next user me
 - GET `/sessions/{id}/stages/{stage}/documents/diff?from_version=1&to_version=2`: unified diff.
 - GET `/sessions/{id}/export/markdown|json|backlog_json|slice_specs`: consolidated document,
   snapshot, backlog with slice assignments, dependencies and waves, or validated slice specifications. Missing, invalid or stale delivery plans return 409.
+- GET `/sessions/{id}/export/archive`: ZIP of every document: `framing.md` (consolidated),
+  `stages/<stage>.md` (latest version of each visited stage) and, when the delivery plan is
+  exportable, `delivery/slices/<slice>.md` and `delivery/backlog.json`. It never returns 409: the
+  delivery files are left out until the plan is ready. The chat and older versions stay in the
+  JSON export.
 
 Session snapshots expose stage coverage, readiness, prioritized question options, clarifications
 and stale markers. `CORS_ORIGINS` is an explicit JSON allowlist, empty by default.

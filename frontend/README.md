@@ -45,8 +45,8 @@ pnpm e2e         # Playwright (chromium): standalone build + real backend in fak
 `pnpm e2e` starts both servers itself (`playwright.config.ts`): the backend through
 `scripts/e2e-backend.mjs` and the standalone build. It covers sign-in (wrong password, backend
 login limit, SSO hidden), session creation, one streamed turn, the updated document and
-coverage, the pending review (input paused, 409 from the backend), approval, the Markdown export,
-and the LLM failure, rate-limit and expired-session states. Screenshots go to
+coverage, the pending review (input paused, 409 from the backend), approval, the Markdown
+and ZIP exports, and the LLM failure, rate-limit and expired-session states. Screenshots go to
 `test-results/screenshots/` (`E2E_SCREENSHOT_DIR` overrides it). Install the browser once with
 `pnpm exec playwright install chromium`. CI runs the same suite (`frontend-e2e` job) and uploads
 the screenshots and traces.

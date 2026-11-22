@@ -230,6 +230,33 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/sessions/{session_id}/export/archive": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Export Archive
+     * @description Download every session document as one ZIP archive.
+     *
+     *     Args:
+     *         session_id (str): Request parameter or session service.
+     *         service (Service): Request parameter or session service.
+     *
+     *     Returns:
+     *         Response: ZIP attachment.
+     */
+    get: operations["export_archive_api_v1_sessions__session_id__export_archive_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/sessions/{session_id}/export/backlog_json": {
     parameters: {
       query?: never;
@@ -2975,6 +3002,40 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["DocumentsResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  export_archive_api_v1_sessions__session_id__export_archive_get: {
+    parameters: {
+      query?: never;
+      header?: {
+        "X-API-Key"?: string | null;
+        Authorization?: string | null;
+      };
+      path: {
+        session_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/zip": string;
         };
       };
       /** @description Validation Error */

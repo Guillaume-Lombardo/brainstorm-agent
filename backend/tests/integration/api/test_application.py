@@ -1,6 +1,8 @@
 """Application contract, owner isolation and persistent editing tests."""
 
+import io
 import json
+import zipfile
 from collections.abc import Iterator  # noqa: TC003
 from pathlib import Path  # noqa: TC003
 
@@ -113,6 +115,7 @@ def test_reopen_edits_versions_comments_and_exports(tmp_path: Path) -> None:
         ("get", f"/stages/{STAGE}/documents/diff?from_version=1&to_version=2", None),
         ("get", "/export/slice_specs", None),
         ("get", "/export/backlog_json", None),
+        ("get", "/export/archive", None),
         ("get", "/research", None),
         ("post", "/research", None),
         ("patch", "/research/unknown/selection", {"selected_ids": []}),
@@ -237,6 +240,32 @@ def _set_partial(client: TestClient, sid: str, partial_fields: dict[str, str]) -
         db.commit()
 
 
+def _archive(client: TestClient, sid: str) -> dict[str, str]:
+    response = client.get(f"/api/v1/sessions/{sid}/export/archive")
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/zip"
+    with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
+        return {name: archive.read(name).decode() for name in archive.namelist()}
+
+
+def test_archive_holds_the_latest_document_of_every_visited_stage(tmp_path: Path) -> None:
+    client = client_for(tmp_path)
+    sid = client.post("/api/v1/sessions").json()["session_id"]
+    base = f"/api/v1/sessions/{sid}"
+    assert set(_archive(client, sid)) == {"framing.md"}
+    assert client.post(base + "/messages", json={"content": PITCH}).status_code == 200
+    assert client.post(base + f"/stages/{STAGE}/reopen").status_code == 200
+    edit = client.patch(base + f"/stages/{STAGE}/fields/pitch_summary", json={"value": "Projet révisé"})
+    assert edit.status_code == 200
+    files = _archive(client, sid)
+    latest = client.get(base + f"/stages/{STAGE}/documents").json()[-1]
+    assert latest["version"] == 2
+    assert set(files) == {"framing.md", f"stages/{STAGE}.md"}
+    assert files[f"stages/{STAGE}.md"] == latest["markdown"].strip() + "\n"
+    assert "Projet révisé" in files[f"stages/{STAGE}.md"]
+    assert files["framing.md"] == client.get(base + "/export/markdown").json()["markdown"]
+
+
 def test_delivery_exports_use_domain_plan_and_reject_stale_or_invalid(tmp_path: Path) -> None:
     client = client_for(tmp_path)
     assert isinstance(client.app, FastAPI)
@@ -288,10 +317,20 @@ def test_delivery_exports_use_domain_plan_and_reject_stale_or_invalid(tmp_path: 
     assert backlog["waves"] == [["slice-0"], ["reports"]]
     assert backlog["slices"][1]["dependencies"] == ["slice-0"]
     assert backlog["backlog"]["mvp_user_stories"][0]["id"] == "story"
+    files = _archive(client, sid)
+    assert set(files) == {
+        "framing.md",
+        "delivery/slices/slice-0.md",
+        "delivery/slices/reports.md",
+        "delivery/backlog.json",
+    }
+    assert files["delivery/slices/reports.md"] == specs["specs"]["reports.md"]
+    assert json.loads(files["delivery/backlog.json"]) == backlog
     _set_partial(client, sid, {"slices": PROPOSED_REASON[Language.EN]})
     # A proposed plan is not exported before the user confirms it.
     assert client.get(base + "/export/slice_specs").status_code == 409
     assert client.get(base + "/export/backlog_json").status_code == 409
+    assert set(_archive(client, sid)) == {"framing.md"}
     _set_partial(client, sid, {})
     assert (
         client.patch(base + "/stages/stage_7_delivery_slicing", json={"fields": {"slices": []}}).status_code

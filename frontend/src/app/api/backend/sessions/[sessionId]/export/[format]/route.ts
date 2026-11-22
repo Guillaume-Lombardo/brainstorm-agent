@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 interface ExportFile {
   suffix: string;
   contentType: string;
-  body: string;
+  body: BodyInit;
 }
 
 const MARKDOWN = "text/markdown; charset=utf-8";
@@ -22,6 +22,10 @@ async function exportFile(
   format: ExportFormat,
 ): Promise<ExportFile> {
   switch (format) {
+    case "archive": {
+      const body = await backend.exportArchive(caller, sessionId);
+      return { suffix: "documents.zip", contentType: "application/zip", body };
+    }
     case "markdown": {
       const { markdown } = await backend.exportMarkdown(caller, sessionId);
       return { suffix: "framing.md", contentType: MARKDOWN, body: markdown };

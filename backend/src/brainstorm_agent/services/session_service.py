@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import difflib
+import io
+import zipfile
 from collections.abc import AsyncGenerator, Awaitable, Callable  # noqa: TC003
 from contextlib import suppress
 from typing import TYPE_CHECKING, Any
@@ -583,6 +585,18 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
         self._require_owned(session_id)
         return self.documents.list_all(session_id)
 
+    def _latest_documents(self, session_id: str) -> list[StepDocument]:
+        """Return the latest document of each visited stage, in stage order.
+
+        Args:
+            session_id (str): Owned session.
+
+        Returns:
+            list[StepDocument]: At most one document per stage.
+        """
+        latest = {item.stage: item for item in self.list_documents(session_id)}
+        return [latest[stage] for stage in Stage.ordered() if stage in latest]
+
     def export_markdown(self, session_id: str) -> str:
         """Export the latest session documents into one Markdown artifact.
 
@@ -594,7 +608,7 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
         """
         overview = self.get_session(session_id)
         messages = self.list_messages(session_id)
-        documents_by_stage = {item.stage: item for item in self.list_documents(session_id) if item.version}
+        documents = self._latest_documents(session_id)
         sections = [
             "# Brainstorm Session Export",
             "",
@@ -608,13 +622,10 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
             f"- Open questions: `{len(overview.open_questions)}`",
             "",
         ]
-        for stage in Stage.ordered():
-            document = documents_by_stage.get(stage)
-            if document is None:
-                continue
+        for document in documents:
             sections.extend(
                 [
-                    f"## {stage.label}",
+                    f"## {document.stage.label}",
                     "",
                     document.markdown.strip(),
                     "",
@@ -1059,6 +1070,32 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
         except ValueError as exc:
             message = "Delivery plan is not ready for export."
             raise ConflictError(message) from exc
+
+    def export_archive(self, session_id: str) -> bytes:
+        """Bundle the session documents into one ZIP archive.
+
+        The delivery files are left out while the delivery plan cannot be exported.
+
+        Args:
+            session_id (str): Owned session.
+
+        Returns:
+            bytes: ZIP with the consolidated document, the latest document of each visited stage,
+                and the slice specifications and backlog of an exportable delivery plan.
+        """
+        files = {"framing.md": self.export_markdown(session_id)}
+        for document in self._latest_documents(session_id):
+            files[f"stages/{document.stage.value}.md"] = document.markdown.strip() + "\n"
+        with suppress(ConflictError):
+            backlog = self.export_backlog(session_id)
+            specs = self.export_slice_specs(session_id).specs
+            files |= {f"delivery/slices/{name}": content for name, content in specs.items()}
+            files["delivery/backlog.json"] = backlog.model_dump_json(indent=2) + "\n"
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            for name, content in files.items():
+                archive.writestr(name, content)
+        return buffer.getvalue()
 
     def prepare_turn(self, session_id: str) -> None:
         """Authorize before sending stream headers.

@@ -4455,6 +4455,82 @@
         ]
       }
     },
+    "/api/v1/sessions/{session_id}/export/archive": {
+      "get": {
+        "description": "Download every session document as one ZIP archive.\n\nArgs:\n    session_id (str): Request parameter or session service.\n    service (Service): Request parameter or session service.\n\nReturns:\n    Response: ZIP attachment.",
+        "operationId": "export_archive_api_v1_sessions__session_id__export_archive_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/zip": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Archive",
+        "tags": [
+          "application"
+        ]
+      }
+    },
     "/api/v1/sessions/{session_id}/export/backlog_json": {
       "get": {
         "description": "Export validated backlog assignments, dependencies and delivery waves.\n\nArgs:\n    session_id (str): Request parameter or session service.\n    service (Service): Request parameter or session service.\n\nReturns:\n    BacklogExport: Application service result.",
