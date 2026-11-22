@@ -304,21 +304,30 @@ describe("ChatPanel", () => {
     const log = container.querySelector('[aria-live="polite"]')!;
     Object.defineProperties(log, {
       scrollHeight: { value: 2000 },
-      clientHeight: { value: 500 },
-      scrollTop: { value: 200, writable: true },
+      clientHeight: { value: 500, configurable: true },
+      scrollTop: { value: 0, writable: true },
     });
-    fireEvent.scroll(log);
+    const readTo = (top: number) => {
+      (log as HTMLElement).scrollTop = top;
+      fireEvent.scroll(log);
+    };
+    readTo(1500);
+    readTo(200);
     rerender(view("First words"));
     expect(scrollTo).toHaveBeenCalledTimes(1);
 
-    (log as HTMLElement).scrollTop = 1490;
-    fireEvent.scroll(log);
+    readTo(1490);
     rerender(view("First words, more"));
     expect(scrollTo).toHaveBeenCalledTimes(2);
 
-    // Scrolled up again, then a new question (from any panel) follows its reply.
-    (log as HTMLElement).scrollTop = 0;
+    // Away from the end without scrolling up (a panel shrank the log): keeps following.
+    Object.defineProperty(log, "clientHeight", { value: 300, configurable: true });
     fireEvent.scroll(log);
+    rerender(view("First words, more, again"));
+    expect(scrollTo).toHaveBeenCalledTimes(3);
+
+    // Scrolled up again, then a new question (from any panel) follows its reply.
+    readTo(0);
     rerender(
       <Harness
         onSend={vi.fn()}
@@ -326,12 +335,12 @@ describe("ChatPanel", () => {
         streaming={{ turnId: null, status: "sending", text: "" }}
       />,
     );
-    expect(scrollTo).toHaveBeenCalledTimes(3);
+    expect(scrollTo).toHaveBeenCalledTimes(4);
 
     // A failed turn drops the local question: a reader who scrolled up stays where they are.
-    (log as HTMLElement).scrollTop = 0;
-    fireEvent.scroll(log);
+    readTo(1500);
+    readTo(0);
     rerender(<Harness onSend={vi.fn()} />);
-    expect(scrollTo).toHaveBeenCalledTimes(3);
+    expect(scrollTo).toHaveBeenCalledTimes(4);
   });
 });

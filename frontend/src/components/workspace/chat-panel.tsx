@@ -64,6 +64,7 @@ export function ChatPanel({
   const inputRef = useRef<HTMLTextAreaElement>(null);
   // Follow new text only while the reader is at the bottom, so they can scroll up mid-reply.
   const followRef = useRef(true);
+  const scrollTopRef = useRef(0);
   const userMessages = messages.filter((message) => message.role === "user").length;
   const userMessagesRef = useRef(userMessages);
 
@@ -157,13 +158,20 @@ export function ChatPanel({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      {/* On phones the log leaves room for the header, the panel links and the composer. */}
       <div
         ref={logRef}
         className="flex h-[calc(100dvh-17rem)] min-h-60 flex-col gap-3 overflow-y-auto px-5 py-4 lg:h-auto lg:min-h-0 lg:flex-1"
         aria-live="polite"
         onScroll={(event) => {
           const { scrollHeight, scrollTop, clientHeight } = event.currentTarget;
-          followRef.current = scrollHeight - scrollTop - clientHeight < 40;
+          if (scrollHeight - scrollTop - clientHeight < 40) {
+            followRef.current = true;
+          } else if (scrollTop < scrollTopRef.current) {
+            // Only the reader scrolls up; a panel opening above just shrinks the log.
+            followRef.current = false;
+          }
+          scrollTopRef.current = scrollTop;
         }}
       >
         {messages.length === 0 && !streaming ? (

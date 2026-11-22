@@ -180,7 +180,7 @@ export const en = {
     price: "Price",
     priceUnknown: "unknown",
     source: "Source",
-    choose: "Features to keep",
+    choose: "Proposed features",
     recommendation: { adopt: "adopt", adapt: "adapt", skip: "skip" },
     save: "Keep selected features",
   },

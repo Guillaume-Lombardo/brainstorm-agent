@@ -231,7 +231,7 @@ export const fr: Messages = {
         [/^([^?`]*\?): /, "$1\u00a0: "],
         [/ \| Options: (?=\[)/, " | Options\u00a0: "],
         [/ \| Recommended: none$/, ""],
-        [/ \| Recommended: /, " | Conseil\u00a0: "],
+        [/ \| Recommended: /, " | Recommandé\u00a0: "],
       ],
       Assumptions: [[/ \(to confirm\)$/, " (à confirmer)"]],
       Risks: [
@@ -291,8 +291,8 @@ export const fr: Messages = {
     price: "Prix",
     priceUnknown: "inconnu",
     source: "Source",
-    choose: "Fonctionnalités à retenir",
-    recommendation: { adopt: "à reprendre", adapt: "à adapter", skip: "à écarter" },
+    choose: "Fonctionnalités proposées",
+    recommendation: { adopt: "à reprendre", adapt: "à adapter", skip: "déconseillé" },
     save: "Retenir la sélection",
   },
   delivery: {
