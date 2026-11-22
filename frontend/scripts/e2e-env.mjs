@@ -27,4 +27,5 @@ export const E2E_USERS = [
   { email: "sidebar@example.com", displayName: "Sidebar" },
   { email: "document@example.com", displayName: "Document" },
   { email: "resize@example.com", displayName: "Resize" },
+  { email: "opening@example.com", displayName: "Opening" },
 ];

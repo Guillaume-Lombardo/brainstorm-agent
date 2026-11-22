@@ -52,6 +52,16 @@ export function canReopen(session: SessionOverview, stage: Stage): boolean {
   );
 }
 
+/** Whether the assistant can start the current stage: a new stage nobody worked on yet. */
+export function canOpen(session: SessionOverview): boolean {
+  return (
+    !session.archived &&
+    !session.pending_human_review &&
+    session.current_stage !== STAGES[0] &&
+    stageState(session, session.current_stage) === undefined
+  );
+}
+
 export interface FieldView extends StageFieldSpec {
   /** `null` for optional fields the gate does not score. */
   coverage: CoverageStatus | null;
@@ -177,6 +187,8 @@ export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
+  /** Stage the message belongs to. */
+  stage: Stage;
   /** Sent by this browser and not yet confirmed by `turn.completed`. */
   local?: boolean;
 }
@@ -186,6 +198,7 @@ export function chatMessages(turns: ConversationTurn[]): ChatMessage[] {
     id: turn.id ?? `turn-${index}`,
     role: turn.role,
     content: turn.content,
+    stage: turn.stage,
   }));
 }
 

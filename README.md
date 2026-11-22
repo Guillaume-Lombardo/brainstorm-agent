@@ -89,7 +89,8 @@ flowchart LR
 ```
 
 Each turn returns a summary, the open questions, the next targeted questions and a new version of the
-stage document. A stage closes only when its gate passes (and, if enabled, after a human review).
+stage document. The assistant opens each new stage with proposals drawn from the earlier ones; they
+only count once confirmed. A stage closes only when its gate passes (and, if enabled, after a human review).
 
 ## 🏗️ Under the hood
 

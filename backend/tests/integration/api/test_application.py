@@ -1,5 +1,6 @@
 """Application contract, owner isolation and persistent editing tests."""
 
+import json
 from collections.abc import Iterator  # noqa: TC003
 from pathlib import Path  # noqa: TC003
 
@@ -283,3 +284,49 @@ def test_delivery_exports_use_domain_plan_and_reject_stale_or_invalid(tmp_path: 
     assert client.get(base + "/export/slice_specs").status_code == 409
     assert client.post(base + "/stages/stage_6_backlog_synthesis/reopen").status_code == 200
     assert client.get(base + "/export/backlog_json").status_code == 409
+
+
+def test_stage_opening_streams_one_assistant_turn_without_user_message(tmp_path: Path) -> None:
+    client = client_for(tmp_path)
+    sid = client.post("/api/v1/sessions").json()["session_id"]
+    base = f"/api/v1/sessions/{sid}"
+    opening = base + "/stages/stage_1_problem_framing/opening"
+    assert client.post(base + f"/stages/{STAGE}/opening").status_code == 409
+    assert client.post(opening).status_code == 409
+    assert client.post(base + "/messages", json={"content": PITCH}).status_code == 200
+    before = client.get(base + "/messages").json()["items"]
+
+    response = client.post(opening)
+
+    assert response.status_code == 200
+    events = [json.loads(line[6:]) for line in response.text.splitlines() if line.startswith("data: ")]
+    assert events[0]["type"] == "turn.started"
+    assert events[-1]["type"] == "turn.completed"
+    assert events[-1]["output"]["processed_stage"] == "stage_1_problem_framing"
+    assert events[-1]["output"]["current_stage"] == "stage_1_problem_framing"
+    added = client.get(base + "/messages").json()["items"][len(before) :]
+    assert [(item["role"], item["stage"]) for item in added] == [("assistant", "stage_1_problem_framing")]
+    assert len(client.get(base + "/documents").json()["items"]) == 2
+    # One opening per stage; the conversation then continues as usual.
+    assert client.post(opening).status_code == 409
+    assert client.post(base + "/messages", json={"content": "problem: slow framing"}).status_code == 200
+
+
+def test_stage_opening_is_refused_while_a_review_is_pending(tmp_path: Path) -> None:
+    client = TestClient(
+        create_app(
+            Settings(
+                database_url=f"sqlite+pysqlite:///{tmp_path / 'review.db'}",
+                llm_mode=LLMMode.FAKE,
+                redis_url="redis://localhost:6399/0",
+                require_human_validation_for_transitions=True,
+            ),
+        ),
+    )
+    sid = client.post("/api/v1/sessions").json()["session_id"]
+    base = f"/api/v1/sessions/{sid}"
+    assert client.post(base + "/messages", json={"content": PITCH}).status_code == 200
+    opening = base + "/stages/stage_1_problem_framing/opening"
+    assert client.post(opening).status_code == 409
+    client.post(base + "/review", json={"stage": STAGE, "action": "approve"})
+    assert client.post(opening).status_code == 200

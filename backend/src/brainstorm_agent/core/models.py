@@ -303,6 +303,8 @@ class AssistantAnalysis(BaseModel):
     completion_tokens: int = 0
     contradictions: list[str] = Field(default_factory=list)
     partial_fields: list[PartialField] = Field(default_factory=list)
+    # Partial fields whose current value the user explicitly confirmed this turn.
+    confirmed_fields: list[str] = Field(default_factory=list)
     clarifications: list[Clarification] = Field(default_factory=list)
     summary: str
     assistant_message: str

@@ -644,6 +644,12 @@ propose `partial_fields` as a list of `{field, reason}` objects. Required partia
 blocking questions prevent advancement. A pitch needs at least five words; objectives need
 numeric targets. These deterministic checks are bounded structural checks, not semantic proof.
 
+When a stage starts, the assistant prepares it from the earlier stages before the user writes
+(see the opening endpoint below). Every prepared field is partial until the user confirms it, so an
+opening never passes the gate: facts, decisions and resolutions returned by the provider are
+dropped, and one question asks to confirm the whole proposal. A proposal is settled by that
+answer, by a name the provider returns in `confirmed_fields`, or by another value.
+
 Stage rules enforce three concrete risks across two categories, explicit event-storming
 irrelevance, MVP capabilities, known impact actors and traceable backlog items. Stage 6 items
 include `objective`, `definition_of_done`, `link`, optional `ears_criteria` (WHEN ... THE SYSTEM
@@ -741,6 +747,12 @@ optional `stage.changed`/`review.required`, then `turn.completed` or a sanitized
 Deltas are tentative until completion. While the turn is silent, the stream sends a
 `: keepalive` SSE comment every 15 seconds; clients ignore it. Reconnect/replay is not supported. Legacy message endpoints
 are unchanged. OpenAPI documents the full event union.
+
+`POST /sessions/{id}/stages/{stage}/opening` takes no body and streams the same events: the
+assistant starts the current stage without any user message. It works once per stage, on a stage
+after the pitch that nobody worked on yet; otherwise, or while a review is pending, it returns 409.
+The workspace calls it after each move to a new stage. The legacy message endpoints and the
+OpenAI-compatible facade do not: there, a new stage starts with the next user message.
 
 - POST `/sessions/{id}/stages/{stage}/reopen`: earlier visited stage; downstream state becomes stale.
 - PATCH `/sessions/{id}/stages/{stage}`: `fields` maps field names to typed JSON values;

@@ -76,6 +76,13 @@ const SERVER_ERROR_MESSAGES: Record<number, string> = {
   504: "The language model took too long to answer. Try again.",
 };
 
+function eventStream(response: Response): ReadableStream<Uint8Array> {
+  if (!response.body) {
+    throw new BackendError("backend_unavailable", "The backend returned no event stream.");
+  }
+  return response.body;
+}
+
 /**
  * Typed client of the backend application API (lot 6, ADR 0010).
  *
@@ -188,14 +195,15 @@ export class HttpBackend {
     content: string,
     signal?: AbortSignal,
   ): Promise<ReadableStream<Uint8Array>> {
-    let response: Response;
     try {
-      response = await this.call({ caller }, "post", "/api/v1/sessions/{session_id}/turns", {
-        path: { session_id: sessionId },
-        body: { content, modality: "text" },
-        accept: "text/event-stream",
-        signal,
-      });
+      return eventStream(
+        await this.call({ caller }, "post", "/api/v1/sessions/{session_id}/turns", {
+          path: { session_id: sessionId },
+          body: { content, modality: "text" },
+          accept: "text/event-stream",
+          signal,
+        }),
+      );
     } catch (error) {
       // The only conflict raised before the stream starts is a pending human review.
       if (error instanceof BackendError && error.code === "conflict") {
@@ -203,10 +211,22 @@ export class HttpBackend {
       }
       throw error;
     }
-    if (!response.body) {
-      throw new BackendError("backend_unavailable", "The backend returned no event stream.");
-    }
-    return response.body;
+  }
+
+  /** Let the assistant start the current stage; `conflict` when it already started. */
+  async streamOpening(
+    caller: Caller,
+    sessionId: string,
+    stage: Stage,
+    signal?: AbortSignal,
+  ): Promise<ReadableStream<Uint8Array>> {
+    return eventStream(
+      await this.call({ caller }, "post", "/api/v1/sessions/{session_id}/stages/{stage}/opening", {
+        path: { session_id: sessionId, stage },
+        accept: "text/event-stream",
+        signal,
+      }),
+    );
   }
 
   async listStageDocuments(

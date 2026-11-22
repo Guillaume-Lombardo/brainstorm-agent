@@ -31,7 +31,10 @@ import { StageStepper } from "./stage-stepper";
 import { initialWorkspaceState, workspaceReducer } from "./state";
 import { errorToFailure } from "./turn";
 import { acceptsNext, mergeQueue, queuedQuestionIds, useTurnQueue } from "./turn-queue";
-import { answerMessage, currentQuestions, lastUserTurnId } from "./view-model";
+import { answerMessage, canOpen, currentQuestions, lastUserTurnId } from "./view-model";
+
+/** What a turn starts from: a message, or the assistant opening a new stage. */
+type TurnInput = { message: string; stage: Stage } | { opening: Stage };
 
 type Loaded =
   { sessionId: string; snapshot: SessionSnapshot } | { sessionId: string; error: unknown };
@@ -122,18 +125,31 @@ function WorkspaceView({ initialSnapshot }: { initialSnapshot: SessionSnapshot }
   }
 
   /** Runs one turn; returns the stored session only after a completed turn. */
-  async function runTurn(message: string): Promise<SessionOverview | null> {
+  async function runTurn(input: TurnInput): Promise<SessionOverview | null> {
     const controller = new AbortController();
     abortRef.current = controller;
     const previousTurn = storedTurnRef.current;
     setActionError(null);
-    dispatch({
-      type: "turn.submitted",
-      message: { id: `local-${crypto.randomUUID()}`, role: "user", content: message },
-    });
+    if ("opening" in input) {
+      dispatch({ type: "opening.started" });
+    } else {
+      dispatch({
+        type: "turn.submitted",
+        message: {
+          id: `local-${crypto.randomUUID()}`,
+          role: "user",
+          content: input.message,
+          stage: input.stage,
+        },
+      });
+    }
     let terminal: "completed" | "failed" | null = null;
     try {
-      for await (const event of api.sendMessage(sessionId, message, controller.signal)) {
+      const events =
+        "opening" in input
+          ? api.openStage(sessionId, input.opening, controller.signal)
+          : api.sendMessage(sessionId, input.message, controller.signal);
+      for await (const event of events) {
         dispatch({ type: "turn.event", event });
         if (event.type === "turn.completed") {
           terminal = "completed";
@@ -150,34 +166,47 @@ function WorkspaceView({ initialSnapshot }: { initialSnapshot: SessionSnapshot }
         if (terminal === "completed") {
           return controller.signal.aborted ? null : stored;
         }
-        if (storedTurnRef.current === previousTurn) {
+        if ("message" in input && storedTurnRef.current === previousTurn) {
           // The backend kept nothing, or could not say so: do not lose the text.
-          dispatch({ type: "draft.restored", content: message });
+          dispatch({ type: "draft.restored", content: input.message });
         }
       }
     } catch (error) {
       if (!controller.signal.aborted) {
         dispatch({ type: "turn.failed", error: errorToFailure(error) });
+        if ("opening" in input) {
+          // Refused when it already started, from another tab for instance: show that state.
+          await refresh();
+        }
       }
     }
     return null;
   }
 
-  /** Runs a turn, then one more for whatever was queued meanwhile, while it is safe to. */
-  async function runTurns(message: string, questionIds: string[]) {
-    const turnStage = session.current_stage;
+  /**
+   * Runs a turn, then one more while it is safe to: the opening of the stage the session
+   * moved to, or whatever was queued meanwhile.
+   */
+  async function runTurns(input: TurnInput, questionIds: string[] = []) {
     runningRef.current = true;
     setRunning(true);
-    let next: string | null = message;
+    let next: TurnInput | null = input;
     let answering = questionIds;
     while (next !== null) {
       setAnsweringIds(answering);
-      const stored = await runTurn(next);
+      const turn: TurnInput = next;
+      const turnStage: Stage = "opening" in turn ? turn.opening : turn.stage;
+      const stored = await runTurn(turn);
       next = null;
-      if (stored && acceptsNext(stored, turnStage)) {
+      if (stored && "message" in turn && canOpen(stored)) {
+        // Queued answers were about the previous stage: they wait for the user.
+        hold();
+        next = { opening: stored.current_stage };
+        answering = [];
+      } else if (stored && acceptsNext(stored, turnStage)) {
         const taken = take({ held: false });
         if (taken.length > 0) {
-          next = mergeQueue(taken);
+          next = { message: mergeQueue(taken), stage: turnStage };
           answering = queuedQuestionIds(taken);
         }
       }
@@ -195,7 +224,7 @@ function WorkspaceView({ initialSnapshot }: { initialSnapshot: SessionSnapshot }
       return;
     }
     setSelectedStage(null);
-    void runTurns(message, questionId ? [questionId] : []);
+    void runTurns({ message, stage: session.current_stage }, questionId ? [questionId] : []);
   }
 
   function sendQueue() {
@@ -204,7 +233,10 @@ function WorkspaceView({ initialSnapshot }: { initialSnapshot: SessionSnapshot }
     }
     const taken = take();
     setSelectedStage(null);
-    void runTurns(mergeQueue(taken), queuedQuestionIds(taken));
+    void runTurns(
+      { message: mergeQueue(taken), stage: session.current_stage },
+      queuedQuestionIds(taken),
+    );
   }
 
   async function act(run: () => Promise<SessionOverview>, resetSelection = false) {
@@ -239,7 +271,20 @@ function WorkspaceView({ initialSnapshot }: { initialSnapshot: SessionSnapshot }
   }
 
   async function review(target: Stage, action: ReviewAction, note?: string) {
-    await act(() => api.submitReview(sessionId, { stage: target, action, note }), true);
+    let reviewed: SessionOverview | null = null;
+    await act(async () => {
+      reviewed = await api.submitReview(sessionId, { stage: target, action, note });
+      return reviewed;
+    }, true);
+    openStage(reviewed);
+  }
+
+  /** Lets the assistant start the current stage when nobody worked on it yet. */
+  function openStage(current: SessionOverview | null) {
+    if (current && canOpen(current) && !runningRef.current) {
+      setSelectedStage(null);
+      void runTurns({ opening: current.current_stage });
+    }
   }
 
   return (
@@ -306,6 +351,7 @@ function WorkspaceView({ initialSnapshot }: { initialSnapshot: SessionSnapshot }
           />
           <ChatPanel
             messages={state.messages}
+            stage={session.current_stage}
             streaming={state.streaming}
             error={state.turnError}
             blockedReason={blockedReason}
@@ -319,6 +365,7 @@ function WorkspaceView({ initialSnapshot }: { initialSnapshot: SessionSnapshot }
               sendMessage(message);
             }}
             onSendQueue={sendQueue}
+            onStart={canOpen(session) ? () => openStage(session) : null}
             onRemoveQueued={remove}
           />
         </section>

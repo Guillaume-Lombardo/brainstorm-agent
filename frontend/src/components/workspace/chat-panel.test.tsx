@@ -3,17 +3,24 @@ import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { describe, expect, it, onTestFinished, vi } from "vitest";
 
+import type { Stage } from "@/lib/backend/types";
+
 import { ChatPanel } from "./chat-panel";
 import type { StreamingTurn, TurnFailure } from "./state";
 import type { QueuedMessage } from "./turn-queue";
 import type { ChatMessage } from "./view-model";
 
-function message(role: ChatMessage["role"], content: string): ChatMessage {
-  return { id: `${role}-${content.length}`, role, content };
+function message(
+  role: ChatMessage["role"],
+  content: string,
+  stage: Stage = "stage_0_pitch",
+): ChatMessage {
+  return { id: `${role}-${content.length}`, role, content, stage };
 }
 
 function Harness({
   messages = [],
+  stage = "stage_0_pitch",
   streaming = null,
   error = null,
   blockedReason = null,
@@ -23,8 +30,10 @@ function Harness({
   onSend = vi.fn(),
   onSendQueue = vi.fn(),
   onRemoveQueued = vi.fn(),
+  onStart = null,
 }: {
   messages?: ChatMessage[];
+  stage?: Stage;
   streaming?: StreamingTurn | null;
   error?: TurnFailure | null;
   blockedReason?: string | null;
@@ -34,11 +43,13 @@ function Harness({
   onSend?: (message: string) => void;
   onSendQueue?: () => void;
   onRemoveQueued?: (id: string) => void;
+  onStart?: (() => void) | null;
 }) {
   const [draft, setDraft] = useState("");
   return (
     <ChatPanel
       messages={messages}
+      stage={stage}
       streaming={streaming}
       error={error}
       blockedReason={blockedReason}
@@ -50,6 +61,7 @@ function Harness({
       onSend={onSend}
       onSendQueue={onSendQueue}
       onRemoveQueued={onRemoveQueued}
+      onStart={onStart}
     />
   );
 }
@@ -59,7 +71,62 @@ const queued: QueuedMessage = {
   content: "Who pays?\nFamilies",
 };
 
+/** Conversation in reading order: stage dividers by name, messages by content. */
+function timeline(): (string | null)[] {
+  return [...document.querySelectorAll('[role="separator"], [data-role]')].map(
+    (node) => node.getAttribute("aria-label") ?? node.textContent,
+  );
+}
+
 describe("ChatPanel", () => {
+  it("marks every stage change in the conversation, also when going back", () => {
+    render(
+      <Harness
+        stage="stage_0_pitch"
+        messages={[
+          message("assistant", "Welcome"),
+          message("user", "My pitch"),
+          message("assistant", "Here is the problem.", "stage_1_problem_framing"),
+        ]}
+      />,
+    );
+    expect(timeline()).toEqual([
+      "Welcome",
+      "My pitch",
+      "New stage 1. Problem framing",
+      "Here is the problem.",
+      "Back to stage 0. Pitch",
+    ]);
+  });
+
+  it("marks the new stage before the opening it streams, and after a reply that ends a stage", () => {
+    const messages = [message("user", "My pitch")];
+    const streaming = { turnId: "t", text: "Reply", status: null };
+    const view = render(
+      <Harness
+        stage="stage_1_problem_framing"
+        messages={messages}
+        streaming={{ ...streaming, opening: true }}
+      />,
+    );
+    expect(timeline()).toEqual(["My pitch", "New stage 1. Problem framing", "Reply"]);
+    view.rerender(
+      <Harness stage="stage_1_problem_framing" messages={messages} streaming={streaming} />,
+    );
+    expect(timeline()).toEqual(["My pitch", "Reply", "New stage 1. Problem framing"]);
+  });
+
+  it("offers to start the stage only while nothing runs", async () => {
+    const onStart = vi.fn();
+    const view = render(<Harness onStart={onStart} />);
+    await userEvent.click(screen.getByRole("button", { name: "Start this stage" }));
+    expect(onStart).toHaveBeenCalledOnce();
+    view.rerender(<Harness onStart={onStart} running />);
+    expect(screen.queryByRole("button", { name: "Start this stage" })).toBeNull();
+    view.rerender(<Harness />);
+    expect(screen.queryByRole("button", { name: "Start this stage" })).toBeNull();
+  });
+
   it("sends the trimmed draft with Enter", async () => {
     const onSend = vi.fn();
     render(<Harness onSend={onSend} />);

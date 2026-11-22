@@ -8,7 +8,13 @@ from uuid import uuid4
 
 from brainstorm_agent.core.elicitation import filter_defaults, selected_questions
 from brainstorm_agent.core.enums import Language, Stage
-from brainstorm_agent.core.gate_questions import GATE_ID_PREFIX, gate_questions
+from brainstorm_agent.core.gate_questions import (
+    GATE_ID_PREFIX,
+    PROPOSED_REASON,
+    confirms_proposals,
+    gate_questions,
+    proposed_fields,
+)
 from brainstorm_agent.core.language import session_language
 from brainstorm_agent.core.models import (
     AssistantAnalysis,
@@ -43,7 +49,30 @@ def _turn_language(state: TurnGraphState) -> Language:
     )
 
 
+# Fields merged item by item, by stable identifier.
+MERGED_COLLECTIONS = ("risks_by_category", "mvp_user_stories", "risk_spikes", "cross_cutting_work")
+
 type TurnNode = Callable[[TurnGraphState], Awaitable[dict[str, object]]]
+
+
+def _as_proposal(analysis: AssistantAnalysis, language: Language) -> None:
+    """Keep a stage opening to proposals: without user input nothing is settled.
+
+    Args:
+        analysis (AssistantAnalysis): Opening analysis, modified in place.
+        language (Language): Session language.
+    """
+    analysis.facts = []
+    analysis.decisions = []
+    analysis.resolved_item_ids = []
+    analysis.resolved_question_ids = []
+    analysis.confirmed_fields = []
+    for assumption in analysis.assumptions:
+        assumption.to_confirm = True
+    analysis.partial_fields = [
+        PartialField(field=name, reason=PROPOSED_REASON[language])
+        for name in analysis.extracted_fields.model_dump(exclude_none=True)
+    ]
 
 
 def make_extract_node(llm: BrainstormLLM) -> TurnNode:
@@ -80,6 +109,10 @@ def make_extract_node(llm: BrainstormLLM) -> TurnNode:
                 if q.id in analysis.resolved_question_ids
             ]
         filter_defaults(analysis)
+        if state.get("opening"):
+            _as_proposal(analysis, _turn_language(state))
+        elif current_stage_state and confirms_proposals(state.get("user_text", state["user_message"])):
+            analysis.confirmed_fields.extend(proposed_fields(current_stage_state.partial_fields))
         analysis = merge_analysis(previous=current_stage_state, patch=analysis)
         return {"analysis": analysis.model_dump(mode="json")}
 
@@ -254,25 +287,36 @@ def merge_analysis(*, previous: StageState | None, patch: AssistantAnalysis) -> 
     if previous is None:
         return patch
     patch.clarifications = [*previous.clarifications, *patch.clarifications]
+    fields = previous.extracted_fields.model_dump(exclude_none=True)
+    updates = patch.extracted_fields.model_dump(exclude_none=True)
+    # A proposal needs a confirmation or another value: repeating it, or adding one item to a
+    # proposed collection, says nothing about the rest.
+    unconfirmed = {
+        name
+        for name in proposed_fields(previous.partial_fields)
+        if name in MERGED_COLLECTIONS or updates.get(name) == fields.get(name)
+    }
     partial_fields = {
         **{
             key: reason
             for key, reason in previous.partial_fields.items()
-            if patch.extracted_fields.get(key) is None
+            if key not in patch.confirmed_fields and (key not in updates or key in unconfirmed)
         },
-        **{item.field: item.reason for item in patch.partial_fields},
+        **{
+            item.field: item.reason
+            for item in patch.partial_fields
+            if item.field not in unconfirmed and item.reason not in PROPOSED_REASON.values()
+        },
     }
     patch.partial_fields = [PartialField(field=key, reason=value) for key, value in partial_fields.items()]
-    fields = previous.extracted_fields.model_dump(exclude_none=True)
-    updates = patch.extracted_fields.model_dump(exclude_none=True)
     for name, value in updates.items():
-        if name in {"risks_by_category", "mvp_user_stories", "risk_spikes", "cross_cutting_work"}:
+        if name in MERGED_COLLECTIONS:
             items = {item["id"]: item for item in fields.get(name, [])}
             items.update({item["id"]: item for item in value})
             fields[name] = list(items.values())
         else:
             fields[name] = value
-    for name in ("risks_by_category", "mvp_user_stories", "risk_spikes", "cross_cutting_work"):
+    for name in MERGED_COLLECTIONS:
         if name in fields:
             fields[name] = [item for item in fields[name] if item["id"] not in patch.resolved_item_ids]
     patch.extracted_fields = type(patch.extracted_fields).model_validate(fields)

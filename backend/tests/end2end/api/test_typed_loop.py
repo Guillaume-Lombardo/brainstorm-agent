@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from brainstorm_agent.core.enums import LLMMode, Stage
+import asyncio
+from typing import Any
+
+from brainstorm_agent.core.enums import Language, LLMMode, Stage
+from brainstorm_agent.core.gate_questions import PROPOSAL_QUESTION
 from brainstorm_agent.core.models import AssistantAnalysis, FactItem, OpenQuestionItem
 from brainstorm_agent.core.stage_contracts import STAGE_CONTRACTS, STAGE_MODELS
 from brainstorm_agent.persistence.session import (
@@ -14,7 +18,71 @@ from brainstorm_agent.services.session_service import SessionService
 from brainstorm_agent.settings import Settings
 
 
-def test_every_stage_accumulates_multiple_free_form_turns(tmp_path):  # noqa: C901 - full workflow fixture
+def _complete_fields(stage: Stage) -> dict[str, Any]:
+    """Return fields that pass the coded gate of a stage.
+
+    Args:
+        stage (Stage): Stage to complete.
+
+    Returns:
+        dict[str, Any]: Stage fields.
+    """
+    fields = {}
+    contract = STAGE_CONTRACTS[stage]
+    for name in contract.required_fields:
+        fields[name] = ["Confirmed answer"] if name in contract.list_fields else "Confirmed answer"
+    if stage is Stage.STAGE_0_PITCH:
+        fields["pitch_summary"] = "A tool to export monthly reports"
+    if stage is Stage.STAGE_1_PROBLEM_FRAMING:
+        fields["measurable_objectives"] = ["Reduce delay by 20 percent"]
+    if stage is Stage.STAGE_3_EVENT_STORMING:
+        fields = {"event_storming_relevant": False, "not_relevant_reason": "No domain event workflow"}
+    if stage is Stage.STAGE_5_RISK_STORMING:
+        fields = {
+            "risks_by_category": [
+                {
+                    "id": f"risk-{i}",
+                    "category": "technical" if i % 2 else "business",
+                    "description": "Data loss",
+                    "impact": "high",
+                    "probability": "low",
+                    "mitigation": "Backup",
+                    "action": "Restore drill",
+                }
+                for i in range(3)
+            ],
+        }
+    if stage is Stage.STAGE_6_BACKLOG_SYNTHESIS:
+        fields = {
+            name: [
+                {
+                    "id": name,
+                    "statement": "Deliver validated scope",
+                    "objective": "Reduce delay",
+                    "definition_of_done": "Delay measured",
+                    "link": "risk-0",
+                    "capability": "Confirmed answer",
+                },
+            ]
+            for name in contract.required_fields
+        }
+    if stage is Stage.STAGE_7_DELIVERY_SLICING:
+        fields = {
+            "slices": [
+                {
+                    "id": "slice-0",
+                    "goal": "Walking skeleton and report export",
+                    "backlog_item_ids": ["mvp_user_stories", "risk_spikes", "cross_cutting_work"],
+                    "integration_scenarios": [
+                        {"ears": "WHEN export requested THE SYSTEM SHALL return reports"},
+                    ],
+                },
+            ],
+        }
+    return fields
+
+
+def test_every_stage_accumulates_multiple_free_form_turns(tmp_path):
     settings = Settings(llm_mode=LLMMode.FAKE, database_url=f"sqlite+pysqlite:///{tmp_path / 'loop.db'}")
     engine = create_engine_from_settings(settings)
     create_all(engine)
@@ -23,58 +91,7 @@ def test_every_stage_accumulates_multiple_free_form_turns(tmp_path):  # noqa: C9
         service = SessionService(db_session=db, settings=settings, llm=fake)
         session_id = service.create_session().session_id
         for stage in Stage.ordered():
-            fields = {}
-            contract = STAGE_CONTRACTS[stage]
-            for name in contract.required_fields:
-                fields[name] = ["Confirmed answer"] if name in contract.list_fields else "Confirmed answer"
-            if stage is Stage.STAGE_0_PITCH:
-                fields["pitch_summary"] = "A tool to export monthly reports"
-            if stage is Stage.STAGE_1_PROBLEM_FRAMING:
-                fields["measurable_objectives"] = ["Reduce delay by 20 percent"]
-            if stage is Stage.STAGE_3_EVENT_STORMING:
-                fields = {"event_storming_relevant": False, "not_relevant_reason": "No domain event workflow"}
-            if stage is Stage.STAGE_5_RISK_STORMING:
-                fields = {
-                    "risks_by_category": [
-                        {
-                            "id": f"risk-{i}",
-                            "category": "technical" if i % 2 else "business",
-                            "description": "Data loss",
-                            "impact": "high",
-                            "probability": "low",
-                            "mitigation": "Backup",
-                            "action": "Restore drill",
-                        }
-                        for i in range(3)
-                    ],
-                }
-            if stage is Stage.STAGE_6_BACKLOG_SYNTHESIS:
-                fields = {
-                    name: [
-                        {
-                            "id": name,
-                            "statement": "Deliver validated scope",
-                            "objective": "Reduce delay",
-                            "definition_of_done": "Delay measured",
-                            "link": "risk-0",
-                            "capability": "Confirmed answer",
-                        },
-                    ]
-                    for name in contract.required_fields
-                }
-            if stage is Stage.STAGE_7_DELIVERY_SLICING:
-                fields = {
-                    "slices": [
-                        {
-                            "id": "slice-0",
-                            "goal": "Walking skeleton and report export",
-                            "backlog_item_ids": ["mvp_user_stories", "risk_spikes", "cross_cutting_work"],
-                            "integration_scenarios": [
-                                {"ears": "WHEN export requested THE SYSTEM SHALL return reports"},
-                            ],
-                        },
-                    ],
-                }
+            fields = _complete_fields(stage)
             first_name = next(iter(fields))
             initial_fields = {first_name: fields.pop(first_name)}
             if stage is Stage.STAGE_5_RISK_STORMING:
@@ -127,6 +144,44 @@ def test_every_stage_accumulates_multiple_free_form_turns(tmp_path):  # noqa: C9
             )
         assert len(service.list_documents(session_id)) == 16
         assert len(service.list_messages(session_id)) == 33
+
+
+def test_opened_stages_wait_for_the_user_before_moving_on(tmp_path):
+    settings = Settings(llm_mode=LLMMode.FAKE, database_url=f"sqlite+pysqlite:///{tmp_path / 'open.db'}")
+    engine = create_engine_from_settings(settings)
+    create_all(engine)
+    fake = FakeBrainstormLLM(prompt_loader=PromptLoader())
+
+    def script(stage: Stage, fields: dict[str, Any]) -> None:
+        fake.scripted_responses.append(
+            AssistantAnalysis(
+                stage=stage,
+                summary="Étape préparée",
+                assistant_message="Voici ce que je propose",
+                extracted_fields=STAGE_MODELS[stage].model_validate(fields),
+            ),
+        )
+
+    with create_session_factory(engine)() as db:
+        service = SessionService(db_session=db, settings=settings, llm=fake)
+        session_id = service.create_session().session_id
+        script(Stage.STAGE_0_PITCH, _complete_fields(Stage.STAGE_0_PITCH))
+        service.process_user_message(session_id=session_id, content="Voici mon projet pour les équipes")
+        for stage in Stage.ordered()[1:]:
+            # Even a complete proposal, built on the earlier stages alone, stays a proposal.
+            script(stage, _complete_fields(stage))
+            opening = asyncio.run(service.aopen_stage(session_id=session_id))
+            assert opening.processed_stage is stage
+            assert opening.current_stage is stage
+            assert not opening.stage_clear_enough
+            assert PROPOSAL_QUESTION.question[Language.FR] in {q.question for q in opening.open_questions}
+            script(stage, {})
+            answer = service.process_user_message(
+                session_id=session_id,
+                content=PROPOSAL_QUESTION.options[Language.FR][0],
+            )
+            assert answer.stage_clear_enough
+        assert [turn.role for turn in service.list_messages(session_id)[3:5]] == ["assistant", "user"]
 
 
 def test_vague_pitch_blocks_until_clarification_and_logs_answer(tmp_path):

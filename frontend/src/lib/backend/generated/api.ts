@@ -656,6 +656,34 @@ export interface paths {
     patch: operations["edit_field_api_v1_sessions__session_id__stages__stage__fields__field__patch"];
     trace?: never;
   };
+  "/api/v1/sessions/{session_id}/stages/{stage}/opening": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Open Stage
+     * @description Stream the assistant turn that starts a stage, without any user message.
+     *
+     *     Args:
+     *         session_id (str): Owned session.
+     *         stage (Stage): Current stage, not worked on yet.
+     *         service (Service): Application service.
+     *
+     *     Returns:
+     *         StreamingResponse: Same events as a user turn.
+     */
+    post: operations["open_stage_api_v1_sessions__session_id__stages__stage__opening_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/sessions/{session_id}/stages/{stage}/reopen": {
     parameters: {
       query?: never;
@@ -3564,6 +3592,42 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["SessionOverview"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  open_stage_api_v1_sessions__session_id__stages__stage__opening_post: {
+    parameters: {
+      query?: never;
+      header?: {
+        "X-API-Key"?: string | null;
+        Authorization?: string | null;
+      };
+      path: {
+        session_id: string;
+        stage: components["schemas"]["Stage"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description SSE: event is the discriminant, data is JSON. Deltas are tentative until turn.completed. Exactly one terminal event: turn.completed or error. No replay/resume support. While the turn is silent, a `: keepalive` SSE comment is sent every 15 s; clients ignore it. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+          "text/event-stream": components["schemas"]["TurnEvent"];
         };
       };
       /** @description Validation Error */

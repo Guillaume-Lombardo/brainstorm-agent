@@ -42,6 +42,23 @@ const stagePath = (sessionId: string, stage: Stage) =>
   `${sessionPath(sessionId)}/stages/${encodeURIComponent(stage)}`;
 
 /** Browser-side client of the Next.js proxy (`/api/backend/*`). */
+async function* streamEvents(
+  path: string,
+  body: object,
+  signal?: AbortSignal,
+): AsyncGenerator<TurnEvent> {
+  const response = await fetch(path, {
+    method: "POST",
+    headers: { accept: "text/event-stream", "content-type": "application/json" },
+    body: JSON.stringify(body),
+    signal,
+  });
+  if (!response.ok || !response.body) {
+    throw await apiErrorFromResponse(response);
+  }
+  yield* parseTurnEvents(response.body);
+}
+
 export const api = {
   listSessions(includeArchived: boolean): Promise<SessionPage> {
     return request(`${BASE}${includeArchived ? "?archived=include" : ""}`);
@@ -107,20 +124,11 @@ export const api = {
     return { blob: await response.blob(), filename };
   },
   /** Send a message and yield the turn's typed events as they arrive. */
-  async *sendMessage(
-    sessionId: string,
-    message: string,
-    signal?: AbortSignal,
-  ): AsyncGenerator<TurnEvent> {
-    const response = await fetch(`${sessionPath(sessionId)}/turns`, {
-      method: "POST",
-      headers: { accept: "text/event-stream", "content-type": "application/json" },
-      body: JSON.stringify({ message }),
-      signal,
-    });
-    if (!response.ok || !response.body) {
-      throw await apiErrorFromResponse(response);
-    }
-    yield* parseTurnEvents(response.body);
+  sendMessage(sessionId: string, message: string, signal?: AbortSignal): AsyncGenerator<TurnEvent> {
+    return streamEvents(`${sessionPath(sessionId)}/turns`, { message }, signal);
+  },
+  /** Let the assistant start a stage; same events as a message. */
+  openStage(sessionId: string, stage: Stage, signal?: AbortSignal): AsyncGenerator<TurnEvent> {
+    return streamEvents(`${sessionPath(sessionId)}/stages/${stage}/opening`, {}, signal);
   },
 };

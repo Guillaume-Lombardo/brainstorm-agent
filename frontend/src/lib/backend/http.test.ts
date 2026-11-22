@@ -170,6 +170,21 @@ describe("HttpBackend", () => {
     expect(headersOf(fetchImpl).accept).toBe("text/event-stream");
   });
 
+  it("opens a stage and keeps its conflicts distinct from a pending review", async () => {
+    const body = new ReadableStream<Uint8Array>();
+    const fetchImpl = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(body, { status: 200 }))
+      .mockResolvedValueOnce(Response.json({ detail: "Already started" }, { status: 409 }));
+    const open = () =>
+      client(fetchImpl).streamOpening({ userId: "u" }, SESSION, "stage_1_problem_framing");
+    await expect(open()).resolves.toBe(body);
+    expect(String(fetchImpl.mock.calls[0][0])).toBe(
+      `http://backend:8000/api/v1/sessions/${SESSION}/stages/stage_1_problem_framing/opening`,
+    );
+    await expect(open()).rejects.toMatchObject({ code: "conflict", status: 409 });
+  });
+
   it("raises a pending review before the stream as review_pending", async () => {
     const fetchImpl = vi.fn<typeof fetch>(async () =>
       Response.json({ detail: "Human review pending" }, { status: 409 }),

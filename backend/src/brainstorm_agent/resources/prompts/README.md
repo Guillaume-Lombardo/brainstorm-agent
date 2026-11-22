@@ -30,4 +30,6 @@ Prompts are externalized so they remain reviewable, testable, and easy to evolve
 v2 injects typed stage field descriptions and strict patch schemas at runtime. Field lists
 are derived from the Pydantic contracts, never duplicated in prompt assets. Previous stage
 context is summarized; current state and recent transcript are bounded separately. The rendering
-asset is a template consumed by the deterministic Markdown renderer. v1 remains unchanged.
+asset is a template consumed by the deterministic Markdown renderer. v1 remains unchanged, apart
+from `stages/opening.md`, which both versions need: it drives the turn where the assistant starts a
+stage.
