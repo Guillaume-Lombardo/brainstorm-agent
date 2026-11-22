@@ -62,7 +62,7 @@ committed `.env`. A missing secret makes the deployment fail (`${VAR:?}`).
 | `BRAINSTORM_ADMIN_DISPLAY_NAME` | `Administrator` | Bootstrap administrator display name |
 | `BRAINSTORM_LLM_MODE` | `openai` | `fake` runs the deterministic offline model (tests only) |
 | `BRAINSTORM_LLM_BASE_URL` | `http://10.16.0.117:4000/v1` | OpenAI-compatible gateway |
-| `BRAINSTORM_MODEL_NAME` | `claude-opus-5-5` | Default model: the Opus 5.5 alias of the docker-box gateway (model names are case-sensitive); `GLM-5.3-Flash` is the cheaper alternative |
+| `BRAINSTORM_MODEL_NAME` | `GLM-5.3-Flash` | Default model: an alias of the docker-box gateway (model names are case-sensitive); `claude-opus-5-5` is the stronger, slower alternative |
 | `BRAINSTORM_LLM_OUTPUT_MODE` | `json_object` | Structured output mode (`json_object`, `json_schema`, `tool`). Anthropic models reject the strict `tool` and `json_schema` grammars of the stage analysis as too large, so the stack keeps the schema in the prompt and validates the JSON in the backend |
 | `BRAINSTORM_LLM_MAX_TOKENS` | `32768` | Output budget per LLM call; a detailed stage analysis exceeds 4096 tokens and is then rejected as truncated |
 | `BRAINSTORM_LLM_TIMEOUT_SECONDS` | `300` | Per-call LLM timeout; Opus 5.5 can spend several minutes on one analysis. The turn stream sends a keepalive every 15 seconds meanwhile, so the frontend proxy and the reverse proxies keep a long turn open, retries included |
