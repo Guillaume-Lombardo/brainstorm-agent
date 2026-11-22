@@ -13,6 +13,8 @@ class TurnGraphState(TypedDict):
     session_state: dict[str, Any]
     current_stage: str
     user_message: str
+    # What the user typed, when `user_message` also carries server context (candidates, comments).
+    user_text: NotRequired[str]
     analysis: NotRequired[dict[str, Any]]
     validation: NotRequired[dict[str, Any]]
     markdown: NotRequired[str]

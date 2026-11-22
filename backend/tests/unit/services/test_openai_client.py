@@ -15,7 +15,7 @@ import pytest
 from openai import AsyncOpenAI
 
 from brainstorm_agent.async_runner import run_async
-from brainstorm_agent.core.enums import ChallengePass, LLMMode, Stage, StructuredOutputMode
+from brainstorm_agent.core.enums import ChallengePass, Language, LLMMode, Stage, StructuredOutputMode
 from brainstorm_agent.core.models import (
     AssistantAnalysis,
     BrainstormSessionState,
@@ -182,6 +182,31 @@ def test_analysis_context_replaces_older_messages_by_the_structured_state():
         assert dropped not in prompt
     assert prompt.count("assistant message 3") == 1
     assert "Latest message" in prompt
+
+
+def test_prompts_state_the_session_language():
+    llm = make_llm([payload()])
+    analysis = run_async(
+        llm.analyze(
+            stage=Stage.STAGE_1_PROBLEM_FRAMING,
+            user_message="ok",
+            session_state=BrainstormSessionState(session_id="test"),
+            current_stage_state=None,
+            language=Language.FR,
+        ),
+    )
+    create = cast("AsyncMock", llm.client.chat.completions.create)
+    assert "Session language: French" in create.call_args.kwargs["messages"][-1]["content"]
+
+    async def chunks() -> AsyncIterator[SimpleNamespace]:  # noqa: RUF029
+        yield SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content="Bonjour"))], usage=None)
+
+    create.side_effect = None
+    create.return_value = chunks()
+    run_async(
+        llm.reply(stage=analysis.stage, analysis=analysis, user_message="ok", language=Language.FR),
+    )
+    assert "Session language: French" in create.call_args.kwargs["messages"][0]["content"]
 
 
 def test_invalid_twice_is_actionable():

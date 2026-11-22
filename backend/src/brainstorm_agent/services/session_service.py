@@ -245,6 +245,7 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
                     "session_state": state.model_dump(mode="json"),
                     "current_stage": current_stage.value,
                     "user_message": context,
+                    "user_text": content,
                     "on_delta": on_delta,
                 },
             )

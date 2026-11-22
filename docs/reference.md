@@ -582,7 +582,9 @@ tokens). `LLM_CONTEXT_TURNS=4` bounds the messages sent to the provider (the las
 Older messages are replaced by the structured state the stage document is rendered from: fields,
 facts, assumptions, decisions, risks, uncertainties and questions. Raw past answers
 (clarifications) stay in the document and are not sent. The chat keeps the full history.
-Previous stages contribute their fields and summaries only. Content follows the user's language, while headings
+Previous stages contribute their fields and summaries only. The session language is detected from
+what the user typed (then from earlier turns), never from the benchmark candidates or comments sent
+along, and is stated to the provider. Content follows the user's language, while headings
 and schema keys remain English. Prompt `v1` remains available; `v2` is the default.
 
 `REDIS_LOCK_TIMEOUT_SECONDS` must exceed `OPENAI_TIMEOUT_SECONDS` times 3 (challenge off)

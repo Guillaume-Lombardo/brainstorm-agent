@@ -31,3 +31,11 @@ def test_session_language_prefers_the_latest_message_then_earlier_user_turns() -
     ]
     assert session_language("", transcript) is Language.FR
     assert session_language("We target the sales team.", transcript) is Language.EN
+
+
+def test_session_language_falls_back_to_the_assistant_replies() -> None:
+    transcript = [
+        {"role": "assistant", "content": "Quelles contraintes s'appliquent au projet ?"},
+        {"role": "user", "content": "B"},
+    ]
+    assert session_language("ok", transcript) is Language.FR
