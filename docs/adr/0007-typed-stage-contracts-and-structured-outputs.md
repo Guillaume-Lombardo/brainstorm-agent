@@ -30,7 +30,10 @@ are logged with their error types only.
 
 Separate structured analysis from conversational reply streaming. A challenge may append findings
 but cannot replace business values. Deterministic gates remain authoritative. Context includes
-current values/coverage, a bounded transcript and previous-stage summaries. Provider usage,
+current values/coverage, a bounded transcript and previous-stage summaries. The structured state is
+the synthetic form of the older messages, so the transcript is limited to the last two exchanges
+(answers queued during a turn may refer to the previous reply) and raw clarifications, rendered
+text and gate verdicts are not sent. The stored messages are untouched. Provider usage,
 including retries and replies, is stored with turn ids in session JSON, requiring no SQL migration.
 The fake adapter supports scripted analysis and explicit field fixtures without making network calls.
 

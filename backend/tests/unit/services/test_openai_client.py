@@ -16,7 +16,13 @@ from openai import AsyncOpenAI
 
 from brainstorm_agent.async_runner import run_async
 from brainstorm_agent.core.enums import ChallengePass, LLMMode, Stage, StructuredOutputMode
-from brainstorm_agent.core.models import AssistantAnalysis, BrainstormSessionState
+from brainstorm_agent.core.models import (
+    AssistantAnalysis,
+    BrainstormSessionState,
+    Clarification,
+    DecisionItem,
+    StageState,
+)
 from brainstorm_agent.exceptions import LLMResponseError
 from brainstorm_agent.services.llm_client import (
     SERVER_OWNED_FIELDS,
@@ -138,6 +144,46 @@ def test_analysis_without_server_owned_fields_is_accepted():
     assert cast("AsyncMock", llm.client.chat.completions.create).await_count == 1
 
 
+def test_analysis_context_replaces_older_messages_by_the_structured_state():
+    llm = make_llm([payload()])
+    stage = Stage.STAGE_1_PROBLEM_FRAMING
+    run_async(
+        llm.analyze(
+            stage=stage,
+            user_message="Latest message",
+            session_state=BrainstormSessionState(
+                session_id="test",
+                transcript=[
+                    {"role": role, "content": f"{role} message {turn}"}
+                    for turn in range(4)
+                    for role in ("user", "assistant")
+                ],
+            ),
+            current_stage_state=StageState(
+                stage=stage,
+                summary="Structured summary",
+                assistant_message="assistant message 3",
+                clarifications=[Clarification(question_id="q", question="Who?", answer="Raw old answer")],
+                decisions=[DecisionItem(id="d1", statement="Kept decision")],
+                latest_markdown="# Rendered document",
+            ),
+        ),
+    )
+    prompt = cast("AsyncMock", llm.client.chat.completions.create).call_args.kwargs["messages"][-1]["content"]
+    for kept in (
+        "user message 2",
+        "assistant message 2",
+        "user message 3",
+        "Structured summary",
+        "Kept decision",
+    ):
+        assert kept in prompt
+    for dropped in ("message 0", "message 1", "Raw old answer", "# Rendered document"):
+        assert dropped not in prompt
+    assert prompt.count("assistant message 3") == 1
+    assert "Latest message" in prompt
+
+
 def test_invalid_twice_is_actionable():
     llm = make_llm(["bad", "bad"])
     with pytest.raises(LLMResponseError, match="LLM_OUTPUT_MODE"):
@@ -199,6 +245,7 @@ def test_reply_stream_accounts_usage():
 def test_reply_keeps_the_analysis_as_internal_context():
     llm = make_llm([payload()])
     analysis = analyze(llm)
+    analysis.clarifications = [Clarification(question_id="q", question="Who?", answer="Raw old answer")]
 
     async def chunks() -> AsyncIterator[SimpleNamespace]:  # noqa: RUF029
         yield SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content="Bonjour"))], usage=None)
@@ -211,7 +258,9 @@ def test_reply_keeps_the_analysis_as_internal_context():
     # The shared system prompt asks for JSON on structured tasks: the reply must not echo it.
     assert "never output json" in system["content"].lower()
     assert user["content"].startswith("User message:\nMon pitch\n\n")
-    assert analysis.model_dump_json() in user["content"].split("Internal analysis", 1)[1]
+    internal = user["content"].split("Internal analysis", 1)[1]
+    assert analysis.model_dump_json(exclude={"clarifications"}) in internal
+    assert "Raw old answer" not in internal
 
 
 def test_challenge_only_appends_findings():

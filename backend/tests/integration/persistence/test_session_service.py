@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import pytest
 from pydantic import ValidationError
 
-from brainstorm_agent.core.enums import LLMMode, Stage
+from brainstorm_agent.core.enums import LLMMode, MessageRole, Stage
 from brainstorm_agent.core.models import AssistantAnalysis, OpenQuestionItem, QuestionPriority
 from brainstorm_agent.exceptions import ConflictError, LLMResponseError
 from brainstorm_agent.persistence.session import (
@@ -79,6 +79,25 @@ def test_session_service_persists_versions_and_resolves_open_questions(tmp_path:
         assert len(stage_1_documents) == 2
         assert stage_1_documents[-1].version == 2
         assert service.get_session(session.session_id).open_questions == []
+
+
+def test_chat_keeps_every_message_while_the_model_window_stays_bounded(tmp_path: Path) -> None:
+    settings = _build_settings(tmp_path)
+    settings.llm_context_turns = 2
+    engine = create_engine_from_settings(settings)
+    create_all(engine)
+
+    with create_session_factory(engine)() as db_session:
+        service = SessionService(db_session=db_session, settings=settings)
+        session_id = service.create_session().session_id
+        sent = ["pitch: Un outil pour les équipes.", *[f"ok {turn}" for turn in range(6)]]
+        outputs = [service.process_user_message(session_id=session_id, content=item) for item in sent]
+
+        stored = [item.content for item in service.list_messages(session_id) if item.role is MessageRole.USER]
+        assert stored == sent
+        assert len(service.sessions.to_state(service._require_owned(session_id)).transcript) == 8
+        # Three neutral answers fit in the stored window: the questions keep the session language.
+        assert outputs[3].open_questions[0].question.startswith("Quel")
 
 
 def test_session_service_requires_human_review_when_enabled(tmp_path: Path) -> None:

@@ -10,6 +10,8 @@ from brainstorm_agent.core.enums import Language
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
+# Messages kept in the session state: short answers ("B", "ok") carry no language by themselves.
+LANGUAGE_MEMORY_MESSAGES = 8
 _WORD = re.compile(r"[a-zà-ÿœæ']+")
 _FRENCH_LETTERS = frozenset("àâçéèêëîïôûùüÿœæ")
 _MARKERS = {
