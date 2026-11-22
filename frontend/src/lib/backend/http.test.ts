@@ -131,6 +131,19 @@ describe("HttpBackend", () => {
     },
   );
 
+  it("returns the documents archive as raw bytes", async () => {
+    const bytes = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0xff, 0x00]);
+    const fetchImpl = vi.fn<typeof fetch>(
+      async () => new Response(bytes, { headers: { "content-type": "application/zip" } }),
+    );
+    const archive = await client(fetchImpl).exportArchive({ userId: "u" }, SESSION);
+    expect(new Uint8Array(archive)).toEqual(bytes);
+    expect(String(fetchImpl.mock.calls[0][0])).toBe(
+      `http://backend:8000/api/v1/sessions/${SESSION}/export/archive`,
+    );
+    expect(headersOf(fetchImpl).accept).toBe("application/zip");
+  });
+
   it("sends typed field values and review actions", async () => {
     const fetchImpl = vi.fn<typeof fetch>(async () => Response.json({}));
     const backend = client(fetchImpl);

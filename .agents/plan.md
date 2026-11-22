@@ -356,6 +356,14 @@ ADR impact: ADR 0007, ADR 0010 and ADR 0011 updated.
 - [x] Open the new stage after an automatic transition or an approval, with a manual fallback.
 - [x] Mark stage changes in the conversation.
 
+### Lot 14: Documents archive
+
+Validated scope: one download with every document of a session.
+ADR impact: ADR 0010 updated.
+
+- [x] Serve a ZIP with the consolidated document, one file per stage and the exportable delivery plan.
+- [x] Offer it first in the Export menu.
+
 ### Production cross-path acceptance fixes
 
 Validated scope: reproduce the deployed expense-sharing journey; correct the Questions panel's

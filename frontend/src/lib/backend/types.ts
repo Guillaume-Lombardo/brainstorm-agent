@@ -77,7 +77,7 @@ export function isReviewAction(value: string): value is ReviewAction {
 }
 
 /** Export endpoints of the backend (`/api/v1/sessions/{id}/export/{format}`). */
-const EXPORT_FORMATS = ["markdown", "json", "slice_specs", "backlog_json"] as const;
+const EXPORT_FORMATS = ["archive", "markdown", "json", "slice_specs", "backlog_json"] as const;
 export type ExportFormat = (typeof EXPORT_FORMATS)[number];
 
 export function isExportFormat(value: string): value is ExportFormat {

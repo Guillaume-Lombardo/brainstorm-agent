@@ -324,6 +324,17 @@ export class HttpBackend {
     });
   }
 
+  /** ZIP of every document; delivery files are left out while the plan is not exportable. */
+  async exportArchive(caller: Caller, sessionId: string): Promise<ArrayBuffer> {
+    const response = await this.call(
+      { caller },
+      "get",
+      "/api/v1/sessions/{session_id}/export/archive",
+      { path: { session_id: sessionId }, accept: "application/zip" },
+    );
+    return response.arrayBuffer();
+  }
+
   private async json<P extends Path, M extends Method>(
     auth: Auth,
     method: M,

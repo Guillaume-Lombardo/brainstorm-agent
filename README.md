@@ -24,7 +24,7 @@ versioned document for every stage.
 - 🚦 **Quality gates in code**: required fields, measurable objectives and blocking questions are
   checked deterministically before any transition.
 - 📄 **Living documents**: facts, assumptions, decisions, risks and open questions, versioned with
-  diffs, exported as Markdown or JSON.
+  diffs, exported as Markdown, JSON or a ZIP of every document.
 - 🔎 **Similar products research** during problem framing, with sources.
 - 🔌 **Model-agnostic**: any OpenAI-compatible endpoint (through LiteLLM), and usable itself as an
   OpenAI-compatible model from OpenWebUI.

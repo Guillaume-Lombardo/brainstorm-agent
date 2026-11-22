@@ -22,6 +22,7 @@ import { api } from "@/lib/api/client";
 import type { ExportFormat } from "@/lib/backend/types";
 
 const EXPORTS: { format: ExportFormat; label: string }[] = [
+  { format: "archive", label: "All documents (ZIP)" },
   { format: "markdown", label: "Framing document (Markdown)" },
   { format: "json", label: "Session (JSON)" },
   { format: "slice_specs", label: "Slice specs (Markdown)" },

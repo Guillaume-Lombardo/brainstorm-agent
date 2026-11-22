@@ -55,6 +55,9 @@ the shapes differ; real HTTP wiring is lot 7b.
 Consolidated Markdown and JSON exports remain available. Backlog JSON and slice specifications delegate to the delivery export functions introduced in
 lot 4. Backlog exports include effective dependencies, full items and delivery waves; slice specs
 map safe filenames to Markdown. Missing, invalid or stale delivery plans return 409.
+The archive export bundles the same documents, one Markdown file per stage, as a ZIP built in memory
+by the service, so that authorization and delivery rules stay in one place. It leaves the delivery
+files out instead of failing while the plan is not exportable.
 CORS is disabled by default and accepts an explicit configured origin allowlist.
 
 ## Consequences

@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+
 import { expect, test, type Page } from "@playwright/test";
 
 import { E2E_PASSWORD } from "../scripts/e2e-env.mjs";
@@ -156,6 +158,17 @@ test("login, new session, streamed turn, updated document, review and approval",
   const download = page.waitForEvent("download");
   await page.getByRole("menuitem", { name: "Framing document (Markdown)" }).click();
   expect((await download).suggestedFilename()).toMatch(/^brainstorm-[0-9a-f]{8}-framing\.md$/);
+
+  await page.getByRole("button", { name: "Export" }).click();
+  const archiveDownload = page.waitForEvent("download");
+  await page.getByRole("menuitem", { name: "All documents (ZIP)" }).click();
+  const archive = await archiveDownload;
+  expect(archive.suggestedFilename()).toMatch(/^brainstorm-[0-9a-f]{8}-documents\.zip$/);
+  // ZIP entry names are stored uncompressed.
+  const bytes = (await readFile(await archive.path())).toString("latin1");
+  expect(bytes.startsWith("PK")).toBe(true);
+  expect(bytes).toContain("framing.md");
+  expect(bytes).toContain("stages/stage_0_pitch.md");
 
   // The sessions list reflects the new stage.
   await page.getByRole("link", { name: "Sessions", exact: true }).click();
