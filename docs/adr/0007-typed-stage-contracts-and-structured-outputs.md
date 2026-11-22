@@ -82,5 +82,14 @@ New metadata persists in session JSON, preserving compatibility without SQL migr
 
 D5 uses an explicit allowlist of non-critical analytical gaps. Defaults remain assumptions marked
 to confirm and never populate fields, including when a provider proposes a critical default.
+A stage opening is a turn without user input (ADR 0010). The server turns everything it extracts
+into proposals: facts, decisions and resolutions are dropped, every assumption is to confirm, and
+every field is partial with a server-owned reason, so an opening cannot pass any gate. Only the user
+settles a proposal: by the confirming answer, recognized in code; by an explicit confirmation the
+provider reports in `confirmed_fields`; or by another value. A repeated value, or one more item in
+a collection merged by id, leaves the proposal open. All proposals share one gate question, and an optional proposed field holds
+the gate like a required one, because later stages read it. A delivery plan still proposed is not
+exported.
+
 Numeric targets, a minimum pitch length and placeholder rejection provide deterministic structural
 specificity checks; they cannot certify the truth or full semantic consistency of free text.

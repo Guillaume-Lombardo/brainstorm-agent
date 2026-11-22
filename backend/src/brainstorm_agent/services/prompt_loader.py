@@ -91,6 +91,14 @@ class PromptLoader:
         }
         return self._read(stage_map[stage])
 
+    def opening_prompt(self) -> str:
+        """Return the prompt for the assistant turn that opens a stage.
+
+        Returns:
+            str: Stage opening prompt text.
+        """
+        return self._read("stages/opening.md")
+
     def completeness_prompt(self) -> str:
         """Return the completeness evaluation prompt.
 

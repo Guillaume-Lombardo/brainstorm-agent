@@ -5,26 +5,30 @@ import {
   ListOrderedIcon,
   ListPlusIcon,
   LoaderCircleIcon,
+  PlayIcon,
   SendIcon,
   XIcon,
 } from "lucide-react";
-import { memo, useEffect, useRef, type KeyboardEvent } from "react";
+import { Fragment, memo, useEffect, useRef, type KeyboardEvent } from "react";
 
 import { ErrorState } from "@/components/error-state";
 import { Markdown } from "@/components/markdown";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import type { Stage } from "@/lib/backend/types";
 import { cn } from "@/lib/utils";
 
 import type { StreamingTurn, TurnFailure } from "./state";
 import { continueList, toggleList, type ListKind, type TextEdit } from "./list-input";
+import { StageDivider } from "./stage-divider";
 import { failureToError } from "./turn";
 import type { QueuedMessage } from "./turn-queue";
 import type { ChatMessage } from "./view-model";
 
 export function ChatPanel({
   messages,
+  stage,
   streaming,
   error,
   blockedReason,
@@ -36,8 +40,11 @@ export function ChatPanel({
   onSend,
   onSendQueue,
   onRemoveQueued,
+  onStart = null,
 }: {
   messages: ChatMessage[];
+  /** Current stage of the session. */
+  stage: Stage;
   streaming: StreamingTurn | null;
   error: TurnFailure | null;
   /** Why sending is disabled (pending review, archived session). */
@@ -52,6 +59,8 @@ export function ChatPanel({
   onSend: (message: string) => void;
   onSendQueue: () => void;
   onRemoveQueued: (id: string) => void;
+  /** Lets the assistant start the current stage, when it did not yet. */
+  onStart?: (() => void) | null;
 }) {
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -72,8 +81,11 @@ export function ChatPanel({
     if (followRef.current) {
       endRef.current?.scrollIntoView?.({ block: "end" });
     }
-  }, [messages.length, streaming?.text]);
+  }, [messages.length, stage, streaming?.text]);
 
+  const lastStage = messages.at(-1)?.stage;
+  const stageChange =
+    lastStage && lastStage !== stage ? <StageDivider from={lastStage} to={stage} /> : null;
   const canSend = !pending && blockedReason === null && draft.trim().length > 0;
 
   function submit() {
@@ -129,9 +141,19 @@ export function ChatPanel({
             No message yet. Pitch your project.
           </p>
         ) : null}
-        {messages.map((message) => (
-          <MessageBubble key={message.id} role={message.role} content={message.content} />
-        ))}
+        {messages.map((message, index) => {
+          const previous = messages[index - 1]?.stage ?? message.stage;
+          return (
+            <Fragment key={message.id}>
+              {previous === message.stage ? null : (
+                <StageDivider from={previous} to={message.stage} />
+              )}
+              <MessageBubble role={message.role} content={message.content} />
+            </Fragment>
+          );
+        })}
+        {/* A reply still streaming belongs to the stage it answers, unless it opens the new one. */}
+        {streaming?.opening ? stageChange : null}
         {streaming ? (
           <div className="flex flex-col gap-1" data-testid="streaming-turn">
             {streaming.status ? (
@@ -142,6 +164,13 @@ export function ChatPanel({
             ) : null}
             {streaming.text ? <MessageBubble role="assistant" content={streaming.text} /> : null}
           </div>
+        ) : null}
+        {streaming?.opening ? null : stageChange}
+        {onStart && !running && !pending ? (
+          <Button type="button" variant="outline" className="self-center" onClick={onStart}>
+            <PlayIcon />
+            Start this stage
+          </Button>
         ) : null}
         <div ref={endRef} />
       </div>

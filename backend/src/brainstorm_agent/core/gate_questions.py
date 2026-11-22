@@ -6,6 +6,7 @@ requirement as a question a user can answer, in the session language (decision D
 
 from __future__ import annotations
 
+import itertools
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 from uuid import uuid4
@@ -53,6 +54,13 @@ MISSING_WHY = _text(
 PARTIAL_WHY = _text(
     "Only partly answered so far: {reason}",
     "Réponse encore partielle : {reason}",
+)
+
+
+# Reason put on the values the assistant prepares when it opens a stage.
+PROPOSED_REASON = _text(
+    "proposed from the earlier stages, to confirm",
+    "proposé à partir des étapes précédentes, à confirmer",
 )
 
 
@@ -486,6 +494,22 @@ RULE_QUESTIONS: dict[str, Wording] = {
 }
 
 
+PROPOSAL_QUESTION = Wording(
+    _text(
+        "Do you confirm the proposals prepared for this stage?",
+        "Confirmez-vous les propositions préparées pour cette étape ?",
+    ),
+    _text(
+        "They come from the earlier stages and only count once you confirm them.",
+        "Elles viennent des étapes précédentes et ne comptent qu'une fois confirmées.",
+    ),
+    _options(
+        ("Yes, I confirm all of them", "I want to change some: I will say which"),
+        ("Oui, je les confirme toutes", "Je veux en modifier : je précise lesquelles"),
+    ),
+)
+
+
 def _question(
     wording: Wording,
     *,
@@ -502,6 +526,39 @@ def _question(
         recommended_option=options[0],
         field=target,
     )
+
+
+def proposed_fields(partial_fields: dict[str, str]) -> set[str]:
+    """Return the fields still waiting for the user to confirm an opening proposal.
+
+    Args:
+        partial_fields (dict[str, str]): Partial coverage reasons by field.
+
+    Returns:
+        set[str]: Proposed field names.
+    """
+    return {name for name, reason in partial_fields.items() if reason in PROPOSED_REASON.values()}
+
+
+def confirms_proposals(text: str) -> bool:
+    """Tell whether the user picked the answer that confirms every proposal.
+
+    Args:
+        text (str): What the user typed or selected.
+
+    Returns:
+        bool: True when the confirming option is the whole message or directly answers its question.
+    """
+    lines = [line.strip() for line in text.strip().splitlines()]
+    return any(
+        lines == [options[0]]
+        or (PROPOSAL_QUESTION.question[language], options[0]) in itertools.pairwise(lines)
+        for language, options in PROPOSAL_QUESTION.options.items()
+    )
+
+
+def _gate_id() -> str:
+    return f"{GATE_ID_PREFIX}{uuid4().hex[:GATE_ID_HEX_LENGTH]}"
 
 
 def field_question(name: str, *, language: Language, partial_reason: str | None = None) -> OpenQuestionItem:
@@ -550,7 +607,23 @@ def gate_questions(
     asked = {q.field for q in model_questions if q.field and q.status is OpenQuestionStatus.OPEN}
     failed = [item for item in validation.readiness if not item.passed and item.id != "blocking_questions"]
     failed_fields = {item.id.removeprefix("field:") for item in failed if item.id.startswith("field:")}
+    proposed = {
+        name
+        for name in failed_fields & proposed_fields(partial_fields)
+        if validation.coverage.get(name) is CoverageStatus.PARTIAL
+    }
+    failed = [item for item in failed if item.id.removeprefix("field:") not in proposed]
     questions = []
+    if proposed:
+        # One question for the whole proposal instead of one per field.
+        questions.append(
+            _question(
+                PROPOSAL_QUESTION,
+                language=language,
+                why=PROPOSAL_QUESTION.why[language],
+                target=None,
+            ).model_copy(update={"id": _gate_id()}),
+        )
     for item in failed:
         if item.id.startswith("field:"):
             name = item.id.removeprefix("field:")
@@ -573,7 +646,5 @@ def gate_questions(
             )
         if question.field in asked:
             continue
-        questions.append(
-            question.model_copy(update={"id": f"{GATE_ID_PREFIX}{uuid4().hex[:GATE_ID_HEX_LENGTH]}"}),
-        )
+        questions.append(question.model_copy(update={"id": _gate_id()}))
     return questions

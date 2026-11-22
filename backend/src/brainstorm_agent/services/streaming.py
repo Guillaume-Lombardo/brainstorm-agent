@@ -29,7 +29,7 @@ class Keepalive:
 async def stream_in_worker(
     service: SessionService,
     session_id: str,
-    content: str,
+    content: str | None,
     keepalive_seconds: float | None = None,
 ) -> AsyncGenerator[TurnEvent | Keepalive]:
     """Run a session turn on one dedicated worker, relaying events and cancellation.
@@ -42,7 +42,7 @@ async def stream_in_worker(
     Args:
         service (SessionService): Authorized request-scoped service.
         session_id (str): Owned session id.
-        content (str): User input.
+        content (str | None): User input, or None when the assistant opens the stage.
         keepalive_seconds (float | None): Silence before each keepalive; defaults
             to ``TURN_KEEPALIVE_SECONDS``.
 

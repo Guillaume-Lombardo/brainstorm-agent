@@ -2,7 +2,7 @@
 
 from collections.abc import AsyncIterator  # noqa: TC003
 from contextlib import aclosing
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
@@ -231,17 +231,60 @@ def export_specs(session_id: str, service: Service) -> SliceSpecsExport:
     return service.export_slice_specs(session_id)
 
 
-@router.post(
-    "/{session_id}/turns",
-    responses={
-        200: {
-            "description": "SSE: event is the discriminant, data is JSON. Deltas are tentative until turn.completed. "
-            "Exactly one terminal event: turn.completed or error. No replay/resume support. "
-            "While the turn is silent, a `: keepalive` SSE comment is sent every 15 s; clients ignore it.",
-            "content": {"text/event-stream": {"schema": {"$ref": "#/components/schemas/TurnEvent"}}},
-        },
+TURN_STREAM_RESPONSES: dict[int | str, dict[str, Any]] = {
+    200: {
+        "description": "SSE: event is the discriminant, data is JSON. Deltas are tentative until turn.completed. "
+        "Exactly one terminal event: turn.completed or error. No replay/resume support. "
+        "While the turn is silent, a `: keepalive` SSE comment is sent every 15 s; clients ignore it.",
+        "content": {"text/event-stream": {"schema": {"$ref": "#/components/schemas/TurnEvent"}}},
     },
-)
+}
+
+
+def _turn_response(service: SessionService, session_id: str, content: str | None) -> StreamingResponse:
+    """Relay one worker turn as Server-Sent Events.
+
+    Args:
+        service (SessionService): Authorized request-scoped service.
+        session_id (str): Owned session.
+        content (str | None): User message, or None when the assistant opens the stage.
+
+    Returns:
+        StreamingResponse: Typed event stream.
+    """
+
+    async def events() -> AsyncIterator[str]:
+        async with aclosing(stream_in_worker(service, session_id, content)) as stream:
+            async for event in stream:
+                if isinstance(event, Keepalive):
+                    yield ": keepalive\n\n"
+                else:
+                    yield f"event: {event.type}\ndata: {event.model_dump_json()}\n\n"
+
+    return StreamingResponse(
+        events(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@router.post("/{session_id}/stages/{stage}/opening", responses=TURN_STREAM_RESPONSES)
+async def open_stage(session_id: str, stage: Stage, service: Service) -> StreamingResponse:
+    """Stream the assistant turn that starts a stage, without any user message.
+
+    Args:
+        session_id (str): Owned session.
+        stage (Stage): Current stage, not worked on yet.
+        service (Service): Application service.
+
+    Returns:
+        StreamingResponse: Same events as a user turn.
+    """
+    await run_in_threadpool(service.prepare_opening, session_id, stage)
+    return _turn_response(service, session_id, None)
+
+
+@router.post("/{session_id}/turns", responses=TURN_STREAM_RESPONSES)
 async def stream_turn(session_id: str, payload: PostMessageRequest, service: Service) -> StreamingResponse:
     """Stream analysis status, live reply deltas, committed state, and terminal result.
 
@@ -254,20 +297,7 @@ async def stream_turn(session_id: str, payload: PostMessageRequest, service: Ser
         StreamingResponse: Application service result.
     """
     await run_in_threadpool(service.prepare_turn, session_id)
-
-    async def events() -> AsyncIterator[str]:
-        async with aclosing(stream_in_worker(service, session_id, payload.content)) as stream:
-            async for event in stream:
-                if isinstance(event, Keepalive):
-                    yield ": keepalive\n\n"
-                else:
-                    yield f"event: {event.type}\ndata: {event.model_dump_json()}\n\n"
-
-    return StreamingResponse(
-        events(),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
-    )
+    return _turn_response(service, session_id, payload.content)
 
 
 @router.get("/{session_id}/research")

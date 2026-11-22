@@ -12,6 +12,7 @@ import {
 
 import {
   answerMessage,
+  canOpen,
   canReopen,
   contractMatrix,
   currentQuestions,
@@ -55,6 +56,29 @@ describe("canReopen", () => {
     expect(canReopen(session, "stage_1_problem_framing")).toBe(true);
     expect(canReopen(session, "stage_2_user_story_mapping")).toBe(false);
     expect(canReopen(sessionFixture(), "stage_0_pitch")).toBe(false);
+  });
+});
+
+describe("canOpen", () => {
+  it("lets the assistant start a new stage once, after the pitch and outside a review", () => {
+    const fresh = { stage_states: {}, current_stage: "stage_3_event_storming" as const };
+    expect(canOpen(stage2Session(fresh))).toBe(true);
+    expect(canOpen(stage2Session())).toBe(false);
+    expect(canOpen(sessionFixture())).toBe(false);
+    expect(canOpen(stage2Session({ ...fresh, archived: true }))).toBe(false);
+    expect(
+      canOpen(
+        stage2Session({
+          ...fresh,
+          pending_human_review: {
+            from_stage: "stage_3_event_storming",
+            to_stage: "stage_4_impact_mapping",
+            summary: "",
+            transition_decision_reason: "",
+          },
+        }),
+      ),
+    ).toBe(false);
   });
 });
 

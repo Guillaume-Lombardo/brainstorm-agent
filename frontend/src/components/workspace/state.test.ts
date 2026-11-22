@@ -6,6 +6,7 @@ import { sessionFixture, stage2Session, stageStateFixture, turnFixture } from "@
 import { initialWorkspaceState, workspaceReducer, type WorkspaceState } from "./state";
 
 const session = stage2Session();
+const STAGE = "stage_2_user_story_mapping";
 const history = [
   turnFixture({ id: "m1", role: "user", content: "pitch: meals" }),
   turnFixture({ id: "m2", role: "assistant", content: "Noted." }),
@@ -15,7 +16,7 @@ function submitted(): WorkspaceState {
   const state = initialWorkspaceState({ session, messages: history });
   return workspaceReducer(state, {
     type: "turn.submitted",
-    message: { id: "local-1", role: "user", content: "Hello" },
+    message: { id: "local-1", role: "user", content: "Hello", stage: STAGE },
   });
 }
 
@@ -50,8 +51,8 @@ describe("workspaceReducer", () => {
   it("maps the stored conversation to chat messages", () => {
     const state = initialWorkspaceState({ session, messages: history });
     expect(state.messages).toEqual([
-      { id: "m1", role: "user", content: "pitch: meals" },
-      { id: "m2", role: "assistant", content: "Noted." },
+      { id: "m1", role: "user", content: "pitch: meals", stage: history[0].stage },
+      { id: "m2", role: "assistant", content: "Noted.", stage: history[1].stage },
     ]);
   });
 
@@ -73,8 +74,32 @@ describe("workspaceReducer", () => {
 
     state = apply(state, completed);
     expect(state.streaming).toBeNull();
-    expect(state.messages.at(-1)).toEqual({ id: "t1", role: "assistant", content: "Hi there" });
+    expect(state.messages.at(-1)).toEqual({
+      id: "t1",
+      role: "assistant",
+      content: "Hi there",
+      stage: STAGE,
+    });
     expect(state.messages.some((message) => message.local)).toBe(false);
+  });
+
+  it("streams a stage opening without a user message, and keeps the draft if it fails", () => {
+    let state = initialWorkspaceState({ session, messages: history });
+    state = workspaceReducer(state, { type: "draft.changed", draft: "Being typed" });
+    state = workspaceReducer(state, { type: "opening.started" });
+    state = apply(
+      state,
+      { type: "turn.started", turn_id: "t1", stage: STAGE },
+      { type: "analysis.status", status: "running" },
+    );
+    expect(state.streaming).toMatchObject({ status: "Preparing the stage…", opening: true });
+    expect(state.messages).toHaveLength(2);
+    expect(apply(state, completed).messages.map(({ id }) => id)).toEqual(["m1", "m2", "t1"]);
+
+    const failed = apply(state, { type: "error", code: "turn_failed", message: "Model failed" });
+    expect(failed.streaming).toBeNull();
+    expect(failed.draft).toBe("Being typed");
+    expect(failed.messages).toHaveLength(2);
   });
 
   it("applies document, coverage, stage and review events", () => {
@@ -134,7 +159,7 @@ describe("workspaceReducer", () => {
     let state = workspaceReducer(submitted(), { type: "draft.changed", draft: "Also this" });
     state = workspaceReducer(state, {
       type: "turn.submitted",
-      message: { id: "local-2", role: "user", content: "Queued answers" },
+      message: { id: "local-2", role: "user", content: "Queued answers", stage: STAGE },
     });
     expect(state.draft).toBe("Also this");
     state = apply(state, { type: "error", code: "turn_failed", message: "Model failed" });

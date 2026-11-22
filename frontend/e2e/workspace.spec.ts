@@ -129,9 +129,21 @@ test("login, new session, streamed turn, updated document, review and approval",
   expect(refused.status()).toBe(409);
   expect(await refused.json()).toMatchObject({ error: { code: "review_pending" } });
 
+  const opening = page.waitForResponse((response) =>
+    response.url().endsWith("/stages/stage_1_problem_framing/opening"),
+  );
   await page.getByRole("button", { name: "Approve" }).click();
   await expect(page.getByText("Current: Problem framing")).toBeVisible();
   await expect(page.getByLabel("Message")).toBeEnabled();
+  // The assistant starts the new stage by itself, below a marker in the conversation.
+  expect((await opening).ok()).toBe(true);
+  await expect(page.getByTestId("streaming-turn")).toHaveCount(0);
+  const marker = page.getByRole("separator", { name: "New stage 1. Problem framing" });
+  await expect(marker).toBeVisible();
+  const conversation = page.getByRole("region", { name: "Conversation" });
+  await expect(conversation.locator('[data-role="user"]')).toHaveCount(1);
+  await expect(conversation.locator('[role="separator"] ~ [data-role="assistant"]')).toHaveCount(1);
+  await page.screenshot({ path: `${SCREENSHOTS}/04-stage-opened.png` });
   // The approved stage stays readable, validated and reopenable.
   await page.getByRole("button", { name: /0\. Pitch/ }).click();
   await expect(page.getByTestId("stage-details")).toContainText("Validated");
@@ -148,6 +160,34 @@ test("login, new session, streamed turn, updated document, review and approval",
   // The sessions list reflects the new stage.
   await page.getByRole("link", { name: "Sessions", exact: true }).click();
   await expect(page.getByRole("link", { name: title })).toBeVisible();
+});
+
+test("a stage whose opening failed can be started by hand, once", async ({ page }) => {
+  await signIn(page, "opening@example.com");
+  const sessionId = await createSession(page, `Opening ${Date.now()}`);
+  await send(page, PITCH);
+  await expect(page.getByText("Input paused")).toBeVisible();
+  const openings = `**/api/backend/sessions/${sessionId}/stages/*/opening`;
+  await page.route(openings, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "text/event-stream",
+      body: sseFrames(
+        { type: "turn.started", turn_id: "t1", stage: "stage_1_problem_framing" },
+        { type: "error", code: "turn_failed", message: "The language model failed." },
+      ),
+    }),
+  );
+  await page.getByRole("button", { name: "Approve" }).click();
+  await expect(page.getByText("The assistant failed")).toBeVisible();
+  await page.unroute(openings);
+
+  // Nothing restarts by itself on a reload; the marker and the button stay.
+  await page.reload();
+  await expect(page.getByRole("separator", { name: "New stage 1. Problem framing" })).toBeVisible();
+  await page.getByRole("button", { name: "Start this stage" }).click();
+  await expect(page.getByRole("button", { name: "Start this stage" })).toHaveCount(0);
+  await expect(page.locator('[role="separator"] ~ [data-role="assistant"]')).toHaveCount(1);
 });
 
 test("model failure, rate limit and expired session are explained", async ({ page, context }) => {

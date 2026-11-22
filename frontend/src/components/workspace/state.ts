@@ -7,6 +7,8 @@ export interface StreamingTurn {
   /** Tentative reply text (`message.delta`), discarded if the turn fails. */
   text: string;
   status: string | null;
+  /** The assistant starts the stage by itself: no message was sent. */
+  opening?: boolean;
 }
 
 export interface TurnFailure {
@@ -31,6 +33,7 @@ export type WorkspaceAction =
   | { type: "snapshot.loaded"; snapshot: SessionSnapshot }
   | { type: "session.updated"; session: SessionOverview }
   | { type: "turn.submitted"; message: ChatMessage }
+  | { type: "opening.started" }
   | { type: "turn.event"; event: TurnEvent }
   | { type: "turn.failed"; error: TurnFailure }
   | { type: "turn.closed" }
@@ -49,6 +52,7 @@ export function initialWorkspaceState(snapshot: SessionSnapshot): WorkspaceState
 }
 
 const STATUS_ANALYZING = "Analyzing your message…";
+const STATUS_OPENING = "Preparing the stage…";
 const STATUS_DOCUMENT = "Updating the stage document…";
 
 /** The unsent message comes back before the text typed while its turn ran. */
@@ -70,11 +74,15 @@ function failTurn(state: WorkspaceState, error: TurnFailure): WorkspaceState {
 function applyEvent(state: WorkspaceState, event: TurnEvent): WorkspaceState {
   const { session } = state;
   const streaming: StreamingTurn = state.streaming ?? { turnId: null, text: "", status: null };
+  const working = streaming.opening ? STATUS_OPENING : STATUS_ANALYZING;
   switch (event.type) {
     case "turn.started":
-      return { ...state, streaming: { turnId: event.turn_id, text: "", status: STATUS_ANALYZING } };
+      return {
+        ...state,
+        streaming: { ...streaming, turnId: event.turn_id, text: "", status: working },
+      };
     case "analysis.status":
-      return { ...state, streaming: { ...streaming, status: STATUS_ANALYZING } };
+      return { ...state, streaming: { ...streaming, status: working } };
     case "message.delta":
       return { ...state, streaming: { ...streaming, text: streaming.text + event.delta } };
     case "document.updated":
@@ -100,7 +108,12 @@ function applyEvent(state: WorkspaceState, event: TurnEvent): WorkspaceState {
         ...state,
         messages: [
           ...state.messages.map((message) => ({ ...message, local: undefined })),
-          { id: event.turn_id, role: "assistant", content: event.output.assistant_message },
+          {
+            id: event.turn_id,
+            role: "assistant",
+            content: event.output.assistant_message,
+            stage: event.output.processed_stage,
+          },
         ],
         streaming: null,
       };
@@ -126,6 +139,12 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
         ...state,
         messages: [...state.messages, { ...action.message, local: true }],
         streaming: { turnId: null, text: "", status: "Sending…" },
+        turnError: null,
+      };
+    case "opening.started":
+      return {
+        ...state,
+        streaming: { turnId: null, text: "", status: STATUS_OPENING, opening: true },
         turnError: null,
       };
     case "turn.event":

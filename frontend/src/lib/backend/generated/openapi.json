@@ -5866,6 +5866,92 @@
         ]
       }
     },
+    "/api/v1/sessions/{session_id}/stages/{stage}/opening": {
+      "post": {
+        "description": "Stream the assistant turn that starts a stage, without any user message.\n\nArgs:\n    session_id (str): Owned session.\n    stage (Stage): Current stage, not worked on yet.\n    service (Service): Application service.\n\nReturns:\n    StreamingResponse: Same events as a user turn.",
+        "operationId": "open_stage_api_v1_sessions__session_id__stages__stage__opening_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "stage",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Stage"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/TurnEvent"
+                }
+              }
+            },
+            "description": "SSE: event is the discriminant, data is JSON. Deltas are tentative until turn.completed. Exactly one terminal event: turn.completed or error. No replay/resume support. While the turn is silent, a `: keepalive` SSE comment is sent every 15 s; clients ignore it."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Open Stage",
+        "tags": [
+          "application"
+        ]
+      }
+    },
     "/api/v1/sessions/{session_id}/stages/{stage}/reopen": {
       "post": {
         "description": "Reopen a previously visited stage, marking downstream stages stale.\n\nArgs:\n    session_id (str): Request parameter or session service.\n    stage (Stage): Request parameter or session service.\n    service (Service): Request parameter or session service.\n\nReturns:\n    SessionOverview: Application service result.",

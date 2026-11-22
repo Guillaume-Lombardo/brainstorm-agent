@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from brainstorm_agent.core.enums import OpenQuestionStatus, Stage
+from brainstorm_agent.core.gate_questions import proposed_fields
 from brainstorm_agent.core.models import (
     CoverageStatus,
     OpenQuestionItem,
@@ -52,6 +53,12 @@ def validate_stage(  # noqa: PLR0913 - independent gate inputs at the domain bou
             if rule.applies(extracted_fields)
             for name in rule.required_fields
         ),
+    )
+    # Later stages read optional fields too: a proposal never leaves its stage unconfirmed.
+    required += tuple(
+        name
+        for name, status in coverage.items()
+        if status is CoverageStatus.PARTIAL and name in proposed_fields(partial) and name not in required
     )
     checklist = [
         ReadinessItem(

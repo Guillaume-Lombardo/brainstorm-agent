@@ -345,6 +345,17 @@ ADR impact: ADR 0007 updated.
 - [x] Send the last two exchanges instead of four; keep the stored window for language detection.
 - [x] Leave raw clarifications, rendered text and gate verdicts out of the provider context.
 
+### Lot 13: Stage openings and markers
+
+Validated scope: the assistant starts each new stage by itself from the earlier stages, without
+weakening the gates; the conversation shows where the stage changed. Questions keep the language of
+the session (delivered separately).
+ADR impact: ADR 0007, ADR 0010 and ADR 0011 updated.
+
+- [x] Stream a turn without user message; keep its output to proposals the user must confirm.
+- [x] Open the new stage after an automatic transition or an approval, with a manual fallback.
+- [x] Mark stage changes in the conversation.
+
 ### Production cross-path acceptance fixes
 
 Validated scope: reproduce the deployed expense-sharing journey; correct the Questions panel's

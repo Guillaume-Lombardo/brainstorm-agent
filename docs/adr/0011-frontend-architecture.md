@@ -72,6 +72,12 @@ and later turns do not send it either. A message whose stream was cut comes back
 when the stored conversation does not hold it.
 The backend still processes one turn at a time per session.
 
+**Stage openings and markers.** After a turn or an approval moves the session to a stage nobody
+worked on, the workspace holds the queue, asks the backend to open that stage, then sends what the
+user queued meanwhile. Loading a page never starts an opening: a "Start this stage" button does,
+after a failure for instance. Messages carry their stage; the conversation shows a marker wherever
+it changes, in another color when the session went back to an earlier stage.
+
 **Errors.** Every proxy error is `{"error": {"code", "message", "retryAfterSeconds?"}}` with the
 status relayed:
 

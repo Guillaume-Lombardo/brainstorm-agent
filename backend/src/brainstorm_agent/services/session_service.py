@@ -36,6 +36,7 @@ from brainstorm_agent.core.application import (
     TurnStarted,
 )
 from brainstorm_agent.core.enums import HumanReviewDecision, MessageRole, Modality, Stage
+from brainstorm_agent.core.gate_questions import proposed_fields
 from brainstorm_agent.core.language import LANGUAGE_MEMORY_MESSAGES
 from brainstorm_agent.core.models import (
     AssistantAnalysis,
@@ -216,9 +217,113 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
 
         Returns:
             AssistantTurnOutput: Structured assistant response.
+        """
+        return await self._process_turn(
+            session_id=session_id,
+            content=content,
+            modality=modality,
+            on_delta=on_delta,
+        )
+
+    async def aopen_stage(
+        self,
+        *,
+        session_id: str,
+        on_delta: Callable[[str], Awaitable[None]] | None = None,
+    ) -> AssistantTurnOutput:
+        """Let the assistant start the current stage from what earlier stages established.
+
+        Args:
+            session_id (str): Session identifier.
+            on_delta (Callable[[str], Awaitable[None]] | None): Async reply delta consumer.
+
+        Returns:
+            AssistantTurnOutput: Prepared proposals and first questions; never a transition.
+        """
+        return await self._process_turn(
+            session_id=session_id,
+            content=None,
+            modality=Modality.TEXT,
+            on_delta=on_delta,
+        )
+
+    @staticmethod
+    def _require_openable(state: BrainstormSessionState) -> None:
+        """Allow an opening only on a started, untouched stage after the pitch.
+
+        Args:
+            state (BrainstormSessionState): Session state.
 
         Raises:
-            pending_human_review_in_progress: If a human validation decision is still pending.
+            ConflictError: The stage is the pitch or was already worked on.
+        """
+        if (
+            state.archived
+            or state.current_stage is Stage.STAGE_0_PITCH
+            or state.current_stage.value in state.stage_states
+        ):
+            message = "This stage cannot be opened: it already started."
+            raise ConflictError(message)
+
+    def _reopen_llm(self) -> None:
+        """Rebuild the owned provider client after a previous turn closed it."""
+        if (
+            self._owns_llm
+            and isinstance(self.llm, OpenAICompatibleBrainstormLLM)
+            and self.llm.client.is_closed()
+        ):
+            self.llm = build_llm(settings=self.settings, prompt_loader=self.prompt_loader)
+            self.graph = build_turn_graph(llm=self.llm, renderer=self.renderer)
+
+    def _turn_context(
+        self,
+        state: BrainstormSessionState,
+        content: str | None,
+        comments: list[SectionComment],
+    ) -> str:
+        """Join the turn input with the owner context the model must read.
+
+        Args:
+            state (BrainstormSessionState): Session state.
+            content (str | None): User message, or None when the assistant opens the stage.
+            comments (list[SectionComment]): Section comments not consumed yet.
+
+        Returns:
+            str: Model input for the turn.
+        """
+        context = self.prompt_loader.opening_prompt() if content is None else content
+        if state.current_stage is Stage.STAGE_2_USER_STORY_MAPPING:
+            context += (
+                "\nOwner-selected benchmark candidates (not validated stories):\n"
+                + self.benchmark_context(state.session_id)
+            )
+        if comments:
+            context += "\n\nOwner section comments:\n" + "\n".join(
+                f"[{item.stage.value}/{item.section}] {item.body}" for item in comments
+            )
+        return context
+
+    async def _process_turn(
+        self,
+        *,
+        session_id: str,
+        content: str | None,
+        modality: Modality,
+        on_delta: Callable[[str], Awaitable[None]] | None,
+    ) -> AssistantTurnOutput:
+        """Run and persist one turn, from a user message or opening the stage.
+
+        Args:
+            session_id (str): Session identifier.
+            content (str | None): User message, or None when the assistant opens the stage.
+            modality (Modality): Input modality.
+            on_delta (Callable[[str], Awaitable[None]] | None): Async reply delta consumer.
+
+        Returns:
+            AssistantTurnOutput: Structured assistant response.
+
+        Raises:
+            pending_human_review_in_progress: A human validation decision is still pending.
         """
         self._require_owned(session_id)
         with self.lock_manager.lock(session_id):
@@ -226,32 +331,19 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
             state = self.sessions.to_state(record)
             if state.pending_human_review is not None:
                 raise ConflictError.pending_human_review_in_progress()
+            if content is None:
+                self._require_openable(state)
             current_stage = state.current_stage
-            if (
-                self._owns_llm
-                and isinstance(self.llm, OpenAICompatibleBrainstormLLM)
-                and self.llm.client.is_closed()
-            ):
-                self.llm = build_llm(settings=self.settings, prompt_loader=self.prompt_loader)
-                self.graph = build_turn_graph(llm=self.llm, renderer=self.renderer)
+            self._reopen_llm()
             comments = [item for item in state.comments if not item.consumed]
-            context = content
-            if current_stage is Stage.STAGE_2_USER_STORY_MAPPING:
-                context += (
-                    "\nOwner-selected benchmark candidates (not validated stories):\n"
-                    + self.benchmark_context(session_id)
-                )
-            if comments:
-                context += "\n\nOwner section comments:\n" + "\n".join(
-                    f"[{item.stage.value}/{item.section}] {item.body}" for item in comments
-                )
             graph_output = await self._invoke_graph(
                 {
                     "session_id": session_id,
                     "session_state": state.model_dump(mode="json"),
                     "current_stage": current_stage.value,
-                    "user_message": context,
-                    "user_text": content,
+                    "user_message": self._turn_context(state, content, comments),
+                    "user_text": content or "",
+                    "opening": content is None,
                     "on_delta": on_delta,
                 },
             )
@@ -311,23 +403,22 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
                 output.pending_review = None
             for comment in comments:
                 comment.consumed = True
-            state.transcript.extend([
-                {"role": "user", "content": content},
-                {"role": "assistant", "content": output.assistant_message},
-            ])
+            if content is not None:
+                state.transcript.append({"role": "user", "content": content})
+                self.messages.add(
+                    ConversationTurn(
+                        session_id=session_id,
+                        role=MessageRole.USER,
+                        content=content,
+                        modality=modality,
+                        stage=current_stage,
+                    ),
+                )
+            state.transcript.append({"role": "assistant", "content": output.assistant_message})
             # Language detection looks further back than the model context, which is cut on use.
             state.transcript = state.transcript[
                 -max(self.settings.llm_context_turns, LANGUAGE_MEMORY_MESSAGES) :
             ]
-            self.messages.add(
-                ConversationTurn(
-                    session_id=session_id,
-                    role=MessageRole.USER,
-                    content=content,
-                    modality=modality,
-                    stage=current_stage,
-                ),
-            )
             assistant_id = str(uuid4())
             state.turn_usage[assistant_id] = {
                 "prompt_tokens": output.prompt_tokens,
@@ -916,11 +1007,11 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
             tuple[DeliveryFields, dict[str, Any]]: Domain export inputs.
 
         Raises:
-            ConflictError: Delivery state is missing or stale.
+            ConflictError: Delivery state is missing, stale or still a proposal.
         """
         state = self.sessions.to_state(self._require_owned(session_id))
         delivery = state.stage_states.get(Stage.STAGE_7_DELIVERY_SLICING.value)
-        if delivery is None or delivery.stale:
+        if delivery is None or delivery.stale or proposed_fields(delivery.partial_fields):
             message = "Delivery slicing must be completed and revalidated before export."
             raise ConflictError(message)
         fields = DeliveryFields.model_validate(delivery.extracted_fields.model_dump())
@@ -981,12 +1072,29 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
         if self.get_session(session_id).pending_human_review is not None:
             raise ConflictError.pending_human_review_in_progress()
 
-    async def stream_turn(self, session_id: str, content: str) -> AsyncGenerator[TurnEvent]:
+    def prepare_opening(self, session_id: str, stage: Stage) -> None:
+        """Authorize a stage opening before sending stream headers.
+
+        Args:
+            session_id (str): Owned session.
+            stage (Stage): Stage the caller expects to open.
+
+        Raises:
+            ConflictError: The stage is not the current one or already started.
+        """
+        self.prepare_turn(session_id)
+        state = self.sessions.to_state(self._require_owned(session_id))
+        if state.current_stage is not stage:
+            message = "Only the current stage can be opened."
+            raise ConflictError(message)
+        self._require_openable(state)
+
+    async def stream_turn(self, session_id: str, content: str | None) -> AsyncGenerator[TurnEvent]:
         """Stream tentative provider deltas then committed state or terminal error.
 
         Args:
             session_id (str): Authorized session.
-            content (str): User message.
+            content (str | None): User message, or None when the assistant opens the stage.
 
         Yields:
             TurnEvent: Ordered typed event, exactly one terminal event.
@@ -1001,7 +1109,9 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
             await queue.put(delta)
 
         task = asyncio.create_task(
-            self.aprocess_user_message(session_id=session_id, content=content, on_delta=on_delta),
+            self.aopen_stage(session_id=session_id, on_delta=on_delta)
+            if content is None
+            else self.aprocess_user_message(session_id=session_id, content=content, on_delta=on_delta),
         )
         waiter: asyncio.Task[str] | None = None
         try:

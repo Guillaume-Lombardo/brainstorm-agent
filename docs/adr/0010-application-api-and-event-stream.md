@@ -37,6 +37,11 @@ and remain tentative until commit. Cancellation of the stream generator cancels 
 best effort; a turn already entering persistence can commit in full after a disconnect. There is no event replay,
 Last-Event-ID recovery or automatic retry contract. HTTP authorization and pending-review errors
 occur before stream headers; runtime failures use the terminal error event.
+`POST /sessions/{id}/stages/{stage}/opening` streams the same events for a turn the assistant
+starts: no user message is stored. The client requests it instead of the server chaining it to the
+transition, so that a transition commits on its own, a failed opening can be retried, and a review
+decision stays a short request. The stage in the path must be the current one, unopened; the check
+runs before the headers and again under the session lock, so two tabs cannot open it twice.
 While the worker stays silent (a long provider call or its retries), the stream sends a
 `: keepalive` SSE comment every 15 seconds. It is transport only, outside the event union, and
 keeps the frontend proxy and the reverse proxies from closing a turn that is still running.
