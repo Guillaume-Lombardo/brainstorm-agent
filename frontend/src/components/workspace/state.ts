@@ -2,11 +2,14 @@ import type { SessionOverview, SessionSnapshot, TurnEvent } from "@/lib/backend/
 
 import { chatMessages, type ChatMessage } from "./view-model";
 
+/** What the running turn is doing, worded by the interface. */
+export type TurnStatus = "sending" | "analyzing" | "opening" | "document";
+
 export interface StreamingTurn {
   turnId: string | null;
   /** Tentative reply text (`message.delta`), discarded if the turn fails. */
   text: string;
-  status: string | null;
+  status: TurnStatus | null;
   /** The assistant starts the stage by itself: no message was sent. */
   opening?: boolean;
 }
@@ -51,10 +54,6 @@ export function initialWorkspaceState(snapshot: SessionSnapshot): WorkspaceState
   };
 }
 
-const STATUS_ANALYZING = "Analyzing your message…";
-const STATUS_OPENING = "Preparing the stage…";
-const STATUS_DOCUMENT = "Updating the stage document…";
-
 /** The unsent message comes back before the text typed while its turn ran. */
 function restoredDraft(content: string | undefined, draft: string): string {
   return [content, draft].filter(Boolean).join("\n\n");
@@ -74,7 +73,7 @@ function failTurn(state: WorkspaceState, error: TurnFailure): WorkspaceState {
 function applyEvent(state: WorkspaceState, event: TurnEvent): WorkspaceState {
   const { session } = state;
   const streaming: StreamingTurn = state.streaming ?? { turnId: null, text: "", status: null };
-  const working = streaming.opening ? STATUS_OPENING : STATUS_ANALYZING;
+  const working: TurnStatus = streaming.opening ? "opening" : "analyzing";
   switch (event.type) {
     case "turn.started":
       return {
@@ -88,7 +87,7 @@ function applyEvent(state: WorkspaceState, event: TurnEvent): WorkspaceState {
     case "document.updated":
       return {
         ...state,
-        streaming: { ...streaming, status: STATUS_DOCUMENT },
+        streaming: { ...streaming, status: "document" },
         documentRevision: state.documentRevision + 1,
       };
     case "coverage.updated":
@@ -138,13 +137,13 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
       return {
         ...state,
         messages: [...state.messages, { ...action.message, local: true }],
-        streaming: { turnId: null, text: "", status: "Sending…" },
+        streaming: { turnId: null, text: "", status: "sending" },
         turnError: null,
       };
     case "opening.started":
       return {
         ...state,
-        streaming: { turnId: null, text: "", status: STATUS_OPENING, opening: true },
+        streaming: { turnId: null, text: "", status: "opening", opening: true },
         turnError: null,
       };
     case "turn.event":

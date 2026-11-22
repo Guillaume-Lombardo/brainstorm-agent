@@ -21,9 +21,8 @@ it("shows empty research and a provider error without adding decisions", async (
   vi.stubGlobal("fetch", fetcher);
   const changed = vi.fn();
   render(<ResearchPanel sessionId="one" available disabled={false} onChanged={changed} />);
-  expect(await screen.findByText("Aucune recherche effectuée.")).toBeVisible();
-  await userEvent.click(screen.getByRole("button", { name: "Rechercher des produits similaires" }));
-  expect(await screen.findByRole("alert")).toHaveTextContent("La recherche a échoué");
+  await userEvent.click(await screen.findByRole("button", { name: "Find similar products" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("The research failed");
   expect(changed).not.toHaveBeenCalled();
 });
 
@@ -66,13 +65,11 @@ it("collapses the benchmark once the selected features are validated", async () 
   const changed = vi.fn().mockResolvedValue(undefined);
   render(<ResearchPanel sessionId="one" available disabled={false} onChanged={changed} />);
   await userEvent.click(await screen.findByRole("checkbox"));
-  await userEvent.click(
-    screen.getByRole("button", { name: "Valider les fonctionnalités retenues" }),
-  );
-  expect(await screen.findByText(/1 fonctionnalité retenue/)).toBeVisible();
+  await userEvent.click(screen.getByRole("button", { name: "Keep selected features" }));
+  expect(await screen.findByText(/1 feature kept/)).toBeVisible();
   expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
   expect(screen.queryByText("Spliit")).not.toBeInTheDocument();
-  await userEvent.click(screen.getByRole("button", { name: "Afficher le benchmark" }));
+  await userEvent.click(screen.getByRole("button", { name: "Show benchmark" }));
   expect(screen.getByRole("checkbox")).toBeChecked();
 });
 
@@ -82,6 +79,6 @@ it("starts collapsed when the latest benchmark already has a validated selection
     vi.fn().mockResolvedValue(Response.json({ enabled: true, benchmarks: [benchmark(["f1"])] })),
   );
   render(<ResearchPanel sessionId="one" available disabled={false} onChanged={vi.fn()} />);
-  expect(await screen.findByRole("button", { name: "Afficher le benchmark" })).toBeVisible();
+  expect(await screen.findByRole("button", { name: "Show benchmark" })).toBeVisible();
   expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
 });

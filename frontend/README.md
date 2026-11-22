@@ -4,7 +4,7 @@ Next.js (App Router) workspace for the stage-driven framing workflow: sign in, m
 converse with the agent and follow the stage documents, readiness, open questions, reviews and
 delivery slices live.
 
-Stack: Next.js 16, React 19, TypeScript strict, Tailwind CSS 4, shadcn/ui (Base UI), Auth.js v5,
+Stack: Next.js 16, React 19, TypeScript strict, Tailwind CSS 4, Base UI, Auth.js v5,
 Vitest + Testing Library, Playwright, pnpm.
 
 ## Run locally
@@ -46,7 +46,8 @@ pnpm e2e         # Playwright (chromium): standalone build + real backend in fak
 `scripts/e2e-backend.mjs` and the standalone build. It covers sign-in (wrong password, backend
 login limit, SSO hidden), session creation, one streamed turn, the updated document and
 coverage, the pending review (input paused, 409 from the backend), approval, the Markdown
-and ZIP exports, and the LLM failure, rate-limit and expired-session states. Screenshots go to
+and ZIP exports, the LLM failure, rate-limit and expired-session states, and the theme and
+language switches. Screenshots go to
 `test-results/screenshots/` (`E2E_SCREENSHOT_DIR` overrides it). Install the browser once with
 `pnpm exec playwright install chromium`. CI runs the same suite (`frontend-e2e` job) and uploads
 the screenshots and traces.
@@ -68,11 +69,16 @@ src/
     types.ts                short names for the generated contract
     http.ts, jwt.ts         typed HTTP client, short-lived signed JWT per call
     route.ts                route-handler helpers: CSRF and auth checks, error mapping, SSE
+  lib/i18n/                 French and English texts (`fr` must match `en`), language resolution
+  lib/theme.ts              theme preference; colors are the tokens of `app/globals.css`
   lib/api/                  browser client of the proxy and SSE parser
   components/               sessions list and workspace (chat, document, stepper, review, ...)
     workspace/view-model.ts presentation derived from the backend state (no business rule)
 ```
 
+- Theme and language come from the `theme` and `lang` cookies, else from the system and the browser.
+  Components take texts from `useMessages()` (`getMessages()` on the server) and colors from tokens:
+  no literal text, no `dark:` variant.
 - The browser only calls `/api/backend/*` on the Next.js server. Credentials, the backend URL and
   the secrets stay server-side.
 - Sign-in: the Credentials provider checks the password through the backend login bridge

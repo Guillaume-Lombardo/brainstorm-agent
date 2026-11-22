@@ -1,8 +1,19 @@
 "use client";
+
+import { ChevronDownIcon, ChevronUpIcon, LoaderCircleIcon, SearchIcon } from "lucide-react";
 import { useEffect, useState } from "react";
+
+import { useMessages } from "@/components/preferences/provider";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { components } from "@/lib/backend/generated/api";
+
 type Benchmark = components["schemas"]["Benchmark"];
+
+/** Error texts of the panel, by key of `messages.research`. */
+type ResearchError = "unreadable" | "unavailable" | "failed" | "saveFailed";
+
+const RECOMMENDATION_BADGE = { adopt: "good", adapt: "accent", skip: "muted" } as const;
 
 /** Optional, explicitly triggered snippet benchmark. */
 export function ResearchPanel({
@@ -16,16 +27,17 @@ export function ResearchPanel({
   disabled: boolean;
   onChanged: () => Promise<void>;
 }) {
+  const t = useMessages().research;
   const [enabled, setEnabled] = useState(false);
   const [history, setHistory] = useState<Benchmark[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<ResearchError | null>(null);
   const [collapsed, setCollapsed] = useState(false);
   const base = `/api/backend/sessions/${encodeURIComponent(sessionId)}/research`;
   async function load() {
     const response = await fetch(base);
-    if (!response.ok) throw new Error("Impossible de lire les recherches.");
+    if (!response.ok) throw new Error("unreadable");
     const data = (await response.json()) as { enabled: boolean; benchmarks: Benchmark[] };
     setEnabled(data.enabled);
     setHistory(data.benchmarks);
@@ -36,7 +48,7 @@ export function ResearchPanel({
     if (available)
       fetch(base)
         .then(async (response) => {
-          if (!response.ok) throw new Error("Impossible de lire les recherches.");
+          if (!response.ok) throw new Error("unreadable");
           const data = (await response.json()) as { enabled: boolean; benchmarks: Benchmark[] };
           if (active) {
             setEnabled(data.enabled);
@@ -46,7 +58,7 @@ export function ResearchPanel({
           }
         })
         .catch(() => {
-          if (active) setError("Impossible de lire les recherches.");
+          if (active) setError("unreadable");
         });
     return () => {
       active = false;
@@ -54,39 +66,25 @@ export function ResearchPanel({
   }, [base, available]);
   if (!available || (!enabled && !error)) return null;
   const latest = history.at(-1);
-  if (latest && collapsed) {
-    const count = latest.selected_ids?.length ?? 0;
-    return (
-      <section
-        className="flex shrink-0 items-center justify-between gap-3 border-b p-3"
-        aria-label="Benchmark"
-      >
-        <p className="text-sm">
-          Benchmark — version {latest.version} ·{" "}
-          {count === 0
-            ? "aucune fonctionnalité retenue"
-            : `${count} fonctionnalité${count > 1 ? "s retenues" : " retenue"}`}
-        </p>
-        <Button variant="outline" aria-expanded={false} onClick={() => setCollapsed(false)}>
-          Afficher le benchmark
-        </Button>
-      </section>
-    );
-  }
   async function run() {
     setBusy(true);
-    setError("");
+    setError(null);
     try {
       const response = await fetch(base, { method: "POST" });
-      if (!response.ok) throw new Error("Recherche indisponible.");
+      if (!response.ok) {
+        setError("unavailable");
+        return;
+      }
       const events = await response.text();
-      if (!events.includes("event: research.completed"))
-        throw new Error("La recherche a échoué. Réessayez.");
+      if (!events.includes("event: research.completed")) {
+        setError("failed");
+        return;
+      }
       await load();
       setCollapsed(false);
       await onChanged();
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "Recherche indisponible.");
+    } catch {
+      setError("unavailable");
     } finally {
       setBusy(false);
     }
@@ -94,118 +92,158 @@ export function ResearchPanel({
   async function save() {
     if (!latest) return;
     setBusy(true);
-    setError("");
+    setError(null);
     try {
       const response = await fetch(`${base}/${latest.id}/selection`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ selected_ids: selected }),
       });
-      if (!response.ok) throw new Error("Impossible d’enregistrer la sélection.");
+      if (!response.ok) {
+        setError("saveFailed");
+        return;
+      }
       await load();
       setCollapsed(true);
       await onChanged();
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "Erreur de sélection.");
+    } catch {
+      setError("saveFailed");
     } finally {
       setBusy(false);
     }
   }
+  const locked = disabled || busy;
   return (
     <section
-      className="max-h-[45vh] shrink-0 space-y-3 overflow-y-auto border-b p-3"
-      aria-label="Benchmark"
+      className="flex max-h-[45vh] shrink-0 flex-col gap-3 overflow-y-auto border-b px-4 py-1.5"
+      aria-label={t.region}
     >
-      <div className="flex flex-wrap gap-2">
-        <Button disabled={disabled || busy || !enabled} onClick={() => void run()}>
-          Rechercher des produits similaires
-        </Button>
-        {latest && (
-          <Button variant="outline" aria-expanded onClick={() => setCollapsed(true)}>
-            Replier le benchmark
+      <div className="flex min-h-7 flex-wrap items-center gap-2">
+        {latest ? (
+          <p className="mr-auto text-[13px]">
+            {t.summary(latest.version)} · {t.kept(latest.selected_ids?.length ?? 0)}
+          </p>
+        ) : null}
+        {latest ? (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="order-last"
+            aria-expanded={!collapsed}
+            aria-label={collapsed ? t.show : t.hide}
+            title={collapsed ? t.show : t.hide}
+            onClick={() => setCollapsed(!collapsed)}
+          >
+            {collapsed ? <ChevronDownIcon /> : <ChevronUpIcon />}
+          </Button>
+        ) : null}
+        {latest && collapsed ? null : (
+          <Button
+            variant={latest ? "outline" : "ghost"}
+            size="sm"
+            disabled={locked || !enabled}
+            onClick={() => void run()}
+          >
+            {busy ? <LoaderCircleIcon className="animate-spin" /> : <SearchIcon />}
+            {t.run}
           </Button>
         )}
-      </div>
-      {busy && <p role="status">Recherche ou enregistrement en cours…</p>}
-      {error && <p role="alert">{error}</p>}
-      {!latest && <p>Aucune recherche effectuée.</p>}
-      {latest && (
-        <>
-          <p>
-            Benchmark — version {latest.version} ({history.length} recherches)
+        {busy ? (
+          <p role="status" className="text-xs text-muted-foreground">
+            {t.running}
           </p>
-          {!latest.synthesis.products.length && <p>Aucun produit sourcé trouvé.</p>}
-          <table className="w-full text-sm">
-            <thead>
-              <tr>
-                <th>Produit</th>
-                <th>Fonctionnalités et prix</th>
-              </tr>
-            </thead>
-            <tbody>
-              {latest.synthesis.products.map((product) => (
-                <tr key={product.url}>
-                  <td>
-                    <a
-                      href={product.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="underline"
-                    >
-                      {product.name}
-                    </a>
-                    <p>{product.summary}</p>
-                    {product.evidence_urls.map((url) => (
+        ) : null}
+      </div>
+      {error ? (
+        <p role="alert" className="text-[13px] text-destructive">
+          {t[error]}
+        </p>
+      ) : null}
+      {latest && !collapsed ? (
+        <>
+          {latest.synthesis.products.length === 0 ? (
+            <p className="text-muted-foreground">{t.none}</p>
+          ) : (
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th scope="col">{t.product}</th>
+                  <th scope="col">{t.features}</th>
+                  <th scope="col">{t.price}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {latest.synthesis.products.map((product) => (
+                  <tr key={product.url}>
+                    <td>
                       <a
-                        key={url}
-                        href={url}
+                        href={product.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="block underline"
+                        className="font-semibold text-primary hover:underline"
                       >
-                        Source
+                        {product.name}
                       </a>
-                    ))}
-                  </td>
-                  <td>
-                    {product.key_features.join(", ")}
-                    <p>{product.pricing ?? "Prix inconnu"}</p>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <p>Recommandations : hypothèses à confirmer.</p>
-          {latest.synthesis.features.map((feature) => {
-            const id = feature.id;
-            if (!id) return null;
-            return (
-              <label key={id} className="block">
-                <input
-                  type="checkbox"
-                  disabled={disabled || busy}
-                  checked={selected.includes(id)}
-                  onChange={(event) =>
-                    setSelected(
-                      event.target.checked
-                        ? [...selected, id]
-                        : selected.filter((value) => value !== id),
-                    )
-                  }
-                />
-                {feature.feature} —{" "}
-                {{ adopt: "Reprendre", adapt: "Adapter", skip: "Écarter" }[feature.recommendation]}
-                <p>
-                  {feature.products.join(", ")} : {feature.justification}
-                </p>
-              </label>
-            );
-          })}
-          <Button disabled={disabled || busy} onClick={() => void save()}>
-            Valider les fonctionnalités retenues
+                      <p>{product.summary}</p>
+                      {product.evidence_urls.map((url) => (
+                        <a
+                          key={url}
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mr-2 text-xs text-muted-foreground underline"
+                        >
+                          {t.source}
+                        </a>
+                      ))}
+                    </td>
+                    <td>{product.key_features.join(", ")}</td>
+                    <td>{product.pricing ?? t.priceUnknown}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          <fieldset className="flex flex-col gap-2">
+            <legend className="mb-2 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+              {t.choose}
+            </legend>
+            {latest.synthesis.features.map((feature) => {
+              const id = feature.id;
+              if (!id) return null;
+              return (
+                <label key={id} className="flex items-start gap-2 text-[13px]">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 accent-primary"
+                    disabled={locked}
+                    checked={selected.includes(id)}
+                    onChange={(event) =>
+                      setSelected(
+                        event.target.checked
+                          ? [...selected, id]
+                          : selected.filter((value) => value !== id),
+                      )
+                    }
+                  />
+                  <span>
+                    <span className="font-semibold">{feature.feature}</span>{" "}
+                    <Badge variant={RECOMMENDATION_BADGE[feature.recommendation]}>
+                      {t.recommendation[feature.recommendation]}
+                    </Badge>
+                    <span className="block text-muted-foreground">
+                      {feature.products.join(", ")} : {feature.justification}
+                    </span>
+                  </span>
+                </label>
+              );
+            })}
+          </fieldset>
+          <Button className="mb-1.5 self-start" disabled={locked} onClick={() => void save()}>
+            {t.save}
           </Button>
         </>
-      )}
+      ) : null}
     </section>
   );
 }

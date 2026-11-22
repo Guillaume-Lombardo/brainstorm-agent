@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { MESSAGES } from "@/lib/i18n";
+
 import {
   SLICES,
   fieldsFixture,
@@ -84,7 +86,7 @@ describe("canOpen", () => {
 
 describe("stageFields", () => {
   it("lists the contract fields in order with coverage and reasons", () => {
-    const fields = stageFields(stage2Session(), "stage_2_user_story_mapping");
+    const fields = stageFields(stage2Session(), "stage_2_user_story_mapping", MESSAGES.en);
     expect(fields.map((field) => field.name)).toEqual([
       "actors_personas",
       "user_journeys",
@@ -106,11 +108,11 @@ describe("stageFields", () => {
   });
 
   it("labels structured items by id and statement", () => {
-    expect(fieldLines([{ id: "R1", statement: "Supplier API changes" }])).toEqual([
-      "R1: Supplier API changes",
-    ]);
-    expect(fieldLines(true)).toEqual(["Yes"]);
-    expect(fieldLines(null)).toEqual([]);
+    expect(
+      fieldLines([{ id: "R1", statement: "Supplier API changes" }], MESSAGES.en.common),
+    ).toEqual(["R1: Supplier API changes"]);
+    expect(fieldLines(true, MESSAGES.en.common)).toEqual(["Yes"]);
+    expect(fieldLines(null, MESSAGES.en.common)).toEqual([]);
   });
 });
 

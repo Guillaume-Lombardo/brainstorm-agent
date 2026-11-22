@@ -3,14 +3,17 @@ import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import { LoginForm } from "@/components/auth/login-form";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { signInErrorMessage } from "@/lib/auth/messages";
+import { PreferenceControls } from "@/components/preferences/preference-controls";
+import { signInError } from "@/lib/auth/messages";
 import { readOidcSettings } from "@/lib/auth/oidc";
 import { safeCallbackPath } from "@/lib/auth/redirect";
+import { getMessages } from "@/lib/preferences";
 
 import { loginWithPassword, loginWithSso } from "./actions";
 
-export const metadata: Metadata = { title: "Sign in · Brainstorm Agent" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getMessages()).login.title };
+}
 
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const { callbackUrl, error } = await searchParams;
@@ -22,21 +25,21 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const oidc = readOidcSettings(process.env);
 
   return (
-    <main className="flex flex-1 items-center justify-center bg-muted/40 p-6">
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle className="text-xl">Brainstorm Agent</CardTitle>
-          <CardDescription>Sign in to frame your project stage by stage.</CardDescription>
-        </CardHeader>
-        <CardContent>
+    <main className="flex flex-1 flex-col">
+      <div className="flex justify-end px-4 py-3">
+        <PreferenceControls />
+      </div>
+      <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center gap-4 px-4 pb-24">
+        <h1 className="text-[22px] leading-none font-bold">Brainstorm Agent</h1>
+        <div className="rounded-lg border bg-card p-4">
           <LoginForm
             callbackUrl={target}
-            initialError={signInErrorMessage(Array.isArray(error) ? error[0] : error)}
+            initialError={signInError(Array.isArray(error) ? error[0] : error)}
             passwordAction={loginWithPassword}
             sso={oidc ? { label: oidc.name, action: loginWithSso } : null}
           />
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </main>
   );
 }

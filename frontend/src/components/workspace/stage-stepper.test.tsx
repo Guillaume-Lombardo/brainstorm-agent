@@ -20,7 +20,7 @@ describe("StageStepper", () => {
     expect(items).toHaveLength(8);
     expect(items[7]).toBeDisabled();
     expect(items[2]).toHaveAttribute("aria-current", "step");
-    expect(within(items[1]).getByText("stale")).toBeInTheDocument();
+    expect(within(items[1]).getByText("Stale")).toBeInTheDocument();
 
     await userEvent.click(items[0]);
     expect(onSelect).toHaveBeenCalledWith("stage_0_pitch");
@@ -30,7 +30,7 @@ describe("StageStepper", () => {
     const session = stage2Session();
     render(<StageStepper session={session} selected={session.current_stage} onSelect={vi.fn()} />);
     const items = within(screen.getByRole("navigation", { name: "Stages" })).getAllByRole("button");
-    expect(items[2]).toHaveTextContent("1/3");
+    expect(items[2]).toHaveTextContent("1/4");
   });
 });
 
@@ -46,13 +46,14 @@ describe("StageDetails", () => {
         onEditField={onEditField}
       />,
     );
-    expect(screen.getByText("Readiness 1/3")).toBeInTheDocument();
     expect(screen.getByText("At least one persona is named.")).toBeInTheDocument();
     const mvp = document.querySelector('[data-field="mvp_scope"]') as HTMLElement;
     expect(within(mvp).getByText("partial")).toBeInTheDocument();
     expect(within(mvp).getByText("Release boundary unclear.")).toBeInTheDocument();
     const personas = document.querySelector('[data-field="actors_personas"]') as HTMLElement;
     expect(within(personas).getByText("missing")).toBeInTheDocument();
+    expect(within(personas).getByText("required")).toBeInTheDocument();
+    expect(screen.queryByText(/Required field/)).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Edit MVP scope" }));
     const editor = screen.getByRole("textbox", { name: "MVP scope value" });

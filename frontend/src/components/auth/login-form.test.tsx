@@ -2,6 +2,8 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
+import { MESSAGES } from "@/lib/i18n";
+
 import { LoginForm } from "./login-form";
 
 const passwordAction = vi.fn(async () => ({ error: null }));
@@ -28,21 +30,23 @@ describe("LoginForm", () => {
     render(
       <LoginForm
         callbackUrl="/sessions"
-        initialError="Sign-in refused."
+        initialError="refused"
         passwordAction={passwordAction}
         sso={null}
       />,
     );
-    expect(screen.getByRole("alert")).toHaveTextContent("Sign-in refused.");
+    expect(screen.getByRole("alert")).toHaveTextContent(MESSAGES.en.login.errors.refused);
   });
 
   it("shows the error returned by the password action", async () => {
-    const limited = vi.fn(async () => ({ error: "Too many sign-in attempts." }));
+    const limited = vi.fn(async () => ({ error: "rateLimited" as const }));
     render(<LoginForm callbackUrl="/sessions" passwordAction={limited} sso={null} />);
     await userEvent.type(screen.getByLabelText("Email"), "ada@example.com");
     await userEvent.type(screen.getByLabelText("Password"), "wrong");
     await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("Too many sign-in attempts.");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      MESSAGES.en.login.errors.rateLimited,
+    );
     expect(limited).toHaveBeenCalledOnce();
   });
 });

@@ -1,10 +1,9 @@
-import { SparklesIcon } from "lucide-react";
-
+import { useMessages } from "@/components/preferences/provider";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import type { OpenQuestionItem } from "@/lib/backend/types";
+import { cn } from "@/lib/utils";
 
-/** Open questions with answer options as buttons; the recommended one stands out. */
+/** Open questions with answer options as chips; the recommended one stands out. */
 export function OpenQuestions({
   questions,
   disabled,
@@ -17,65 +16,59 @@ export function OpenQuestions({
   queueing?: boolean;
   onAnswer: (question: OpenQuestionItem, option: string) => void;
 }) {
+  const t = useMessages().questions;
   if (questions.length === 0) {
-    return (
-      <p className="p-4 text-sm text-muted-foreground">
-        {queueing
-          ? "Aucune autre question en attendant la fin de l'analyse."
-          : "Aucune question ouverte pour le moment."}
-      </p>
-    );
+    return <p className="p-4 text-muted-foreground">{queueing ? t.noneWaiting : t.none}</p>;
   }
-  const list = (
-    <ul className="flex flex-col gap-4 p-4">
-      {questions.map((question, index) => (
-        <li key={question.id ?? index} className="flex flex-col gap-2 rounded-xl border p-3">
-          <div className="flex flex-wrap items-center gap-1">
-            {question.blocking ? <Badge variant="destructive">Bloquante</Badge> : null}
-          </div>
-          <p className="font-medium">{question.question}</p>
-          {question.why_it_matters ? (
-            <p className="text-xs text-muted-foreground">
-              Pourquoi cette question : {question.why_it_matters}
-            </p>
-          ) : null}
-          {(question.options ?? []).length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              {(question.options ?? []).map((option) => {
-                const recommended = option === question.recommended_option;
-                return (
-                  <Button
-                    key={option}
-                    size="sm"
-                    variant={recommended ? "default" : "outline"}
-                    // Options are model-written sentences: let them wrap within the panel.
-                    className="h-auto max-w-full py-1 text-left whitespace-normal"
-                    disabled={disabled}
-                    onClick={() => onAnswer(question, option)}
-                    data-recommended={recommended || undefined}
-                  >
-                    {recommended ? <SparklesIcon aria-hidden /> : null}
-                    {option}
-                    {recommended ? <span className="sr-only"> (recommandé)</span> : null}
-                  </Button>
-                );
-              })}
-            </div>
-          ) : (
-            <p className="text-xs text-muted-foreground italic">Répondez dans la conversation.</p>
-          )}
-        </li>
-      ))}
-    </ul>
-  );
   return (
     <>
-      {queueing ? (
-        <p className="px-4 pt-4 text-xs text-muted-foreground">
-          Analyse en cours : vos réponses partiront ensemble dès qu&apos;elle se termine.
-        </p>
-      ) : null}
-      {list}
+      {queueing ? <p className="px-4 pt-3 text-xs text-muted-foreground">{t.queueing}</p> : null}
+      <ul className="divide-y px-4">
+        {questions.map((question, index) => (
+          <li key={question.id ?? index} className="flex flex-col gap-2 py-4">
+            <div className="font-semibold text-pretty">
+              <p className="inline">{question.question}</p>
+              {question.blocking ? (
+                <Badge variant="destructive" className="ml-2 align-text-bottom">
+                  {t.blocking}
+                </Badge>
+              ) : null}
+            </div>
+            {question.why_it_matters ? (
+              <p className="text-[13px] text-muted-foreground">{question.why_it_matters}</p>
+            ) : null}
+            {(question.options ?? []).length > 0 ? (
+              <div className="flex flex-wrap gap-1.5">
+                {(question.options ?? []).map((option) => {
+                  const recommended = option === question.recommended_option;
+                  return (
+                    <button
+                      key={option}
+                      type="button"
+                      // Options are model-written sentences: they wrap within the panel.
+                      className={cn(
+                        "max-w-full cursor-pointer rounded-md border bg-card px-2.5 py-1.5 text-left text-[13px] hover:border-primary disabled:pointer-events-none disabled:opacity-50",
+                        recommended && "border-primary",
+                      )}
+                      disabled={disabled}
+                      onClick={() => onAnswer(question, option)}
+                      data-recommended={recommended || undefined}
+                    >
+                      {recommended ? (
+                        <span aria-hidden className="mr-1 text-star">
+                          ★
+                        </span>
+                      ) : null}
+                      {option}
+                      {recommended ? <span className="sr-only"> ({t.recommended})</span> : null}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
+          </li>
+        ))}
+      </ul>
     </>
   );
 }

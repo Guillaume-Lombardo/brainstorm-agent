@@ -364,6 +364,16 @@ ADR impact: ADR 0010 updated.
 - [x] Serve a ZIP with the consolidated document, one file per stage and the exportable delivery plan.
 - [x] Offer it first in the Export menu.
 
+### Lot 15: Theme, languages and visual refresh
+
+Validated scope: dark mode that follows the system, French and English interface, sober look close
+to the owner's other tools, less text on screen. No change to the backend, gates or exports.
+ADR impact: ADR 0011 updated.
+
+- [x] Light, dark and system themes from shared color tokens.
+- [x] French and English dictionaries, language switch that keeps the running work.
+- [x] Restyled sign-in, sessions and workspace, usable on phones.
+
 ### Production cross-path acceptance fixes
 
 Validated scope: reproduce the deployed expense-sharing journey; correct the Questions panel's

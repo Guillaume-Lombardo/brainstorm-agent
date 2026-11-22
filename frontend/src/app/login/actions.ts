@@ -3,21 +3,20 @@
 import { AuthError, CredentialsSignin } from "next-auth";
 
 import { signIn } from "@/auth";
+import type { SignInError } from "@/lib/auth/messages";
 import { OIDC_PROVIDER_ID } from "@/lib/auth/oidc";
 import { safeCallbackPath } from "@/lib/auth/redirect";
 
 export interface LoginState {
-  error: string | null;
+  error: SignInError | null;
 }
 
-/** User-facing message of a failed password sign-in; never says which part was wrong. */
-function credentialsErrorMessage(error: AuthError): string {
+/** Error shown for a failed password sign-in; never says which part was wrong. */
+function credentialsError(error: AuthError): SignInError {
   if (error instanceof CredentialsSignin) {
-    return error.code === "rate_limited"
-      ? "Too many sign-in attempts. Wait a minute and try again."
-      : "Invalid email or password.";
+    return error.code === "rate_limited" ? "rateLimited" : "invalid";
   }
-  return "Sign-in failed. Try again later.";
+  return "failed";
 }
 
 export async function loginWithPassword(
@@ -32,7 +31,7 @@ export async function loginWithPassword(
     });
   } catch (error) {
     if (error instanceof AuthError) {
-      return { error: credentialsErrorMessage(error) };
+      return { error: credentialsError(error) };
     }
     // Successful sign-in redirects by throwing; let Next.js handle it.
     throw error;

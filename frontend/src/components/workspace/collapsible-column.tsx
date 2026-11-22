@@ -16,6 +16,7 @@ import {
   type ReactNode,
 } from "react";
 
+import { useMessages } from "@/components/preferences/provider";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -54,13 +55,13 @@ interface CollapsibleColumnProps {
 }
 
 /**
- * Workspace side column that collapses to a narrow rail and resizes on large screens.
+ * Workspace side column, a bordered panel that collapses to a narrow rail and resizes on large screens.
  *
  * The column width animates while the content keeps its open width and fades out, so text
  * never re-wraps during the motion. A window-splitter handle on the inner edge resizes the
  * open column with the pointer or the arrow keys; Home and End go to the bounds, Enter
  * collapses, a double click restores the default width. The toggle is absolutely placed in
- * the top 44px of the column: content must keep that band free of anything that scrolls.
+ * the top 40px of the panel: content must keep that band free of anything that scrolls.
  *
  * Args:
  *   props (CollapsibleColumnProps): Column side, label, content id, layout and content.
@@ -76,6 +77,7 @@ export function CollapsibleColumn({
   children,
 }: CollapsibleColumnProps) {
   const { collapsed, width, minWidth, maxWidth } = layout;
+  const t = useMessages().columns;
   const [resizing, setResizing] = useState(false);
   const largeScreen = useLargeScreen();
   const columnRef = useRef<HTMLElement>(null);
@@ -166,7 +168,8 @@ export function CollapsibleColumn({
     }
   }
 
-  const label = collapsed ? `Expand ${name} panel` : `Collapse ${name} panel`;
+  const shownName = t.names[name] ?? name;
+  const label = collapsed ? t.expand(shownName) : t.collapse(shownName);
   const [OpenIcon, CloseIcon] =
     side === "left"
       ? [PanelLeftOpenIcon, PanelLeftCloseIcon]
@@ -179,8 +182,9 @@ export function CollapsibleColumn({
       data-side={side}
       style={{ "--open-width": `${width}px` } as CSSProperties}
       className={cn(
-        "relative flex min-h-0 flex-col",
-        side === "left" ? "border-r" : "border-l",
+        // Half of each gap between panels belongs to the column: the handle sits in its middle.
+        "relative flex min-h-0 flex-col px-3 pb-3",
+        side === "left" ? "lg:pr-1.5" : "lg:pl-1.5",
         // Collapse, expand, key steps and resets animate; drags and refits to the window do not.
         layout.animate &&
           "lg:motion-safe:transition-[width] lg:motion-safe:duration-300 lg:motion-safe:ease-[cubic-bezier(0.32,0.72,0,1)]",
@@ -191,10 +195,10 @@ export function CollapsibleColumn({
         ref={toggleRef}
         type="button"
         variant="ghost"
-        size="icon"
+        size="icon-sm"
         className={cn(
-          "absolute top-3 z-10 hidden text-muted-foreground lg:inline-flex",
-          side === "left" ? "right-2" : "left-2",
+          "absolute top-1.5 z-10 hidden lg:inline-flex",
+          side === "left" ? "right-2.5" : "left-2.5",
         )}
         aria-controls={panelId}
         aria-expanded={!collapsed}
@@ -210,11 +214,11 @@ export function CollapsibleColumn({
           tabIndex={0}
           aria-orientation="vertical"
           aria-controls={panelId}
-          aria-label={`Resize ${name} panel`}
+          aria-label={t.resize(shownName)}
           aria-valuenow={width}
           aria-valuemin={minWidth}
           aria-valuemax={maxWidth}
-          title="Drag to resize, double click to reset"
+          title={t.resizeHint}
           data-resizing={resizing}
           className={cn(
             // An 8px grab area centered on the border, above the neighbouring column.
@@ -240,15 +244,21 @@ export function CollapsibleColumn({
         </div>
       )}
       {/* Clips the content while the column is narrower than it. */}
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div
+        className={cn(
+          "flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border bg-card",
+          collapsed && "lg:border-transparent lg:bg-transparent",
+        )}
+      >
         <div
           id={panelId}
           // A collapsed panel leaves the tab order and the accessibility tree at once, even
           // while it fades out.
           inert={collapsed && largeScreen}
           className={cn(
-            // The content keeps the open width minus the 1px border while the column animates.
-            "flex min-h-0 flex-1 flex-col lg:w-[calc(var(--open-width)-1px)]",
+            // The content keeps the open width, less the gutters and borders, while the column
+            // animates.
+            "flex min-h-0 flex-1 flex-col lg:w-[calc(var(--open-width)-20px)]",
             // It fades out fast on collapse, and back in once the column is mostly open. Only
             // opacity moves: `inert` above hides it from keyboard and assistive tech at once,
             // whereas a `visibility` transition would be inherited by children that animate

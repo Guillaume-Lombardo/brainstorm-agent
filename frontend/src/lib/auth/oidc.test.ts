@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { signInErrorMessage } from "./messages";
+import { signInError } from "./messages";
 import { oidcIdentity, readOidcSettings } from "./oidc";
 import { safeCallbackPath } from "./redirect";
 
@@ -49,11 +49,11 @@ describe("oidcIdentity", () => {
   });
 });
 
-describe("signInErrorMessage", () => {
+describe("signInError", () => {
   it("explains a refused SSO sign-in and hides unknown error types", () => {
-    expect(signInErrorMessage("AccessDenied")).toMatch(/did not confirm your e-mail/);
-    expect(signInErrorMessage("<script>")).toBe("Sign-in failed. Try again later.");
-    expect(signInErrorMessage(undefined)).toBeNull();
+    expect(signInError("AccessDenied")).toBe("refused");
+    expect(signInError("<script>")).toBe("failed");
+    expect(signInError(undefined)).toBeNull();
   });
 });
 

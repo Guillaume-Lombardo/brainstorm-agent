@@ -68,7 +68,7 @@ describe("workspaceReducer", () => {
     );
     expect(state.streaming).toEqual({
       turnId: "t1",
-      status: "Analyzing your message…",
+      status: "analyzing",
       text: "Hi there",
     });
 
@@ -92,7 +92,7 @@ describe("workspaceReducer", () => {
       { type: "turn.started", turn_id: "t1", stage: STAGE },
       { type: "analysis.status", status: "running" },
     );
-    expect(state.streaming).toMatchObject({ status: "Preparing the stage…", opening: true });
+    expect(state.streaming).toMatchObject({ status: "opening", opening: true });
     expect(state.messages).toHaveLength(2);
     expect(apply(state, completed).messages.map(({ id }) => id)).toEqual(["m1", "m2", "t1"]);
 
@@ -136,7 +136,7 @@ describe("workspaceReducer", () => {
       },
     );
     expect(state.documentRevision).toBe(1);
-    expect(state.streaming?.status).toBe("Updating the stage document…");
+    expect(state.streaming?.status).toBe("document");
     expect(state.session.stage_states?.stage_2_user_story_mapping).toBe(coverage);
     expect(state.session.stage_states?.stage_0_pitch).toBe(session.stage_states?.stage_0_pitch);
     expect(state.session.pending_human_review?.from_stage).toBe("stage_2_user_story_mapping");

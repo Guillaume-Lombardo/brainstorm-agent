@@ -85,6 +85,11 @@ export function stage2Session(overrides: Partial<SessionOverview> = {}): Session
           { id: "personas", message: "At least one persona is named.", passed: false },
           { id: "backbone", message: "The backbone has activities.", passed: false },
           { id: "mvp", message: "The MVP scope is explicit.", passed: true },
+          {
+            id: "field:actors_personas",
+            message: "Required field actors_personas: missing",
+            passed: false,
+          },
         ],
       }),
     },

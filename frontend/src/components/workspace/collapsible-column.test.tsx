@@ -45,12 +45,11 @@ describe("CollapsibleColumn", () => {
     expect(window.localStorage.getItem(`${PREFIX}.collapsed`)).toBe("false");
   });
 
-  it("puts the border and the controls on the inner side of a right column", () => {
+  it("puts the controls on the inner side of a right column", () => {
     render(<Harness side="right" />);
     expect(column()).toHaveAttribute("data-side", "right");
-    expect(column()).toHaveClass("border-l");
     expect(column().style.getPropertyValue("--open-width")).toBe("300px");
-    expect(screen.getByRole("button", { name: "Collapse test panel" })).toHaveClass("left-2");
+    expect(screen.getByRole("button", { name: "Collapse test panel" })).toHaveClass("left-2.5");
     expect(handle()).toHaveClass("-left-1");
   });
 
