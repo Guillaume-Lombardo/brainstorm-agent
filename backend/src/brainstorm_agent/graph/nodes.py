@@ -10,6 +10,7 @@ from brainstorm_agent.core.elicitation import filter_defaults, selected_question
 from brainstorm_agent.core.enums import Language, Stage
 from brainstorm_agent.core.gate_questions import (
     GATE_ID_PREFIX,
+    PROPOSAL_QUESTION,
     PROPOSED_REASON,
     confirms_proposals,
     gate_questions,
@@ -25,6 +26,7 @@ from brainstorm_agent.core.models import (
     StageState,
     StageValidationResult,
 )
+from brainstorm_agent.core.quality_rules import concrete
 from brainstorm_agent.core.validation import validate_stage
 from brainstorm_agent.services.llm_client import StreamingReply
 
@@ -69,10 +71,14 @@ def _as_proposal(analysis: AssistantAnalysis, language: Language) -> None:
     analysis.confirmed_fields = []
     for assumption in analysis.assumptions:
         assumption.to_confirm = True
-    analysis.partial_fields = [
-        PartialField(field=name, reason=PROPOSED_REASON[language])
-        for name in analysis.extracted_fields.model_dump(exclude_none=True)
-    ]
+    # A placeholder proposes nothing: there is no value to confirm.
+    fields = {
+        name: [item for item in value if concrete(item)] if isinstance(value, list) else value
+        for name, value in analysis.extracted_fields.model_dump(exclude_none=True).items()
+    }
+    fields = {name: value for name, value in fields.items() if concrete(value)}
+    analysis.extracted_fields = type(analysis.extracted_fields).model_validate(fields)
+    analysis.partial_fields = [PartialField(field=name, reason=PROPOSED_REASON[language]) for name in fields]
 
 
 def make_extract_node(llm: BrainstormLLM) -> TurnNode:
@@ -164,15 +170,17 @@ def apply_stage_rules(state: TurnGraphState) -> dict[str, object]:
             if key != stage.value
         },
     )
-    analysis.open_questions.extend(
-        gate_questions(
-            validation,
-            language=_turn_language(state),
-            partial_fields=partial_fields,
-            contradictions=analysis.contradictions,
-            model_questions=analysis.open_questions,
-        ),
+    questions = gate_questions(
+        validation,
+        language=_turn_language(state),
+        partial_fields=partial_fields,
+        contradictions=analysis.contradictions,
+        model_questions=analysis.open_questions,
     )
+    # The question budget never hides the confirmation: nothing else settles the whole proposal.
+    confirmation = [q for q in questions if q.question in PROPOSAL_QUESTION.question.values()]
+    others = [q for q in questions if q not in confirmation]
+    analysis.open_questions = [*confirmation, *analysis.open_questions, *others]
     analysis.stage_is_clear_enough = validation.stage_is_clear_enough
     analysis.transition_decision_reason = validation.transition_decision_reason
     return {

@@ -277,7 +277,12 @@ def test_opening_keeps_only_proposals_to_confirm():
             stage=Stage.STAGE_1_PROBLEM_FRAMING,
             summary="",
             assistant_message="",
-            extracted_fields=ProblemFields(problem_statement="Slow", users_actors=["Sales"]),
+            extracted_fields=ProblemFields(
+                problem_statement="Slow",
+                users_actors=["Sales"],
+                measurable_objectives=["100 % by June", "TBD"],
+                non_goals=["TBD"],
+            ),
             facts=[FactItem(statement="Invented fact")],
             decisions=[DecisionItem(statement="Invented decision")],
             assumptions=[AssumptionItem(statement="Sales qualify alone")],
@@ -288,10 +293,16 @@ def test_opening_keeps_only_proposals_to_confirm():
     assert analysis.facts == []
     assert analysis.decisions == []
     assert analysis.confirmed_fields == []
+    assert analysis.extracted_fields.model_dump(exclude_none=True) == {
+        "problem_statement": "Slow",
+        "users_actors": ["Sales"],
+        "measurable_objectives": ["100 % by June"],
+    }
     assert [item.to_confirm for item in analysis.assumptions] == [True]
     assert {item.field: item.reason for item in analysis.partial_fields} == {
         "problem_statement": PROPOSED,
         "users_actors": PROPOSED,
+        "measurable_objectives": PROPOSED,
     }
 
 
@@ -451,6 +462,7 @@ def test_proposals_are_confirmed_with_one_question():
             partial_fields=[
                 PartialField(field=key, reason=reason) for key, reason in state.partial_fields.items()
             ],
+            open_questions=[OpenQuestionItem(question=f"Question {n}?") for n in range(3)],
         ).model_dump(mode="json"),
     })
     gate = [
@@ -458,6 +470,13 @@ def test_proposals_are_confirmed_with_one_question():
         for q in AssistantAnalysis.model_validate(result["analysis"]).open_questions
         if q.id.startswith("gate:")
     ]
+    # The question budget keeps it even when the provider asks three questions of the first topic.
+    assert (
+        selected_questions(
+            AssistantAnalysis.model_validate(result["analysis"]).open_questions,
+        )[0].question
+        == PROPOSAL_QUESTION.question[Language.FR]
+    )
     assert gate[0].question == PROPOSAL_QUESTION.question[Language.FR]
     assert gate[0].options == list(PROPOSAL_QUESTION.options[Language.FR])
     assert not {"problem_statement", "users_actors"} & {q.field for q in gate}
