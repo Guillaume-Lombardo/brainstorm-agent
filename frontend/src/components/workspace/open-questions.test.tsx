@@ -2,20 +2,21 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
+import { PreferencesProvider } from "@/components/preferences/provider";
 import { questionFixture } from "@/test/fixtures";
 
 import { OpenQuestions } from "./open-questions";
+
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 
 describe("OpenQuestions", () => {
   it("highlights the recommended option and answers with the chosen one", async () => {
     const question = questionFixture();
     const onAnswer = vi.fn();
     render(<OpenQuestions questions={[question]} disabled={false} onAnswer={onAnswer} />);
-    expect(screen.getByText("Bloquante")).toBeInTheDocument();
-    expect(
-      screen.getByText("Pourquoi cette question : It changes the data model."),
-    ).toBeInTheDocument();
-    const recommended = screen.getByRole("button", { name: /^Yes.*recommandé/ });
+    expect(screen.getByText("Blocking")).toBeInTheDocument();
+    expect(screen.getByText("It changes the data model.")).toBeInTheDocument();
+    const recommended = screen.getByRole("button", { name: /^Yes.*recommended/ });
     expect(recommended).toHaveAttribute("data-recommended", "true");
     expect(screen.getByRole("button", { name: "No" })).not.toHaveAttribute("data-recommended");
 
@@ -23,19 +24,18 @@ describe("OpenQuestions", () => {
     expect(onAnswer).toHaveBeenCalledWith(question, "No");
   });
 
-  it("uses French labels without exposing internal priority codes", () => {
+  it("speaks the language of the interface without exposing internal priority codes", () => {
     render(
-      <OpenQuestions
-        questions={[questionFixture({ priority: "scope" })]}
-        disabled={false}
-        onAnswer={vi.fn()}
-      />,
+      <PreferencesProvider locale="fr" theme="system">
+        <OpenQuestions
+          questions={[questionFixture({ priority: "scope" })]}
+          disabled={false}
+          onAnswer={vi.fn()}
+        />
+      </PreferencesProvider>,
     );
     expect(screen.getByText("Bloquante")).toBeInTheDocument();
     expect(screen.queryByText("scope")).not.toBeInTheDocument();
-    expect(
-      screen.getByText("Pourquoi cette question : It changes the data model."),
-    ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Yes.*recommandé/ })).toHaveAttribute(
       "data-recommended",
       "true",
@@ -52,11 +52,11 @@ describe("OpenQuestions", () => {
         onAnswer={onAnswer}
       />,
     );
-    expect(screen.getByText(/vos réponses partiront ensemble/)).toBeInTheDocument();
+    expect(screen.getByText(/your answers will leave together/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "No" }));
     expect(onAnswer).toHaveBeenCalledOnce();
     rerender(<OpenQuestions questions={[]} disabled={false} queueing onAnswer={onAnswer} />);
-    expect(screen.getByText(/Aucune autre question/)).toBeInTheDocument();
+    expect(screen.getByText(/No other question/)).toBeInTheDocument();
   });
 
   it("disables answers while an action or review is pending", () => {
@@ -73,16 +73,14 @@ describe("OpenQuestions", () => {
         onAnswer={vi.fn()}
       />,
     );
-    // Buttons default to one fixed-height line: the panel would clip a long option.
-    expect(screen.getByRole("button", { name: /^Immediate booking/ })).toHaveClass(
-      "h-auto",
-      "max-w-full",
-      "whitespace-normal",
-    );
+    // A one-line button would be clipped by the panel.
+    const button = screen.getByRole("button", { name: /^Immediate booking/ });
+    expect(button).toHaveClass("max-w-full");
+    expect(button).not.toHaveClass("whitespace-nowrap");
   });
 
   it("shows an empty state", () => {
     render(<OpenQuestions questions={[]} disabled={false} onAnswer={vi.fn()} />);
-    expect(screen.getByText("Aucune question ouverte pour le moment.")).toBeInTheDocument();
+    expect(screen.getByText("No open question.")).toBeInTheDocument();
   });
 });

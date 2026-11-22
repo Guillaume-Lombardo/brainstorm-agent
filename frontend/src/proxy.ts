@@ -9,5 +9,5 @@ export default auth;
 
 export const config = {
   // Everything except Auth.js endpoints, the health probe and static assets.
-  matcher: ["/((?!api/auth|api/health|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!api/auth|api/health|_next/static|_next/image|favicon.ico|icon.svg).*)"],
 };

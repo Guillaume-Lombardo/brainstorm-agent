@@ -5,14 +5,22 @@ import { useEffect, useState } from "react";
 
 import { ErrorState } from "@/components/error-state";
 import { Markdown } from "@/components/markdown";
+import { useMessages } from "@/components/preferences/provider";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/api/client";
-import type { DocumentDiff, SectionComment, Stage, StepDocument } from "@/lib/backend/types";
+import {
+  STAGES,
+  type DocumentDiff,
+  type SectionComment,
+  type Stage,
+  type StepDocument,
+} from "@/lib/backend/types";
+import { MESSAGES } from "@/lib/i18n";
 
 import { DiffView } from "./diff-view";
-import { splitSections } from "./markdown-sections";
+import { readableDocument, splitSections, translateDocument } from "./markdown-sections";
 
 type Loaded = { key: string; versions: StepDocument[] } | { key: string; error: unknown };
 
@@ -33,6 +41,7 @@ export function DocumentPanel({
   readOnly: boolean;
   onComment: (section: string, body: string) => Promise<boolean>;
 }) {
+  const t = useMessages().document;
   const key = `${stage}:${revision}`;
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [selection, setSelection] = useState<{ key: string; version: number } | null>(null);
@@ -51,7 +60,7 @@ export function DocumentPanel({
 
   if (!loaded || loaded.key !== key) {
     return (
-      <div className="flex flex-col gap-2 p-4" aria-label="Loading document">
+      <div className="flex flex-col gap-2 p-4" aria-label={t.loading}>
         <Skeleton className="h-6 w-1/2" />
         <Skeleton className="h-24 w-full" />
       </div>
@@ -62,11 +71,7 @@ export function DocumentPanel({
   }
   const { versions } = loaded;
   if (versions.length === 0) {
-    return (
-      <p className="p-4 text-sm text-muted-foreground">
-        No document yet for this stage. It appears after the first answer.
-      </p>
-    );
+    return <p className="p-4 text-muted-foreground">{t.empty}</p>;
   }
   const latest = versions.at(-1)!;
   const selectedVersion =
@@ -74,7 +79,7 @@ export function DocumentPanel({
       ? (versions.find((version) => version.version === selection.version) ?? latest)
       : latest;
   const previous = versions.find((version) => version.version === selectedVersion.version - 1);
-  const sections = splitSections(selectedVersion.markdown);
+  const sections = splitSections(readableDocument(selectedVersion.markdown));
   const headings = new Set(sections.map((section) => section.heading));
   const otherComments = comments.filter(
     (comment) => comment.stage === stage && !headings.has(comment.section),
@@ -82,32 +87,30 @@ export function DocumentPanel({
 
   return (
     <div className="flex flex-col gap-3 p-4">
-      <div className="flex flex-wrap items-center gap-2 text-sm">
-        <label htmlFor="document-version" className="text-muted-foreground">
-          Version
-        </label>
+      <div className="flex flex-wrap items-center gap-2">
         <select
-          id="document-version"
-          className="h-8 rounded-lg border bg-background px-2"
+          aria-label={t.version}
+          className="h-7 cursor-pointer rounded-md border bg-card px-1.5 text-[13px]"
           value={selectedVersion.version}
           onChange={(event) => setSelection({ key, version: Number(event.target.value) })}
         >
           {versions.map((version) => (
             <option key={version.version} value={version.version}>
               v{version.version}
-              {version.version === latest.version ? " (latest)" : ""}
+              {version.version === latest.version ? ` (${t.latest})` : ""}
             </option>
           ))}
         </select>
-        <Button
-          size="sm"
-          variant={showDiff ? "default" : "outline"}
-          disabled={!previous}
-          aria-pressed={showDiff}
-          onClick={() => setShowDiff((value) => !value)}
-        >
-          {previous ? `Diff with v${previous.version}` : "No previous version"}
-        </Button>
+        {previous ? (
+          <Button
+            size="sm"
+            variant="outline"
+            aria-pressed={showDiff}
+            onClick={() => setShowDiff((value) => !value)}
+          >
+            {t.compare(previous.version)}
+          </Button>
+        ) : null}
       </div>
       {showDiff && previous ? (
         <BackendDiff
@@ -117,7 +120,7 @@ export function DocumentPanel({
           to={selectedVersion.version}
         />
       ) : (
-        <article className="flex flex-col gap-2" data-testid="stage-document">
+        <article data-testid="stage-document">
           {sections.map((section, index) => (
             <DocumentSection
               key={`${section.heading ?? "preamble"}-${index}`}
@@ -131,8 +134,10 @@ export function DocumentPanel({
             />
           ))}
           {otherComments.length > 0 ? (
-            <section aria-label="Review notes" className="flex flex-col gap-2 border-t pt-2">
-              <h3 className="text-xs font-medium text-muted-foreground uppercase">Review notes</h3>
+            <section aria-label={t.reviewNotes} className="mt-4 flex flex-col gap-2 border-t pt-3">
+              <h3 className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                {t.reviewNotes}
+              </h3>
               {otherComments.map((comment, index) => (
                 <CommentNote key={comment.id ?? index} comment={comment} />
               ))}
@@ -157,28 +162,36 @@ function DocumentSection({
   readOnly: boolean;
   onComment: (section: string, body: string) => Promise<boolean>;
 }) {
+  const messages = useMessages();
+  const t = messages.document;
   const [draft, setDraft] = useState<string | null>(null);
+  // The panel is about one stage: its name is not repeated as a heading.
+  const named = STAGES.find((stage) => MESSAGES.en.stages[stage] === heading);
+  const text = named ? markdown.slice(markdown.indexOf("\n") + 1) : markdown;
+  const title = named ? messages.stages[named] : heading && (t.lines[heading] ?? heading);
+  const label = t.commentOn(title ?? "");
 
   return (
-    <section className="group relative">
-      <Markdown className="text-sm">{markdown}</Markdown>
-      {heading ? (
-        <div className="flex flex-col gap-2">
+    <section className="group first:[&_h1]:mt-0">
+      {heading && !readOnly && draft === null ? (
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          className="float-right ml-2 focus-visible:opacity-100 pointer-fine:opacity-0 pointer-fine:group-hover:opacity-100"
+          aria-label={label}
+          title={label}
+          onClick={() => setDraft("")}
+        >
+          <MessageSquarePlusIcon />
+        </Button>
+      ) : null}
+      <Markdown>{translateDocument(text, t)}</Markdown>
+      {comments.length > 0 || draft !== null ? (
+        <div className="my-2 flex flex-col gap-2">
           {comments.map((comment, index) => (
             <CommentNote key={comment.id ?? index} comment={comment} />
           ))}
-          {readOnly && draft === null ? null : draft === null ? (
-            <Button
-              variant="ghost"
-              size="xs"
-              className="self-start text-muted-foreground"
-              aria-label={`Comment on ${heading}`}
-              onClick={() => setDraft("")}
-            >
-              <MessageSquarePlusIcon />
-              Comment
-            </Button>
-          ) : (
+          {heading === null || draft === null ? null : (
             <form
               className="flex flex-col gap-2"
               onSubmit={(event) => {
@@ -187,18 +200,19 @@ function DocumentSection({
               }}
             >
               <Textarea
-                aria-label={`Comment on ${heading}`}
+                aria-label={label}
                 value={draft}
                 rows={2}
                 required
+                autoFocus
                 onChange={(event) => setDraft(event.target.value)}
               />
               <div className="flex justify-end gap-2">
                 <Button type="button" variant="ghost" size="sm" onClick={() => setDraft(null)}>
-                  Cancel
+                  {messages.common.cancel}
                 </Button>
                 <Button type="submit" size="sm" disabled={readOnly}>
-                  Add comment
+                  {t.addComment}
                 </Button>
               </div>
             </form>
@@ -210,14 +224,11 @@ function DocumentSection({
 }
 
 function CommentNote({ comment }: { comment: SectionComment }) {
+  const t = useMessages().document;
   return (
-    <p className="rounded-lg bg-amber-500/10 px-3 py-2 text-xs">
-      {comment.body}
-      {comment.consumed ? (
-        <span className="ml-1 text-muted-foreground">(taken into account)</span>
-      ) : (
-        <span className="ml-1 text-muted-foreground">(used by the next answer)</span>
-      )}
+    <p className="rounded-md bg-warn-soft px-3 py-2 text-[13px]">
+      {comment.body}{" "}
+      <span className="text-muted-foreground">{comment.consumed ? t.consumed : t.pending}</span>
     </p>
   );
 }
@@ -236,6 +247,7 @@ function BackendDiff({
   from: number;
   to: number;
 }) {
+  const t = useMessages().document;
   const key = `${stage}:${from}:${to}`;
   const [loaded, setLoaded] = useState<LoadedDiff | null>(null);
 
@@ -251,7 +263,7 @@ function BackendDiff({
   }, [sessionId, stage, from, to, key]);
 
   if (!loaded || loaded.key !== key) {
-    return <Skeleton className="h-24 w-full" aria-label="Loading diff" />;
+    return <Skeleton className="h-24 w-full" aria-label={t.loadingDiff} />;
   }
   if ("error" in loaded) {
     return <ErrorState error={loaded.error} />;

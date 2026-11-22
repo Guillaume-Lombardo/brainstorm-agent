@@ -1,16 +1,27 @@
 import type { Metadata } from "next";
 
+import { PreferencesProvider } from "@/components/preferences/provider";
+import { getLocale, getTheme } from "@/lib/preferences";
+
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Brainstorm Agent",
-  description: "Stage-driven project framing workspace.",
+  title: { default: "Brainstorm Agent", template: "%s · Brainstorm Agent" },
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const [locale, theme] = await Promise.all([getLocale(), getTheme()]);
   return (
-    <html lang="en" className="h-full antialiased">
-      <body className="flex min-h-full flex-col">{children}</body>
+    <html
+      lang={locale}
+      data-theme={theme === "system" ? undefined : theme}
+      className="h-full antialiased"
+    >
+      <body className="flex min-h-full flex-col">
+        <PreferencesProvider locale={locale} theme={theme}>
+          {children}
+        </PreferencesProvider>
+      </body>
     </html>
   );
 }

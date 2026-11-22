@@ -20,7 +20,7 @@ describe("DiffView", () => {
     const diff = screen.getByTestId("diff-view");
     expect(diff).not.toHaveTextContent("stage_0_pitch v1");
     expect(screen.getByText("-- one")).toHaveClass("line-through");
-    expect(screen.getByText("+- two")).toHaveClass("text-emerald-800");
+    expect(screen.getByText("+- two")).toHaveClass("text-good");
     // A removed horizontal rule inside the hunk is a change, not a header.
     expect(screen.getByText("----")).toHaveClass("line-through");
   });

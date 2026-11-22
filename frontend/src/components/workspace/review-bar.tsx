@@ -1,27 +1,17 @@
 "use client";
 
-import { CheckIcon, MessageSquareWarningIcon, RotateCcwIcon, XIcon } from "lucide-react";
+import { RotateCcwIcon } from "lucide-react";
 import { useState } from "react";
 
+import { useMessages } from "@/components/preferences/provider";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  STAGE_LABELS,
-  type ReviewAction,
-  type SessionOverview,
-  type Stage,
-} from "@/lib/backend/types";
+import type { ReviewAction, SessionOverview, Stage } from "@/lib/backend/types";
+import { cn } from "@/lib/utils";
 
-import { canReopen, stageStatus } from "./view-model";
+import { canReopen } from "./view-model";
 
 type NoteAction = Exclude<ReviewAction, "approve">;
 
@@ -39,10 +29,10 @@ export function ReviewBar({
   onReview: (stage: Stage, action: ReviewAction, note?: string) => Promise<void>;
   onReopen: (stage: Stage) => Promise<void>;
 }) {
+  const t = useMessages();
   const [noteAction, setNoteAction] = useState<NoteAction | null>(null);
   const [note, setNote] = useState("");
   const pendingReview = session.pending_human_review ?? null;
-  const status = stageStatus(session, selected);
   const reopenable = canReopen(session, selected);
 
   if (!pendingReview && !reopenable) {
@@ -51,59 +41,46 @@ export function ReviewBar({
 
   return (
     <div
-      className="flex flex-wrap items-center gap-2 border-b bg-muted/40 px-4 py-2 text-sm"
+      className={cn(
+        "mx-3 mb-3 flex flex-wrap items-center gap-2 rounded-lg border px-4 py-2",
+        pendingReview ? "border-primary bg-accent" : "bg-card",
+      )}
       role="region"
-      aria-label="Review"
+      aria-label={t.review.region}
     >
       {pendingReview ? (
         <>
-          <span className="flex-1 font-medium">
-            {STAGE_LABELS[pendingReview.from_stage]} is ready for your review.
+          <span className="basis-full font-semibold sm:flex-1 sm:basis-0">
+            {t.review.ready(t.stages[pendingReview.from_stage])}
           </span>
           <Button
-            size="sm"
             disabled={disabled}
             onClick={() => void onReview(pendingReview.from_stage, "approve")}
           >
-            <CheckIcon />
-            Approve
+            {t.review.approve}
           </Button>
           <Button
-            size="sm"
             variant="outline"
             disabled={disabled}
             onClick={() => setNoteAction("request_changes")}
           >
-            <MessageSquareWarningIcon />
-            Request changes
+            {t.review.requestChanges}
           </Button>
-          <Button
-            size="sm"
-            variant="destructive"
-            disabled={disabled}
-            onClick={() => setNoteAction("reject")}
-          >
-            <XIcon />
-            Reject
+          <Button variant="destructive" disabled={disabled} onClick={() => setNoteAction("reject")}>
+            {t.review.reject}
           </Button>
         </>
       ) : null}
       {reopenable ? (
         <>
           {!pendingReview ? (
-            <span className="flex-1 text-muted-foreground">
-              {STAGE_LABELS[selected]} is {status === "stale" ? "stale" : "validated"}. Reopening
-              marks later stages stale.
+            <span className="basis-full text-muted-foreground sm:flex-1 sm:basis-0">
+              {t.review.reopenHint}
             </span>
           ) : null}
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={disabled}
-            onClick={() => void onReopen(selected)}
-          >
+          <Button variant="outline" disabled={disabled} onClick={() => void onReopen(selected)}>
             <RotateCcwIcon />
-            Reopen {STAGE_LABELS[selected]}
+            {t.review.reopen(t.stages[selected])}
           </Button>
         </>
       ) : null}
@@ -117,14 +94,9 @@ export function ReviewBar({
         }}
       >
         <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {noteAction === "reject" ? "Reject stage" : "Request changes"}
-            </DialogTitle>
-            <DialogDescription>
-              The note is shown to the agent and kept with the stage document.
-            </DialogDescription>
-          </DialogHeader>
+          <DialogTitle>
+            {noteAction === "reject" ? t.review.rejectTitle : t.review.requestChanges}
+          </DialogTitle>
           <form
             className="flex flex-col gap-3"
             onSubmit={(event) => {
@@ -139,7 +111,7 @@ export function ReviewBar({
               );
             }}
           >
-            <Label htmlFor="review-note">Note</Label>
+            <Label htmlFor="review-note">{t.review.note}</Label>
             <Textarea
               id="review-note"
               value={note}
@@ -147,7 +119,9 @@ export function ReviewBar({
               onChange={(event) => setNote(event.target.value)}
             />
             <DialogFooter>
-              <Button type="submit">{noteAction === "reject" ? "Reject" : "Send"}</Button>
+              <Button type="submit" variant={noteAction === "reject" ? "destructive" : "default"}>
+                {noteAction === "reject" ? t.review.reject : t.review.send}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>

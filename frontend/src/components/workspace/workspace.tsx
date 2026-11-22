@@ -1,15 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useReducer, useRef, useState } from "react";
+import { useEffect, useReducer, useRef, useState, type ReactNode } from "react";
 
+import { AppHeader } from "@/components/app-header";
 import { ErrorState } from "@/components/error-state";
+import { useMessages } from "@/components/preferences/provider";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api } from "@/lib/api/client";
 import {
-  STAGE_LABELS,
   type OpenQuestionItem,
   type ReviewAction,
   type SessionOverview,
@@ -41,6 +42,7 @@ type Loaded =
 
 /** Loads a session, then renders the workspace. */
 export function Workspace({ sessionId }: { sessionId: string }) {
+  const t = useMessages().workspace;
   const [loaded, setLoaded] = useState<Loaded | null>(null);
 
   useEffect(() => {
@@ -56,27 +58,51 @@ export function Workspace({ sessionId }: { sessionId: string }) {
 
   if (!loaded || loaded.sessionId !== sessionId) {
     return (
-      <div
-        className="grid flex-1 grid-cols-1 gap-4 p-4 lg:grid-cols-[260px_minmax(0,1fr)_440px]"
-        aria-label="Loading workspace"
-      >
-        <Skeleton className="h-full" />
-        <Skeleton className="h-full" />
-        <Skeleton className="h-full" />
-      </div>
+      <>
+        <WorkspaceHeader />
+        <div
+          className="grid flex-1 grid-cols-1 gap-3 px-3 pb-3 lg:grid-cols-[242px_minmax(0,1fr)_422px]"
+          aria-label={t.loading}
+        >
+          <Skeleton className="h-full" />
+          <Skeleton className="h-full" />
+          <Skeleton className="h-full" />
+        </div>
+      </>
     );
   }
   if ("error" in loaded) {
     return (
-      <div className="mx-auto flex w-full max-w-xl flex-col gap-4 p-6">
-        <ErrorState error={loaded.error} />
-        <Link href="/sessions" className="text-sm underline">
-          Back to sessions
-        </Link>
-      </div>
+      <>
+        <WorkspaceHeader />
+        <ErrorState error={loaded.error} className="mx-auto w-full max-w-xl" />
+      </>
     );
   }
   return <WorkspaceView initialSnapshot={loaded.snapshot} />;
+}
+
+/** Way back to the sessions, title and actions of the session. */
+function WorkspaceHeader({ title, children }: { title?: string; children?: ReactNode }) {
+  const t = useMessages().sessions;
+  return (
+    <AppHeader>
+      <div className="flex min-w-0 basis-full items-center gap-2 sm:flex-1 sm:basis-0">
+        <Link href="/sessions" className="shrink-0 text-muted-foreground hover:text-foreground">
+          {t.title}
+        </Link>
+        {title ? (
+          <>
+            <span aria-hidden className="text-muted-foreground">
+              /
+            </span>
+            <h1 className="truncate text-[15px] font-semibold">{title}</h1>
+          </>
+        ) : null}
+      </div>
+      {children}
+    </AppHeader>
+  );
 }
 
 const STAGES_COLUMN: ColumnSpec = {
@@ -93,6 +119,7 @@ const DOCUMENT_COLUMN: ColumnSpec = {
 };
 
 function WorkspaceView({ initialSnapshot }: { initialSnapshot: SessionSnapshot }) {
+  const t = useMessages();
   const [state, dispatch] = useReducer(workspaceReducer, initialSnapshot, initialWorkspaceState);
   const [selectedStage, setSelectedStage] = useState<Stage | null>(null);
   const [actionError, setActionError] = useState<unknown>(null);
@@ -260,9 +287,9 @@ function WorkspaceView({ initialSnapshot }: { initialSnapshot: SessionSnapshot }
   const pendingReview = session.pending_human_review ?? null;
   const archived = session.archived === true;
   const blockedReason = archived
-    ? "This session is archived and read-only."
+    ? t.workspace.blocked.archived
     : pendingReview
-      ? `${STAGE_LABELS[pendingReview.from_stage]} is waiting for your review. Approve it or request changes first.`
+      ? t.workspace.blocked.review(t.stages[pendingReview.from_stage])
       : null;
   const questions = currentQuestions(session, [...answeringIds, ...queuedQuestionIds(queue)]);
 
@@ -288,17 +315,11 @@ function WorkspaceView({ initialSnapshot }: { initialSnapshot: SessionSnapshot }
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex items-center gap-3 border-b px-4 py-2">
-        <Link href="/sessions" className="text-sm text-muted-foreground hover:underline">
-          Sessions
-        </Link>
-        <span className="text-muted-foreground">/</span>
-        <h1 className="flex-1 truncate font-semibold">{session.title}</h1>
-        {archived ? <Badge variant="outline">Archived</Badge> : null}
-        <Badge variant="secondary">Current: {STAGE_LABELS[session.current_stage]}</Badge>
+    <>
+      <WorkspaceHeader title={session.title}>
+        {archived ? <Badge>{t.workspace.archived}</Badge> : null}
         <ExportMenu sessionId={sessionId} />
-      </div>
+      </WorkspaceHeader>
       <ReviewBar
         session={session}
         selected={stage}
@@ -309,7 +330,7 @@ function WorkspaceView({ initialSnapshot }: { initialSnapshot: SessionSnapshot }
         }}
       />
       {actionError ? (
-        <div className="px-4 pt-2">
+        <div className="px-3 pb-3">
           <ErrorState error={actionError} />
         </div>
       ) : null}
@@ -320,16 +341,18 @@ function WorkspaceView({ initialSnapshot }: { initialSnapshot: SessionSnapshot }
         <CollapsibleColumn side="left" name="stages" panelId="stages-panel" layout={stagesColumn}>
           <p
             aria-hidden
-            className="mt-3 hidden h-8 shrink-0 items-center px-5 text-xs font-medium tracking-wide text-muted-foreground uppercase lg:flex"
+            className="flex h-10 shrink-0 items-center px-3 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase"
           >
-            Stages
+            {t.workspace.stagesPanel}
           </p>
-          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-3 lg:pt-4">
-            <StageStepper
-              session={session}
-              selected={stage}
-              onSelect={(next) => setSelectedStage(next === session.current_stage ? null : next)}
-            />
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+            <div className="px-1.5 pb-2">
+              <StageStepper
+                session={session}
+                selected={stage}
+                onSelect={(next) => setSelectedStage(next === session.current_stage ? null : next)}
+              />
+            </div>
             <StageDetails
               session={session}
               stage={stage}
@@ -340,34 +363,39 @@ function WorkspaceView({ initialSnapshot }: { initialSnapshot: SessionSnapshot }
             />
           </div>
         </CollapsibleColumn>
-        <section className="flex min-h-[60vh] flex-col lg:min-h-0" aria-label="Conversation">
-          <ResearchPanel
-            sessionId={sessionId}
-            available={session.current_stage !== "stage_0_pitch"}
-            disabled={busy || archived}
-            onChanged={async () => {
-              await refresh();
-            }}
-          />
-          <ChatPanel
-            messages={state.messages}
-            stage={session.current_stage}
-            streaming={state.streaming}
-            error={state.turnError}
-            blockedReason={blockedReason}
-            pending={acting}
-            running={running}
-            queue={queue}
-            draft={state.draft}
-            onDraftChange={(draft) => dispatch({ type: "draft.changed", draft })}
-            onSend={(message) => {
-              dispatch({ type: "draft.changed", draft: "" });
-              sendMessage(message);
-            }}
-            onSendQueue={sendQueue}
-            onStart={canOpen(session) ? () => openStage(session) : null}
-            onRemoveQueued={remove}
-          />
+        <section
+          className="order-first flex h-[calc(100dvh-7rem)] min-h-96 flex-col px-3 pb-3 lg:order-none lg:h-auto lg:min-h-0 lg:px-1.5"
+          aria-label={t.workspace.conversation}
+        >
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border bg-card">
+            <ResearchPanel
+              sessionId={sessionId}
+              available={session.current_stage !== "stage_0_pitch"}
+              disabled={busy || archived}
+              onChanged={async () => {
+                await refresh();
+              }}
+            />
+            <ChatPanel
+              messages={state.messages}
+              stage={session.current_stage}
+              streaming={state.streaming}
+              error={state.turnError}
+              blockedReason={blockedReason}
+              pending={acting}
+              running={running}
+              queue={queue}
+              draft={state.draft}
+              onDraftChange={(draft) => dispatch({ type: "draft.changed", draft })}
+              onSend={(message) => {
+                dispatch({ type: "draft.changed", draft: "" });
+                sendMessage(message);
+              }}
+              onSendQueue={sendQueue}
+              onStart={canOpen(session) ? () => openStage(session) : null}
+              onRemoveQueued={remove}
+            />
+          </div>
         </section>
         <CollapsibleColumn
           side="right"
@@ -377,13 +405,13 @@ function WorkspaceView({ initialSnapshot }: { initialSnapshot: SessionSnapshot }
         >
           {/* Only the tab content scrolls: the tab row stays clear of the collapse toggle. */}
           <Tabs defaultValue="document" className="min-h-0 flex-1">
-            <TabsList className="m-3 shrink-0 lg:ml-12">
-              <TabsTrigger value="document">Document</TabsTrigger>
+            <TabsList className="lg:pl-9">
+              <TabsTrigger value="document">{t.workspace.tabs.document}</TabsTrigger>
               <TabsTrigger value="questions">
-                Questions
-                {questions.length > 0 ? <Badge className="ml-1">{questions.length}</Badge> : null}
+                {t.workspace.tabs.questions}
+                {questions.length > 0 ? <Badge variant="accent">{questions.length}</Badge> : null}
               </TabsTrigger>
-              <TabsTrigger value="delivery">Delivery</TabsTrigger>
+              <TabsTrigger value="delivery">{t.workspace.tabs.delivery}</TabsTrigger>
             </TabsList>
             <TabsContent value="document" className="min-h-0 overflow-y-auto">
               <DocumentPanel
@@ -411,6 +439,6 @@ function WorkspaceView({ initialSnapshot }: { initialSnapshot: SessionSnapshot }
           </Tabs>
         </CollapsibleColumn>
       </div>
-    </div>
+    </>
   );
 }

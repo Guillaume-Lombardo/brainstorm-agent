@@ -95,7 +95,7 @@ describe("ChatPanel", () => {
       "My pitch",
       "New stage 1. Problem framing",
       "Here is the problem.",
-      "Back to stage 0. Pitch",
+      "Back to 0. Pitch",
     ]);
   });
 
@@ -144,9 +144,9 @@ describe("ChatPanel", () => {
 
   it("shows the streaming status and partial answer", () => {
     render(
-      <Harness onSend={vi.fn()} streaming={{ turnId: "t", status: "Checking", text: "Partial" }} />,
+      <Harness onSend={vi.fn()} streaming={{ turnId: "t", status: "document", text: "Partial" }} />,
     );
-    expect(screen.getByRole("status")).toHaveTextContent("Checking");
+    expect(screen.getByRole("status")).toHaveTextContent("Updating the stage document…");
     expect(screen.getByText("Partial")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
   });
@@ -157,7 +157,7 @@ describe("ChatPanel", () => {
     render(
       <Harness
         running
-        streaming={{ turnId: "t", status: "Checking", text: "" }}
+        streaming={{ turnId: "t", status: "document", text: "" }}
         queue={[queued]}
         onSend={onSend}
         onRemoveQueued={onRemoveQueued}
@@ -195,7 +195,7 @@ describe("ChatPanel", () => {
       />,
     );
     expect(screen.getByRole("textbox", { name: "Message" })).toBeDisabled();
-    expect(screen.getByText("Pitch is waiting for your review.")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Pitch is waiting for your review.")).toBeInTheDocument();
     expect(screen.getByText("Try again in 5 seconds.")).toBeInTheDocument();
   });
 
@@ -288,16 +288,16 @@ describe("ChatPanel", () => {
   });
 
   it("stops following a reply once the reader scrolls up", () => {
-    const scrollIntoView = vi.fn();
-    Element.prototype.scrollIntoView = scrollIntoView;
+    const scrollTo = vi.fn();
+    Element.prototype.scrollTo = scrollTo;
     onTestFinished(() => {
-      delete (Element.prototype as Partial<Element>).scrollIntoView;
+      delete (Element.prototype as Partial<Element>).scrollTo;
     });
     const view = (text: string) => (
       <Harness onSend={vi.fn()} streaming={{ turnId: "t", status: null, text }} />
     );
     const { container, rerender } = render(view("First"));
-    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    expect(scrollTo).toHaveBeenCalledTimes(1);
 
     const log = container.querySelector('[aria-live="polite"]')!;
     Object.defineProperties(log, {
@@ -307,12 +307,12 @@ describe("ChatPanel", () => {
     });
     fireEvent.scroll(log);
     rerender(view("First words"));
-    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    expect(scrollTo).toHaveBeenCalledTimes(1);
 
     (log as HTMLElement).scrollTop = 1490;
     fireEvent.scroll(log);
     rerender(view("First words, more"));
-    expect(scrollIntoView).toHaveBeenCalledTimes(2);
+    expect(scrollTo).toHaveBeenCalledTimes(2);
 
     // Scrolled up again, then a new question (from any panel) follows its reply.
     (log as HTMLElement).scrollTop = 0;
@@ -321,15 +321,15 @@ describe("ChatPanel", () => {
       <Harness
         onSend={vi.fn()}
         messages={[message("user", "Next question")]}
-        streaming={{ turnId: null, status: "Sending…", text: "" }}
+        streaming={{ turnId: null, status: "sending", text: "" }}
       />,
     );
-    expect(scrollIntoView).toHaveBeenCalledTimes(3);
+    expect(scrollTo).toHaveBeenCalledTimes(3);
 
     // A failed turn drops the local question: a reader who scrolled up stays where they are.
     (log as HTMLElement).scrollTop = 0;
     fireEvent.scroll(log);
     rerender(<Harness onSend={vi.fn()} />);
-    expect(scrollIntoView).toHaveBeenCalledTimes(3);
+    expect(scrollTo).toHaveBeenCalledTimes(3);
   });
 });

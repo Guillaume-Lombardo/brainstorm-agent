@@ -3,8 +3,8 @@
 import { useEffect, useState, type ReactNode } from "react";
 
 import { ErrorState } from "@/components/error-state";
+import { useMessages } from "@/components/preferences/provider";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/errors";
@@ -14,6 +14,7 @@ import type {
   IntegrationScenario,
   SessionOverview,
 } from "@/lib/backend/types";
+import type { Messages } from "@/lib/i18n";
 
 import { contractMatrix, deliverySlices, stageState } from "./view-model";
 
@@ -33,6 +34,7 @@ export function DeliveryView({
   session: SessionOverview;
   revision: number;
 }) {
+  const t = useMessages().delivery;
   const slices = deliverySlices(session);
   const state = stageState(session, "stage_7_delivery_slicing");
   const ready = state !== undefined && !state.stale && slices.length > 0;
@@ -63,11 +65,7 @@ export function DeliveryView({
   }, [session.session_id, key, ready]);
 
   if (slices.length === 0) {
-    return (
-      <p className="p-4 text-sm text-muted-foreground">
-        Delivery slices appear once the delivery slicing stage starts.
-      </p>
-    );
+    return <p className="p-4 text-muted-foreground">{t.empty}</p>;
   }
   // The validated plan carries the dependencies the backend resolved (implicit ones on
   // the first slice and on contract providers); the draft slices only list explicit ones.
@@ -75,13 +73,13 @@ export function DeliveryView({
   let waves: string[][] | null = null;
   let notice: ReactNode = null;
   if (!ready) {
-    notice = "The delivery plan is stale: revalidate the delivery slicing stage.";
+    notice = t.stale;
   } else if (!loaded || loaded.key !== key) {
-    notice = <Skeleton className="h-16 w-full" aria-label="Loading delivery plan" />;
+    notice = <Skeleton className="h-16 w-full" aria-label={t.loading} />;
   } else if ("error" in loaded) {
     notice = <ErrorState error={loaded.error} />;
   } else if ("pending" in loaded) {
-    notice = "Waves appear once the delivery plan passes its deterministic checks.";
+    notice = t.pending;
   } else {
     shown = loaded.plan.slices;
     waves = loaded.plan.waves;
@@ -99,11 +97,15 @@ export function DeliverySlicingView({
   waves: string[][] | null;
   notice?: ReactNode;
 }) {
+  const t = useMessages().delivery;
   return (
     <div className="flex flex-col gap-6 p-4">
       <section aria-labelledby="waves-title" className="flex flex-col gap-2">
-        <h3 id="waves-title" className="text-sm font-semibold">
-          Waves and dependencies
+        <h3
+          id="waves-title"
+          className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase"
+        >
+          {t.waves}
         </h3>
         {waves ? (
           <DependencyGraph slices={slices} waves={waves} />
@@ -112,8 +114,11 @@ export function DeliverySlicingView({
         )}
       </section>
       <section aria-labelledby="slices-title" className="flex flex-col gap-2">
-        <h3 id="slices-title" className="text-sm font-semibold">
-          Slices
+        <h3
+          id="slices-title"
+          className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase"
+        >
+          {t.slices}
         </h3>
         <div className="grid gap-3">
           {slices.map((slice) => (
@@ -122,8 +127,11 @@ export function DeliverySlicingView({
         </div>
       </section>
       <section aria-labelledby="contracts-title" className="flex flex-col gap-2">
-        <h3 id="contracts-title" className="text-sm font-semibold">
-          Contract matrix
+        <h3
+          id="contracts-title"
+          className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase"
+        >
+          {t.contracts}
         </h3>
         <ContractMatrix slices={slices} />
       </section>
@@ -131,57 +139,57 @@ export function DeliverySlicingView({
   );
 }
 
-function scenarioText(scenario: IntegrationScenario): string {
+function scenarioText(scenario: IntegrationScenario, t: Messages["delivery"]): string {
   if (scenario.ears) {
     return scenario.ears;
   }
   return [
-    scenario.given && `Given ${scenario.given}`,
-    scenario.when && `when ${scenario.when}`,
-    scenario.then && `then ${scenario.then}`,
+    scenario.given && t.given(scenario.given),
+    scenario.when && t.when(scenario.when),
+    scenario.then && t.then(scenario.then),
   ]
     .filter(Boolean)
     .join(", ");
 }
 
 function SliceCard({ slice }: { slice: DeliverySlice }) {
+  const t = useMessages().delivery;
   const dependencies = slice.dependencies ?? [];
   const stubs = slice.stubs ?? [];
   return (
-    <Card size="sm" data-testid={`slice-${slice.id}`}>
-      <CardHeader>
-        <CardTitle>{slice.id}</CardTitle>
-        <CardDescription>{slice.goal}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-2 text-xs">
-        <div className="flex flex-wrap gap-1">
-          {(slice.owned_domain ?? []).map((domain) => (
-            <Badge key={domain} variant="secondary">
-              {domain}
-            </Badge>
-          ))}
-          {(slice.backlog_item_ids ?? []).map((item) => (
-            <Badge key={item} variant="outline">
-              {item}
-            </Badge>
-          ))}
-        </div>
+    <div
+      className="flex flex-col gap-2 rounded-lg border p-3 text-[13px]"
+      data-testid={`slice-${slice.id}`}
+    >
+      <p>
+        <span className="font-mono text-xs font-semibold text-primary">{slice.id}</span>
+        <span className="block font-semibold">{slice.goal}</span>
+      </p>
+      <div className="flex flex-wrap gap-1">
+        {(slice.owned_domain ?? []).map((domain) => (
+          <Badge key={domain} variant="accent">
+            {domain}
+          </Badge>
+        ))}
+        {(slice.backlog_item_ids ?? []).map((item) => (
+          <Badge key={item}>{item}</Badge>
+        ))}
+      </div>
+      <p>
+        <span className="text-muted-foreground">{t.dependsOn}</span>{" "}
+        {dependencies.join(", ") || t.none}
+      </p>
+      <ul className="list-disc pl-4">
+        {(slice.integration_scenarios ?? []).map((scenario, index) => (
+          <li key={index}>{scenarioText(scenario, t)}</li>
+        ))}
+      </ul>
+      {stubs.length > 0 ? (
         <p>
-          <span className="text-muted-foreground">Depends on:</span>{" "}
-          {dependencies.join(", ") || "none"}
+          <span className="text-muted-foreground">{t.stubs}</span> {stubs.join(", ")}
         </p>
-        <ul className="list-disc pl-4">
-          {(slice.integration_scenarios ?? []).map((scenario, index) => (
-            <li key={index}>{scenarioText(scenario)}</li>
-          ))}
-        </ul>
-        {stubs.length > 0 ? (
-          <p>
-            <span className="text-muted-foreground">Stubs:</span> {stubs.join(", ")}
-          </p>
-        ) : null}
-      </CardContent>
-    </Card>
+      ) : null}
+    </div>
   );
 }
 
@@ -192,6 +200,7 @@ const ROW_GAP = 16;
 
 /** Layered SVG graph: one column per wave, arrows from dependency to dependent. */
 function DependencyGraph({ slices, waves }: { slices: DeliverySlice[]; waves: string[][] }) {
+  const t = useMessages().delivery;
   const position = new Map<string, { x: number; y: number }>();
   const ordered = waves.map((sliceIds, index) => ({ index, sliceIds }));
   ordered.forEach((wave, column) => {
@@ -210,7 +219,7 @@ function DependencyGraph({ slices, waves }: { slices: DeliverySlice[]; waves: st
   return (
     <svg
       role="img"
-      aria-label="Slice dependency graph"
+      aria-label={t.graph}
       viewBox={`0 0 ${width} ${height}`}
       className="w-full max-w-full"
     >
@@ -235,7 +244,7 @@ function DependencyGraph({ slices, waves }: { slices: DeliverySlice[]; waves: st
           textAnchor="middle"
           className="fill-muted-foreground text-[10px]"
         >
-          Wave {wave.index}
+          {t.wave(wave.index)}
         </text>
       ))}
       {slices.flatMap((slice) =>
@@ -283,20 +292,19 @@ function DependencyGraph({ slices, waves }: { slices: DeliverySlice[]; waves: st
 
 /** Contracts × slices: O = owner/provider, C = consumer. */
 function ContractMatrix({ slices }: { slices: DeliverySlice[] }) {
+  const t = useMessages().delivery;
   const rows = contractMatrix(slices);
   if (rows.length === 0) {
-    return <p className="text-xs text-muted-foreground">No contract declared yet.</p>;
+    return <p className="text-xs text-muted-foreground">{t.noContract}</p>;
   }
   return (
     <div className="overflow-x-auto">
-      <table className="w-full border-collapse text-xs" aria-label="Contract matrix">
+      <table className="data-table" aria-label={t.contracts}>
         <thead>
           <tr>
-            <th scope="col" className="border px-2 py-1 text-left">
-              Contract
-            </th>
+            <th scope="col">{t.contract}</th>
             {slices.map((slice) => (
-              <th key={slice.id} scope="col" className="border px-2 py-1">
+              <th key={slice.id} scope="col">
                 {slice.id}
               </th>
             ))}
@@ -305,7 +313,7 @@ function ContractMatrix({ slices }: { slices: DeliverySlice[] }) {
         <tbody>
           {rows.map((row) => (
             <tr key={`${row.owner}-${row.id}`}>
-              <th scope="row" className="border px-2 py-1 text-left font-normal">
+              <th scope="row">
                 <span className="font-medium">{row.id}</span> {row.specification}
               </th>
               {slices.map((slice) => {
@@ -314,8 +322,7 @@ function ContractMatrix({ slices }: { slices: DeliverySlice[] }) {
                 return (
                   <td
                     key={slice.id}
-                    className="border px-2 py-1 text-center"
-                    aria-label={role === "O" ? "owner" : role === "C" ? "consumer" : "none"}
+                    aria-label={role === "O" ? t.owner : role === "C" ? t.consumer : t.none}
                   >
                     {role}
                   </td>
@@ -325,7 +332,7 @@ function ContractMatrix({ slices }: { slices: DeliverySlice[] }) {
           ))}
         </tbody>
       </table>
-      <p className="mt-1 text-xs text-muted-foreground">O: owning slice · C: consuming slice</p>
+      <p className="mt-1 text-xs text-muted-foreground">{t.legend}</p>
     </div>
   );
 }

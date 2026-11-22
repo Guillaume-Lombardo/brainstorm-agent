@@ -5,7 +5,7 @@ import { Fragment, memo, useEffect, useRef, type ChangeEvent, type KeyboardEvent
 
 import { ErrorState } from "@/components/error-state";
 import { Markdown } from "@/components/markdown";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useMessages } from "@/components/preferences/provider";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import type { Stage } from "@/lib/backend/types";
@@ -17,6 +17,11 @@ import { StageDivider } from "./stage-divider";
 import { failureToError } from "./turn";
 import type { QueuedMessage } from "./turn-queue";
 import type { ChatMessage } from "./view-model";
+
+/** Scrolls the conversation alone: on phones the page around it scrolls too. */
+function scrollToEnd(log: HTMLElement | null) {
+  log?.scrollTo?.({ top: log.scrollHeight });
+}
 
 export function ChatPanel({
   messages,
@@ -54,7 +59,8 @@ export function ChatPanel({
   /** Lets the assistant start the current stage, when it did not yet. */
   onStart?: (() => void) | null;
 }) {
-  const endRef = useRef<HTMLDivElement>(null);
+  const t = useMessages().chat;
+  const logRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   // Follow new text only while the reader is at the bottom, so they can scroll up mid-reply.
   const followRef = useRef(true);
@@ -71,9 +77,20 @@ export function ChatPanel({
 
   useEffect(() => {
     if (followRef.current) {
-      endRef.current?.scrollIntoView?.({ block: "end" });
+      scrollToEnd(logRef.current);
     }
   }, [messages.length, stage, streaming?.text]);
+
+  // The panels around the conversation open, close and load: its end stays in view.
+  useEffect(() => {
+    const log = logRef.current;
+    if (!log || typeof ResizeObserver === "undefined") {
+      return;
+    }
+    const observer = new ResizeObserver(() => followRef.current && scrollToEnd(log));
+    observer.observe(log);
+    return () => observer.disconnect();
+  }, []);
 
   const lastStage = messages.at(-1)?.stage;
   const stageChange =
@@ -141,7 +158,8 @@ export function ChatPanel({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div
-        className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4"
+        ref={logRef}
+        className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-5 py-4"
         aria-live="polite"
         onScroll={(event) => {
           const { scrollHeight, scrollTop, clientHeight } = event.currentTarget;
@@ -149,9 +167,7 @@ export function ChatPanel({
         }}
       >
         {messages.length === 0 && !streaming ? (
-          <p className="m-auto text-sm text-muted-foreground">
-            No message yet. Pitch your project.
-          </p>
+          <p className="m-auto text-muted-foreground">{t.empty}</p>
         ) : null}
         {messages.map((message, index) => {
           const previous = messages[index - 1]?.stage ?? message.stage;
@@ -171,7 +187,7 @@ export function ChatPanel({
             {streaming.status ? (
               <p className="flex items-center gap-2 text-xs text-muted-foreground" role="status">
                 <LoaderCircleIcon className="size-3 animate-spin" aria-hidden />
-                {streaming.status}
+                {t.status[streaming.status]}
               </p>
             ) : null}
             {streaming.text ? <MessageBubble role="assistant" content={streaming.text} /> : null}
@@ -181,30 +197,19 @@ export function ChatPanel({
         {onStart && !running && !pending ? (
           <Button type="button" variant="outline" className="self-center" onClick={onStart}>
             <PlayIcon />
-            Start this stage
+            {t.start}
           </Button>
         ) : null}
-        <div ref={endRef} />
       </div>
       <div className="flex flex-col gap-2 border-t p-3">
         {error ? <ErrorState error={failureToError(error)} /> : null}
-        {blockedReason ? (
-          <Alert>
-            <AlertTitle>Input paused</AlertTitle>
-            <AlertDescription>{blockedReason}</AlertDescription>
-          </Alert>
-        ) : null}
         {queue.length > 0 ? (
           <section
-            aria-label="Waiting answers"
-            className="flex flex-col gap-1 rounded-xl border border-dashed p-2 text-xs"
+            aria-label={t.waiting}
+            className="flex flex-col gap-1 rounded-md border border-dashed p-2 text-xs"
           >
             <div className="flex items-center justify-between gap-2 text-muted-foreground">
-              <p>
-                {running && queue.some((item) => !item.held)
-                  ? "Queued: sent together when the current turn ends."
-                  : "Not sent yet: check these messages, then send or remove them."}
-              </p>
+              <p>{running && queue.some((item) => !item.held) ? t.queued : t.unsent}</p>
               {running ? null : (
                 <Button
                   type="button"
@@ -213,7 +218,7 @@ export function ChatPanel({
                   disabled={pending || blockedReason !== null}
                   onClick={onSendQueue}
                 >
-                  Send now
+                  {t.sendNow}
                 </Button>
               )}
             </div>
@@ -222,14 +227,14 @@ export function ChatPanel({
                 <li key={item.id} className="flex items-start gap-1">
                   <p className="flex-1 whitespace-pre-wrap">{item.content}</p>
                   {running && item.held ? (
-                    <span className="text-muted-foreground">Kept</span>
+                    <span className="text-muted-foreground">{t.kept}</span>
                   ) : null}
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon-sm"
-                    aria-label="Remove from queue"
-                    title="Remove from queue"
+                    aria-label={t.remove}
+                    title={t.remove}
                     onClick={() => onRemoveQueued(item.id)}
                   >
                     <XIcon />
@@ -248,8 +253,8 @@ export function ChatPanel({
         >
           <Textarea
             ref={inputRef}
-            aria-label="Message"
-            placeholder="Answer the agent or add context…"
+            aria-label={t.message}
+            placeholder={blockedReason ?? t.placeholder}
             value={draft}
             rows={2}
             disabled={blockedReason !== null}
@@ -258,9 +263,10 @@ export function ChatPanel({
           />
           <Button
             type="submit"
+            size="icon"
             disabled={!canSend}
-            aria-label={running ? "Queue" : "Send"}
-            title={running ? "Queue until the current turn ends" : undefined}
+            aria-label={running ? t.queue : t.send}
+            title={running ? t.queueHint : undefined}
           >
             {pending ? (
               <LoaderCircleIcon className="animate-spin" />
@@ -287,10 +293,9 @@ const MessageBubble = memo(function MessageBubble({
     <div
       data-role={role}
       className={cn(
-        "max-w-[85%] rounded-xl px-3 py-2 text-sm",
         role === "user"
-          ? "self-end bg-primary whitespace-pre-wrap text-primary-foreground"
-          : "self-start bg-muted",
+          ? "max-w-[85%] self-end rounded-lg bg-accent px-3 py-2 [overflow-wrap:anywhere] whitespace-pre-wrap"
+          : "max-w-[75ch] py-1",
       )}
     >
       {/* Assistant replies are Markdown; user input stays the literal text that was typed. */}

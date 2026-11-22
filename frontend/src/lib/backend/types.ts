@@ -51,17 +51,6 @@ export const STAGES = [
   "stage_7_delivery_slicing",
 ] as const satisfies readonly Stage[];
 
-export const STAGE_LABELS: Record<Stage, string> = {
-  stage_0_pitch: "Pitch",
-  stage_1_problem_framing: "Problem framing",
-  stage_2_user_story_mapping: "User story mapping",
-  stage_3_event_storming: "Event storming",
-  stage_4_impact_mapping: "Impact mapping",
-  stage_5_risk_storming: "Risk storming",
-  stage_6_backlog_synthesis: "Backlog synthesis",
-  stage_7_delivery_slicing: "Delivery slicing",
-};
-
 export function isStage(value: string): value is Stage {
   return (STAGES as readonly string[]).includes(value);
 }

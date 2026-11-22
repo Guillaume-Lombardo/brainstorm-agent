@@ -78,6 +78,20 @@ user queued meanwhile. Loading a page never starts an opening: a "Start this sta
 after a failure for instance. Messages carry their stage; the conversation shows a marker wherever
 it changes, in another color when the session went back to an earlier stage.
 
+**Theme and language.** Both are display preferences of the browser, not of the account: cookies
+`theme` (`light` or `dark`; absent means the system) and `lang` (`fr` or `en`; absent means the
+browser language, then English). The root layout reads them on the server, so the first paint is
+already right and needs no inline script. Colors are tokens written once with `light-dark()` and
+follow `color-scheme`; components use tokens only, never a per-theme variant. Texts are two typed
+dictionaries in `lib/i18n/` (`fr` must have every key of `en`), without a library. Switching
+language renders the server components again and keeps the client state, a running turn included.
+
+The language of the interface does not change the conversation, which follows the language the user
+writes in, nor stored documents and exports. The workspace translates on display what the backend
+writes in English: fixed lines of the document template, readiness messages and errors, by exact
+text. An unknown text is shown as received. The document tab also leaves out the parts shown next to
+it (fields, readiness, transition); exports keep them.
+
 **Errors.** Every proxy error is `{"error": {"code", "message", "retryAfterSeconds?"}}` with the
 status relayed:
 
@@ -125,6 +139,10 @@ brand: Next.js bundles the module more than once (route handlers, Auth.js callba
   fake LLM mode gives deterministic data without it.
 - A per-IP login limiter in Next.js: see above. The backend's per-identity limit is shared and
   already enforced.
+- An i18n library and localized routes: the interface is private, has two languages and no text to
+  index; a typed dictionary is enough.
+- Backend texts by code instead of by English text: cleaner, but changes the contract and stored
+  documents. A changed sentence falls back to English until the dictionary follows.
 - Nonce-based CSP: requires dynamic rendering of every page and middleware; deferred until scripts
   from other origins are needed.
 

@@ -20,7 +20,7 @@ describe("StageStepper", () => {
     expect(items).toHaveLength(8);
     expect(items[7]).toBeDisabled();
     expect(items[2]).toHaveAttribute("aria-current", "step");
-    expect(within(items[1]).getByText("stale")).toBeInTheDocument();
+    expect(within(items[1]).getByText("Stale")).toBeInTheDocument();
 
     await userEvent.click(items[0]);
     expect(onSelect).toHaveBeenCalledWith("stage_0_pitch");

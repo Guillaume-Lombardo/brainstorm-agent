@@ -13,6 +13,7 @@ import {
   type Stage,
   type StageState,
 } from "@/lib/backend/types";
+import type { Messages } from "@/lib/i18n";
 
 /**
  * Presentation derived from the backend session state. Nothing here is a contract:
@@ -88,12 +89,12 @@ function itemLabel(item: unknown): string {
 }
 
 /** Display lines of a field value, whatever its contract kind. */
-export function fieldLines(value: unknown): string[] {
+export function fieldLines(value: unknown, words: { yes: string; no: string }): string[] {
   if (value === null || value === undefined || value === "") {
     return [];
   }
   if (typeof value === "boolean") {
-    return [value ? "Yes" : "No"];
+    return [value ? words.yes : words.no];
   }
   if (Array.isArray(value)) {
     return value.map(itemLabel);
@@ -102,16 +103,21 @@ export function fieldLines(value: unknown): string[] {
 }
 
 /** Fields of a stage in contract order, with coverage and partial-coverage reasons. */
-export function stageFields(session: SessionOverview, stage: Stage): FieldView[] {
+export function stageFields(
+  session: SessionOverview,
+  stage: Stage,
+  messages: Messages,
+): FieldView[] {
   const state = stageState(session, stage);
   const values = (state?.extracted_fields ?? {}) as Record<string, unknown>;
   return STAGE_FIELDS[stage].map((spec) => {
     const value = values[spec.name] ?? null;
     return {
       ...spec,
+      label: messages.fields[spec.name] ?? spec.label,
       coverage: state?.coverage?.[spec.name] ?? (spec.required ? "missing" : null),
       value,
-      lines: fieldLines(value),
+      lines: fieldLines(value, messages.common),
       reason: state?.partial_fields?.[spec.name],
     };
   });
