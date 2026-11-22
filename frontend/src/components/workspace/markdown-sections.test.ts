@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import { MESSAGES } from "@/lib/i18n";
 
-import { readableDocument, splitSections, translateDocument } from "./markdown-sections";
+import {
+  headingStage,
+  readableDocument,
+  splitSections,
+  translateDocument,
+} from "./markdown-sections";
 
 describe("splitSections", () => {
   it("splits on level-2 headings and keeps the preamble", () => {
@@ -105,7 +110,6 @@ describe("readableDocument", () => {
 ### Décision de passage
 
 - Étape assez claire\u00a0: non
-- Raison\u00a0: Ambiguïtés (partiel) (later); Des questions bloquantes restent ouvertes.
 `);
     expect(record).toContain("- Stage clear enough: no");
   });
@@ -115,6 +119,14 @@ describe("readableDocument", () => {
     expect(readableDocument(code)).toEqual({ body: code, record: "" });
     expect(splitSections(code)).toHaveLength(1);
     expect(translateDocument(code, MESSAGES.fr)).toBe(code);
+  });
+});
+
+describe("headingStage", () => {
+  it("knows the template headings, not the user's", () => {
+    expect(headingStage("Stage 2 - User Story Mapping")).toBe("stage_2_user_story_mapping");
+    expect(headingStage("Stage 2 - Checkout pilot")).toBeUndefined();
+    expect(headingStage(null)).toBeUndefined();
   });
 });
 

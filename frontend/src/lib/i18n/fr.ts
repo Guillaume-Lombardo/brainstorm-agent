@@ -244,7 +244,6 @@ export const fr: Messages = {
       "Transition Decision": [
         [/^Stage clear enough: yes$/, "Étape assez claire\u00a0: oui"],
         [/^Stage clear enough: no$/, "Étape assez claire\u00a0: non"],
-        [/^Reason: /, "Raison\u00a0: "],
       ],
       "Delivery waves": [
         [/^Wave (\d+): /, "Vague $1\u00a0: "],

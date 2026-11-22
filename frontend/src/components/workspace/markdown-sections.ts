@@ -54,6 +54,9 @@ const REPEATED = new Set(["# Questions to Continue", "### Open Questions"]);
 /** Parts recording how the stage was assessed, folded under the document. */
 const RECORD = new Set(["### Stage Fields", "### Readiness", "### Transition Decision"]);
 
+/** The decision repeats the checks listed above it. */
+const REPEATED_REASON = /^- Reason: /;
+
 /** Stage document as read on screen: no repeated nor empty part. Exports keep everything. */
 export function readableDocument(markdown: string): { body: string; record: string } {
   const parts: { heading: string; level: number; lines: string[] }[] = [];
@@ -64,7 +67,9 @@ export function readableDocument(markdown: string): { body: string; record: stri
       parts.push(part);
       part = { heading: text.trim(), level, lines: [] };
     }
-    part.lines.push(text);
+    if (part.heading !== "### Transition Decision" || !REPEATED_REASON.test(text)) {
+      part.lines.push(text);
+    }
   }
   parts.push(part);
 
@@ -93,10 +98,20 @@ function joinFilled(parts: { level: number; lines: string[] }[]): string {
     .join("\n");
 }
 
-/** Stage named by a heading of the backend template ("Stage 2 - User Story Mapping"). */
+/** Stage headings of the backend template, in workflow order. */
+const STAGE_HEADINGS = [
+  "Stage 0 - Initial Pitch",
+  "Stage 1 - Problem Framing and 5W1H",
+  "Stage 2 - User Story Mapping",
+  "Stage 3 - Event Storming",
+  "Stage 4 - Impact Mapping",
+  "Stage 5 - Risk Storming and Pre-mortem",
+  "Stage 6 - Backlog Synthesis",
+  "Stage 7 - Delivery Slicing",
+];
+
 export function headingStage(heading: string | null): Stage | undefined {
-  const index = heading && /^Stage (\d) - /.exec(heading)?.[1];
-  return index ? STAGES[Number(index)] : undefined;
+  return heading === null ? undefined : STAGES[STAGE_HEADINGS.indexOf(heading)];
 }
 
 const FIELD_LABELS = new Map(
@@ -128,10 +143,6 @@ function assessmentText(section: string, text: string, messages: Messages): stri
       : coverage
         ? `${fieldLabel(coverage[1], messages)} (${messages.stageDetails.coverage[coverage[2] as CoverageStatus]})`
         : text;
-  }
-  if (section === "Transition Decision" && text.startsWith("Reason: ")) {
-    const reasons = text.slice("Reason: ".length).split("; ");
-    return `Reason: ${reasons.map((reason) => checkText(reason, messages)).join("; ")}`;
   }
   return text;
 }
