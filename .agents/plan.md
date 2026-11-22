@@ -326,6 +326,16 @@ Markdown/JSON exports, French workspace panel and internal SearXNG deployment.
 - [x] Configure pinned internal SearXNG, document settings and run Docker smoke.
 - [x] Complete checks, review loop, rebase and ready PR (no merge).
 
+### Lot 11: Faster turns and queued answers
+
+Validated scope: shorten the wait between two inputs and let the user answer meanwhile. Same model,
+same gates, same three-question budget.
+ADR impact: ADR 0007 and ADR 0011 updated.
+
+- [x] Accept JSON wrapped in a Markdown fence: every Opus analysis was rejected and generated twice.
+- [x] Stop asking the provider for fields the server overwrites; log rejected outputs.
+- [x] Queue messages and answers written while a turn runs and send them as one turn.
+
 ### Production cross-path acceptance fixes
 
 Validated scope: reproduce the deployed expense-sharing journey; correct the Questions panel's

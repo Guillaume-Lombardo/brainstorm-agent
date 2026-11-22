@@ -26,6 +26,7 @@ from brainstorm_agent.core.quality_rules import reference_catalog
 from brainstorm_agent.core.stage_contracts import STAGE_CONTRACTS, STAGE_FIELD_ALIASES, STAGE_MODELS
 from brainstorm_agent.core.validation import validate_stage
 from brainstorm_agent.exceptions import LLMResponseError
+from brainstorm_agent.logging import get_logger
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -36,6 +37,17 @@ if TYPE_CHECKING:
     from brainstorm_agent.settings import Settings
 
 
+# Analysis fields the server fills or overwrites on every turn: asking the provider for them
+# only adds output tokens, hence latency.
+SERVER_OWNED_FIELDS = frozenset({
+    "stage",
+    "prompt_tokens",
+    "completion_tokens",
+    "clarifications",
+    "assistant_message",
+    "stage_is_clear_enough",
+    "transition_decision_reason",
+})
 RISK_PART_COUNT = 5
 RECOMMENDED_LABEL = {Language.EN: "recommended", Language.FR: "recommandé"}
 
@@ -86,6 +98,46 @@ def _strip_gate_metadata(value: object) -> None:
     elif isinstance(value, list):
         for child in value:
             _strip_gate_metadata(child)
+
+
+def _drop_server_fields(schema: dict[str, Any], model: type[BaseModel]) -> dict[str, Any]:
+    """Leave the server-owned analysis fields out of a provider-facing schema.
+
+    Args:
+        schema (dict[str, Any]): JSON schema of the model.
+        model (type[BaseModel]): Output contract.
+
+    Returns:
+        dict[str, Any]: Schema limited to what the provider must answer.
+    """
+    if not issubclass(model, AssistantAnalysis):
+        return schema
+    definitions = {
+        name: value for name, value in schema["$defs"].items() if name not in {"Clarification", "Stage"}
+    }
+    return {
+        **schema,
+        "$defs": definitions,
+        "properties": {
+            name: value for name, value in schema["properties"].items() if name not in SERVER_OWNED_FIELDS
+        },
+        "required": [name for name in schema["required"] if name not in SERVER_OWNED_FIELDS],
+    }
+
+
+def _unfenced(content: str) -> str:
+    """Drop the Markdown code fence some providers put around their JSON.
+
+    Args:
+        content (str): Raw provider text.
+
+    Returns:
+        str: Fenced content, or the text unchanged without a fence.
+    """
+    text = content.strip()
+    if not (text.startswith("```") and text.endswith("```")):
+        return content
+    return text.removeprefix("```").removeprefix("json").removesuffix("```")
 
 
 @runtime_checkable
@@ -410,7 +462,7 @@ class OpenAICompatibleBrainstormLLM:
         """
         if finish_reason not in {"stop", "tool_calls"}:
             cls._invalid_response(cls._truncated_error())
-        parsed = model.model_validate_json(content)
+        parsed = model.model_validate_json(_unfenced(content))
         if isinstance(parsed, AssistantAnalysis) and parsed.stage is not stage:
             cls._invalid_response(cls._stage_error())
         return parsed
@@ -442,7 +494,10 @@ class OpenAICompatibleBrainstormLLM:
             {"role": "system", "content": self.prompt_loader.system_prompt()},
             {"role": "user", "content": prompt},
         ]
-        schema = pydantic_function_tool(model)["function"]["parameters"]
+        schema = _drop_server_fields(
+            cast("dict[str, Any]", pydantic_function_tool(model)["function"]["parameters"]),
+            model,
+        )
         _strip_gate_metadata(schema)
         options: Any
         if self.settings.llm_output_mode is StructuredOutputMode.TOOL:
@@ -487,6 +542,16 @@ class OpenAICompatibleBrainstormLLM:
                     completion.choices[0].finish_reason,
                 )
             except (ValueError, ValidationError) as exc:
+                # Error types only: the messages quote model output, hence user content.
+                get_logger(__name__).warning(
+                    "llm_output_rejected",
+                    stage=stage.value,
+                    attempt=attempt + 1,
+                    finish_reason=completion.choices[0].finish_reason,
+                    errors=sorted({item["type"] for item in exc.errors()})
+                    if isinstance(exc, ValidationError)
+                    else [str(exc)],
+                )
                 if attempt:
                     raise LLMResponseError(
                         stage=stage.value,
@@ -524,6 +589,7 @@ class OpenAICompatibleBrainstormLLM:
             f"{STAGE_MODELS[stage].__name__}Analysis",
             __base__=AssistantAnalysis,
             stage=(Stage, stage),
+            assistant_message=(str, ""),
             extracted_fields=(STAGE_MODELS[stage], ...),
         )
         current = (
@@ -559,7 +625,7 @@ class OpenAICompatibleBrainstormLLM:
         prompt = "\n\n".join([
             self.prompt_loader.stage_prompt(stage),
             self.prompt_loader.completeness_prompt(),
-            json.dumps(model.model_json_schema()),
+            json.dumps(_drop_server_fields(model.model_json_schema(), model)),
             json.dumps(context),
             user_message,
         ])

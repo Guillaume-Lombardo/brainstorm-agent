@@ -8,18 +8,25 @@ import type { OpenQuestionItem } from "@/lib/backend/types";
 export function OpenQuestions({
   questions,
   disabled,
+  queueing = false,
   onAnswer,
 }: {
   questions: OpenQuestionItem[];
   disabled: boolean;
+  /** A turn is running: answers wait and go together in the next turn. */
+  queueing?: boolean;
   onAnswer: (question: OpenQuestionItem, option: string) => void;
 }) {
   if (questions.length === 0) {
     return (
-      <p className="p-4 text-sm text-muted-foreground">Aucune question ouverte pour le moment.</p>
+      <p className="p-4 text-sm text-muted-foreground">
+        {queueing
+          ? "Aucune autre question en attendant la fin de l'analyse."
+          : "Aucune question ouverte pour le moment."}
+      </p>
     );
   }
-  return (
+  const list = (
     <ul className="flex flex-col gap-4 p-4">
       {questions.map((question, index) => (
         <li key={question.id ?? index} className="flex flex-col gap-2 rounded-xl border p-3">
@@ -60,5 +67,15 @@ export function OpenQuestions({
         </li>
       ))}
     </ul>
+  );
+  return (
+    <>
+      {queueing ? (
+        <p className="px-4 pt-4 text-xs text-muted-foreground">
+          Analyse en cours : vos réponses partiront ensemble dès qu&apos;elle se termine.
+        </p>
+      ) : null}
+      {list}
+    </>
   );
 }

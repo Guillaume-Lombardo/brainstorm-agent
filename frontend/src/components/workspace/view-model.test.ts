@@ -7,6 +7,7 @@ import {
   sessionFixture,
   stage2Session,
   stageStateFixture,
+  turnFixture,
 } from "@/test/fixtures";
 
 import {
@@ -17,6 +18,7 @@ import {
   deliverySlices,
   draftFromValue,
   fieldLines,
+  lastUserTurnId,
   stageFields,
   stageStatus,
   valueFromDraft,
@@ -129,6 +131,26 @@ describe("currentQuestions", () => {
       "gate",
       "security",
     ]);
+    // Answered questions make room for the next ones before the backend processes them.
+    expect(currentQuestions(session, ["scope", "gate"]).map((question) => question.id)).toEqual([
+      "security",
+      "ux",
+      "technical",
+    ]);
+  });
+});
+
+describe("lastUserTurnId", () => {
+  it("tells a stored message from an interrupted one with the same text", () => {
+    const turns = [
+      turnFixture({ id: "u1", role: "user", content: "Yes" }),
+      turnFixture({ id: "a1", role: "assistant", content: "reply" }),
+    ];
+    expect(lastUserTurnId(turns)).toBe("u1");
+    expect(
+      lastUserTurnId([...turns, turnFixture({ id: "u2", role: "user", content: "Yes" })]),
+    ).toBe("u2");
+    expect(lastUserTurnId([])).toBeUndefined();
   });
 });
 

@@ -42,7 +42,24 @@ describe("OpenQuestions", () => {
     );
   });
 
-  it("disables answers while a turn or review is pending", () => {
+  it("keeps answers available while a turn runs", async () => {
+    const onAnswer = vi.fn();
+    const { rerender } = render(
+      <OpenQuestions
+        questions={[questionFixture()]}
+        disabled={false}
+        queueing
+        onAnswer={onAnswer}
+      />,
+    );
+    expect(screen.getByText(/vos réponses partiront ensemble/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "No" }));
+    expect(onAnswer).toHaveBeenCalledOnce();
+    rerender(<OpenQuestions questions={[]} disabled={false} queueing onAnswer={onAnswer} />);
+    expect(screen.getByText(/Aucune autre question/)).toBeInTheDocument();
+  });
+
+  it("disables answers while an action or review is pending", () => {
     render(<OpenQuestions questions={[questionFixture()]} disabled onAnswer={vi.fn()} />);
     expect(screen.getByRole("button", { name: "No" })).toBeDisabled();
   });

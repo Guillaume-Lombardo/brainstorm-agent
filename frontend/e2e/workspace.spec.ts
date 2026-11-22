@@ -458,6 +458,111 @@ test("a French pitch gets readable gate questions and a formatted reply", async 
   await page.screenshot({ path: `${SCREENSHOTS}/07-questions-fr.png` });
 });
 
+test("questions are answered while a turn runs and leave together in the next one", async ({
+  page,
+}) => {
+  await signIn(page, "francais@example.com");
+  const sessionId = await createSession(page, `File d'attente ${Date.now()}`);
+  const pitch = page.waitForResponse((response) => response.url().endsWith("/turns"));
+  await send(page, "pitch: Un planificateur de repas pour les familles pressées");
+  await (await pitch).text();
+  await page.getByRole("tab", { name: /Questions/ }).click();
+  const panel = page.getByRole("tabpanel", { name: /Questions/ });
+  await expect(panel.getByRole("listitem")).toHaveCount(3);
+
+  // Hold the next turn open, as a slow model would.
+  let release = () => {};
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const sent: string[] = [];
+  await page.route(`**/api/backend/sessions/${sessionId}/turns`, async (route) => {
+    sent.push((route.request().postDataJSON() as { message: string }).message);
+    if (sent.length === 1) {
+      await held;
+    }
+    await route.continue();
+  });
+  const answer = async () => {
+    const question = panel.getByRole("listitem").first();
+    const text = await question.locator("p").first().innerText();
+    await question.locator('[data-recommended="true"]').click();
+    await expect(panel.getByText(text)).toHaveCount(0);
+    return text;
+  };
+  const first = await answer();
+  await expect(panel).toContainText("vos réponses partiront ensemble");
+  const second = await answer();
+  const third = await answer();
+  await expect(panel).toContainText("Aucune autre question en attendant la fin de l'analyse.");
+  await page.getByLabel("Message").fill("Une précision de plus");
+  await page.getByRole("button", { name: "Queue", exact: true }).click();
+  const queue = page.getByRole("region", { name: "Waiting answers" });
+  await expect(queue.getByRole("listitem")).toHaveCount(3);
+  await page.screenshot({ path: `${SCREENSHOTS}/08-queued-answers.png` });
+
+  release();
+  await expect(queue).toHaveCount(0);
+  await expect(page.getByTestId("streaming-turn")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Send" })).toBeVisible();
+  expect(sent).toHaveLength(2);
+  expect(sent[0]).toContain(first);
+  for (const text of [second, third, "Une précision de plus"]) {
+    expect(sent[1]).toContain(text);
+  }
+});
+
+test("a failed turn keeps the queued answers until the user sends them", async ({ page }) => {
+  await signIn(page, "errors@example.com");
+  const sessionId = await createSession(page, `Kept ${Date.now()}`);
+  let release = () => {};
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const sent: string[] = [];
+  await page.route(`**/api/backend/sessions/${sessionId}/turns`, async (route) => {
+    sent.push((route.request().postDataJSON() as { message: string }).message);
+    if (sent.length === 1) {
+      await held;
+      await route.fulfill({
+        status: 200,
+        contentType: "text/event-stream",
+        body: sseFrames({ type: "error", code: "turn_failed", message: "The model failed." }),
+      });
+    } else if (sent.length === 2) {
+      // Cut without any terminal event: the backend kept nothing.
+      await route.fulfill({
+        status: 200,
+        contentType: "text/event-stream",
+        body: sseFrames({ type: "turn.started", turn_id: "t2", stage: "stage_0_pitch" }),
+      });
+    } else {
+      await route.continue();
+    }
+  });
+  await send(page, "pitch: Un planificateur de repas pour les familles");
+  await page.getByLabel("Message").fill("clear: plan hebdomadaire");
+  await page.getByRole("button", { name: "Queue", exact: true }).click();
+  release();
+  const input = page.getByLabel("Message");
+  const queue = page.getByRole("region", { name: "Waiting answers" });
+  await expect(input).toHaveValue("pitch: Un planificateur de repas pour les familles");
+  await expect(queue).toContainText("clear: plan hebdomadaire");
+
+  // An interrupted stream gives the message back too.
+  await page.getByRole("button", { name: "Send", exact: true }).click();
+  await expect(input).toHaveValue("pitch: Un planificateur de repas pour les familles");
+
+  // A successful resend does not send the kept answer on its own.
+  await page.getByRole("button", { name: "Send", exact: true }).click();
+  await expect(page.getByTestId("stage-details")).toContainText("planificateur");
+  await expect(page.getByRole("button", { name: "Send now" })).toBeEnabled();
+  expect(sent).toHaveLength(3);
+  await page.getByRole("button", { name: "Send now" }).click();
+  await expect(queue).toHaveCount(0);
+  await expect.poll(() => sent.at(-1)).toBe("clear: plan hebdomadaire");
+});
+
 test("research products and retain two benchmark features", async ({ page }) => {
   await signIn(page, "journey@example.com");
   await createSession(page, "Benchmark project");

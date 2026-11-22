@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
@@ -17,7 +18,11 @@ from brainstorm_agent.async_runner import run_async
 from brainstorm_agent.core.enums import ChallengePass, LLMMode, Stage, StructuredOutputMode
 from brainstorm_agent.core.models import AssistantAnalysis, BrainstormSessionState
 from brainstorm_agent.exceptions import LLMResponseError
-from brainstorm_agent.services.llm_client import OpenAICompatibleBrainstormLLM, build_llm
+from brainstorm_agent.services.llm_client import (
+    SERVER_OWNED_FIELDS,
+    OpenAICompatibleBrainstormLLM,
+    build_llm,
+)
 from brainstorm_agent.services.prompt_loader import PromptLoader
 from brainstorm_agent.settings import Settings
 
@@ -82,6 +87,55 @@ def test_retry_invalid_json_and_schema(invalid):
         "Validation error"
         in cast("AsyncMock", llm.client.chat.completions.create).call_args.kwargs["messages"][-1]["content"]
     )
+
+
+@pytest.mark.parametrize(
+    "wrap",
+    ["```json\n{}\n```", "```\n{}\n```\n"],
+)
+def test_fenced_json_needs_no_second_call(wrap):
+    llm = make_llm([wrap.replace("{}", payload())], StructuredOutputMode.JSON_OBJECT)
+    assert analyze(llm).extracted_fields.get("problem_statement") == "Temps perdu"
+    assert cast("AsyncMock", llm.client.chat.completions.create).await_count == 1
+
+
+def test_rejected_output_is_logged_without_its_content(mocker):
+    logger = mocker.patch("brainstorm_agent.services.llm_client.get_logger").return_value
+    analyze(make_llm(['{"summary": "secret project", "unknown": 1}', payload()]))
+    logger.warning.assert_called_once()
+    assert logger.warning.call_args.args == ("llm_output_rejected",)
+    fields = logger.warning.call_args.kwargs
+    assert fields["attempt"] == 1
+    assert fields["errors"] == ["extra_forbidden"]
+    assert "secret" not in str(fields)
+
+
+@pytest.mark.parametrize("mode", list(StructuredOutputMode))
+def test_provider_schema_leaves_out_server_owned_fields(mode):
+    llm = make_llm([payload()], mode)
+    analyze(llm)
+    options = cast("AsyncMock", llm.client.chat.completions.create).call_args.kwargs
+    prompt = options["messages"][-1]["content"]
+    decoder = json.JSONDecoder()
+    schemas = [decoder.raw_decode(prompt[prompt.index('{"$defs"') :])[0]]
+    if mode is StructuredOutputMode.JSON_SCHEMA:
+        schemas.append(options["response_format"]["json_schema"]["schema"])
+    if mode is StructuredOutputMode.TOOL:
+        schemas.append(options["tools"][0]["function"]["parameters"])
+    for schema in schemas:
+        assert set(schema["required"]) <= set(schema["properties"])
+        assert not SERVER_OWNED_FIELDS & set(schema["properties"])
+        assert {"summary", "extracted_fields", "open_questions"} <= set(schema["properties"])
+        assert "Clarification" not in schema["$defs"]
+
+
+def test_analysis_without_server_owned_fields_is_accepted():
+    slim = {key: value for key, value in json.loads(payload()).items() if key not in SERVER_OWNED_FIELDS}
+    llm = make_llm([json.dumps(slim)])
+    analysis = analyze(llm)
+    assert analysis.stage is Stage.STAGE_1_PROBLEM_FRAMING
+    assert not analysis.assistant_message
+    assert cast("AsyncMock", llm.client.chat.completions.create).await_count == 1
 
 
 def test_invalid_twice_is_actionable():
