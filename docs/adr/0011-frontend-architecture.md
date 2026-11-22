@@ -67,7 +67,9 @@ the composer, before any text typed meanwhile.
 sent then joins a queue, in browser memory only, and goes as one message when the turn completes,
 so several answers cost one turn. Answered questions leave the panel to the next retained ones,
 never more than three at a time. The queue stays for the user to send or remove when the turn
-fails, a review is pending or the stage changed: an answer never moves to another stage on its own.
+fails, a review is pending or the stage changed: an answer never moves to another stage on its own,
+and later turns do not send it either. A message whose stream was cut comes back to the composer
+when the stored conversation does not hold it.
 The backend still processes one turn at a time per session.
 
 **Errors.** Every proxy error is `{"error": {"code", "message", "retryAfterSeconds?"}}` with the

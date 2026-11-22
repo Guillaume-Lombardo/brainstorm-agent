@@ -7,6 +7,7 @@ import {
   sessionFixture,
   stage2Session,
   stageStateFixture,
+  turnFixture,
 } from "@/test/fixtures";
 
 import {
@@ -17,6 +18,7 @@ import {
   deliverySlices,
   draftFromValue,
   fieldLines,
+  isStored,
   stageFields,
   stageStatus,
   valueFromDraft,
@@ -135,6 +137,18 @@ describe("currentQuestions", () => {
       "ux",
       "technical",
     ]);
+  });
+});
+
+describe("isStored", () => {
+  it("recognizes the message of an interrupted turn in the stored conversation", () => {
+    const turns = [
+      turnFixture({ role: "user", content: "first" }),
+      turnFixture({ role: "assistant", content: "reply" }),
+    ];
+    expect(isStored(turns, "first")).toBe(true);
+    expect(isStored(turns, "queued answers")).toBe(false);
+    expect(isStored([], "first")).toBe(false);
   });
 });
 

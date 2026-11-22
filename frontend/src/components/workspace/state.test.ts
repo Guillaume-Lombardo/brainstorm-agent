@@ -139,6 +139,8 @@ describe("workspaceReducer", () => {
     expect(state.draft).toBe("Also this");
     state = apply(state, { type: "error", code: "turn_failed", message: "Model failed" });
     expect(state.draft).toBe("Queued answers\n\nAlso this");
+    state = workspaceReducer(state, { type: "draft.restored", content: "Interrupted" });
+    expect(state.draft).toBe("Interrupted\n\nQueued answers\n\nAlso this");
   });
 
   it("restores the draft when the request itself is refused", () => {

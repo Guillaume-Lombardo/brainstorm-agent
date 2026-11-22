@@ -34,7 +34,8 @@ export type WorkspaceAction =
   | { type: "turn.event"; event: TurnEvent }
   | { type: "turn.failed"; error: TurnFailure }
   | { type: "turn.closed" }
-  | { type: "draft.changed"; draft: string };
+  | { type: "draft.changed"; draft: string }
+  | { type: "draft.restored"; content: string };
 
 export function initialWorkspaceState(snapshot: SessionSnapshot): WorkspaceState {
   return {
@@ -50,6 +51,11 @@ export function initialWorkspaceState(snapshot: SessionSnapshot): WorkspaceState
 const STATUS_ANALYZING = "Analyzing your message…";
 const STATUS_DOCUMENT = "Updating the stage document…";
 
+/** The unsent message comes back before the text typed while its turn ran. */
+function restoredDraft(content: string | undefined, draft: string): string {
+  return [content, draft].filter(Boolean).join("\n\n");
+}
+
 function failTurn(state: WorkspaceState, error: TurnFailure): WorkspaceState {
   const local = state.messages.filter((message) => message.local);
   return {
@@ -57,8 +63,7 @@ function failTurn(state: WorkspaceState, error: TurnFailure): WorkspaceState {
     messages: state.messages.filter((message) => !message.local),
     streaming: null,
     turnError: error,
-    // Text typed while the turn ran stays, after the message to send again.
-    draft: [local.at(-1)?.content, state.draft].filter(Boolean).join("\n\n"),
+    draft: restoredDraft(local.at(-1)?.content, state.draft),
   };
 }
 
@@ -142,5 +147,7 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
         : state;
     case "draft.changed":
       return { ...state, draft: action.draft };
+    case "draft.restored":
+      return { ...state, draft: restoredDraft(action.content, state.draft) };
   }
 }

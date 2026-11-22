@@ -6,10 +6,10 @@ import type { SessionOverview, Stage } from "@/lib/backend/types";
 export interface QueuedMessage {
   id: string;
   content: string;
-  /** Stage the message was written for: it never moves to another stage on its own. */
-  stage: Stage;
   /** Open question answered by this message, when it comes from the questions panel. */
   questionId?: string;
+  /** Its turn did not end normally: it only leaves when the user sends or removes it. */
+  held?: boolean;
 }
 
 /** One message for the whole queue: a single turn answers every queued question. */
@@ -22,23 +22,19 @@ export function queuedQuestionIds(queue: QueuedMessage[]): string[] {
   return queue.flatMap((item) => item.questionId ?? []);
 }
 
-/** Whether the queue may be sent without asking: same stage, and the backend accepts input. */
-export function canFlush(queue: QueuedMessage[], session: SessionOverview): boolean {
-  return (
-    queue.length > 0 &&
-    !session.archived &&
-    !session.pending_human_review &&
-    queue.every((item) => item.stage === session.current_stage)
-  );
+/** Whether a turn left the session on its own stage, ready for another message. */
+export function acceptsNext(session: SessionOverview, stage: Stage): boolean {
+  return !session.archived && !session.pending_human_review && session.current_stage === stage;
 }
 
 export interface TurnQueue {
   queue: QueuedMessage[];
-  /** Current queue, readable from a running turn whose render is outdated. */
-  peek: () => QueuedMessage[];
-  add: (message: Omit<QueuedMessage, "id">) => void;
+  add: (message: Pick<QueuedMessage, "content" | "questionId">) => void;
   remove: (id: string) => void;
-  clear: () => void;
+  /** Takes messages out, all of them or only those not held, even from an outdated render. */
+  take: (options?: { held: boolean }) => QueuedMessage[];
+  /** Keeps what is left for the user to send or remove. */
+  hold: () => void;
 }
 
 export function useTurnQueue(): TurnQueue {
@@ -50,12 +46,19 @@ export function useTurnQueue(): TurnQueue {
   }, []);
   return {
     queue,
-    peek: useCallback(() => ref.current, []),
     add: useCallback(
       (message) => update([...ref.current, { ...message, id: crypto.randomUUID() }]),
       [update],
     ),
     remove: useCallback((id) => update(ref.current.filter((item) => item.id !== id)), [update]),
-    clear: useCallback(() => update([]), [update]),
+    take: useCallback(
+      ({ held } = { held: true }) => {
+        const taken = ref.current.filter((item) => held || !item.held);
+        update(ref.current.filter((item) => !taken.includes(item)));
+        return taken;
+      },
+      [update],
+    ),
+    hold: useCallback(() => update(ref.current.map((item) => ({ ...item, held: true }))), [update]),
   };
 }

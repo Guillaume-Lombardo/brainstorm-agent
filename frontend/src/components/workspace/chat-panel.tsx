@@ -179,7 +179,10 @@ export function ChatPanel({
             <ul className="flex max-h-32 flex-col gap-1 overflow-y-auto">
               {queue.map((item) => (
                 <li key={item.id} className="flex items-start gap-1">
-                  <p className="line-clamp-3 flex-1 whitespace-pre-wrap">{item.content}</p>
+                  <p className="flex-1 whitespace-pre-wrap">{item.content}</p>
+                  {running && item.held ? (
+                    <span className="text-muted-foreground">Kept</span>
+                  ) : null}
                   <Button
                     type="button"
                     variant="ghost"

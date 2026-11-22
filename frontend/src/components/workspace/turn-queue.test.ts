@@ -3,56 +3,52 @@ import { describe, expect, it } from "vitest";
 
 import { stage2Session } from "@/test/fixtures";
 
-import {
-  canFlush,
-  mergeQueue,
-  queuedQuestionIds,
-  useTurnQueue,
-  type QueuedMessage,
-} from "./turn-queue";
-
-const queue: QueuedMessage[] = [
-  { id: "a", content: "Who?\nFamilies", stage: "stage_2_user_story_mapping", questionId: "q1" },
-  { id: "b", content: "And a free note", stage: "stage_2_user_story_mapping" },
-];
+import { acceptsNext, mergeQueue, queuedQuestionIds, useTurnQueue } from "./turn-queue";
 
 describe("turn queue", () => {
   it("merges every queued message into one turn", () => {
+    const queue = [
+      { id: "a", content: "Who?\nFamilies", questionId: "q1" },
+      { id: "b", content: "And a free note" },
+    ];
     expect(mergeQueue(queue)).toBe("Who?\nFamilies\n\nAnd a free note");
     expect(queuedQuestionIds(queue)).toEqual(["q1"]);
   });
 
-  it("flushes only on the stage the messages were written for, when input is accepted", () => {
-    expect(canFlush(queue, stage2Session())).toBe(true);
-    expect(canFlush([], stage2Session())).toBe(false);
-    expect(canFlush(queue, stage2Session({ current_stage: "stage_3_event_storming" }))).toBe(false);
-    expect(canFlush(queue, stage2Session({ archived: true }))).toBe(false);
-    expect(
-      canFlush(
-        queue,
-        stage2Session({
-          pending_human_review: {
-            from_stage: "stage_2_user_story_mapping",
-            to_stage: "stage_3_event_storming",
-            summary: "",
-            transition_decision_reason: "",
-          },
-        }),
-      ),
-    ).toBe(false);
+  it("goes on only when the turn stayed on its stage and input is accepted", () => {
+    const stage = "stage_2_user_story_mapping";
+    expect(acceptsNext(stage2Session(), stage)).toBe(true);
+    expect(acceptsNext(stage2Session({ current_stage: "stage_3_event_storming" }), stage)).toBe(
+      false,
+    );
+    expect(acceptsNext(stage2Session({ archived: true }), stage)).toBe(false);
+    const review = {
+      from_stage: "stage_2_user_story_mapping" as const,
+      to_stage: "stage_3_event_storming" as const,
+      summary: "",
+      transition_decision_reason: "",
+    };
+    expect(acceptsNext(stage2Session({ pending_human_review: review }), stage)).toBe(false);
   });
 
-  it("is readable at once by the running turn", () => {
+  it("keeps held messages out of the automatic send", () => {
     const { result } = renderHook(() => useTurnQueue());
-    const { peek } = result.current;
+    const { add, hold, take } = result.current;
+    const contents = () => result.current.queue.map((item) => item.content);
     act(() => {
-      result.current.add({ content: "One", stage: "stage_0_pitch" });
-      result.current.add({ content: "Two", stage: "stage_0_pitch" });
-      expect(peek().map((item) => item.content)).toEqual(["One", "Two"]);
+      add({ content: "Kept" });
+      hold();
+      add({ content: "New" });
+      // Read at once, as the running turn does, without waiting for a render.
+      expect(take({ held: false }).map((item) => item.content)).toEqual(["New"]);
     });
-    act(() => result.current.remove(result.current.queue[0].id));
-    expect(result.current.queue.map((item) => item.content)).toEqual(["Two"]);
-    act(() => result.current.clear());
-    expect(peek()).toEqual([]);
+    expect(contents()).toEqual(["Kept"]);
+    act(() => add({ content: "Other" }));
+    act(() => result.current.remove(result.current.queue[1].id));
+    expect(contents()).toEqual(["Kept"]);
+    act(() => {
+      expect(take().map((item) => item.content)).toEqual(["Kept"]);
+    });
+    expect(contents()).toEqual([]);
   });
 });

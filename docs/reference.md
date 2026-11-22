@@ -564,8 +564,8 @@ requires its id in `resolved_question_ids`. Use `resolved_item_ids` to retract o
 `json_object` if the selected LiteLLM model does not support strict schemas: Anthropic models reject
 the stage analysis grammar as too large (400 "compiled grammar is too large"), so the docker-box
 stack defaults to `json_object`. Unsupported-provider errors are
-surfaced; the service does not silently downgrade. A Markdown fence or prose around the JSON object
-is dropped before validation. Invalid JSON/schema gets exactly one repair
+surfaced; the service does not silently downgrade. A Markdown code fence around the JSON is dropped
+before validation. Invalid JSON/schema gets exactly one repair
 attempt with the validation error, then an actionable error with no persisted partial turn. Each
 rejected output logs `llm_output_rejected` (error types only, never the content): a repair doubles
 the length of the turn. The analysis schema sent to the provider leaves out the fields the server

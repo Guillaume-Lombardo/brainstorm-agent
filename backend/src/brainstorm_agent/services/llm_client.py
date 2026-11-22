@@ -100,38 +100,44 @@ def _strip_gate_metadata(value: object) -> None:
             _strip_gate_metadata(child)
 
 
-def _provider_schema(model: type[BaseModel]) -> dict[str, Any]:
-    """Build the strict schema sent to the provider.
+def _drop_server_fields(schema: dict[str, Any], model: type[BaseModel]) -> dict[str, Any]:
+    """Leave the server-owned analysis fields out of a provider-facing schema.
 
     Args:
+        schema (dict[str, Any]): JSON schema of the model.
         model (type[BaseModel]): Output contract.
 
     Returns:
-        dict[str, Any]: Strict JSON schema without application metadata or server-owned fields.
+        dict[str, Any]: Schema limited to what the provider must answer.
     """
-    schema = cast("dict[str, Any]", pydantic_function_tool(model)["function"]["parameters"])
-    _strip_gate_metadata(schema)
-    if issubclass(model, AssistantAnalysis):
-        schema["properties"] = {
+    if not issubclass(model, AssistantAnalysis):
+        return schema
+    definitions = {
+        name: value for name, value in schema["$defs"].items() if name not in {"Clarification", "Stage"}
+    }
+    return {
+        **schema,
+        "$defs": definitions,
+        "properties": {
             name: value for name, value in schema["properties"].items() if name not in SERVER_OWNED_FIELDS
-        }
-        schema["required"] = [name for name in schema["required"] if name not in SERVER_OWNED_FIELDS]
-        for definition in ("Clarification", "Stage"):
-            schema["$defs"].pop(definition, None)
-    return schema
+        },
+        "required": [name for name in schema["required"] if name not in SERVER_OWNED_FIELDS],
+    }
 
 
-def _json_object(content: str) -> str:
-    """Drop the Markdown fence or prose some providers put around a JSON object.
+def _unfenced(content: str) -> str:
+    """Drop the Markdown code fence some providers put around their JSON.
 
     Args:
         content (str): Raw provider text.
 
     Returns:
-        str: Outermost JSON object, or the text unchanged when it holds none.
+        str: Fenced content, or the text unchanged without a fence.
     """
-    start, end = content.find("{"), content.rfind("}")
-    return content[start : end + 1] if 0 <= start < end else content
+    text = content.strip()
+    if not (text.startswith("```") and text.endswith("```")):
+        return content
+    return text.removeprefix("```").removeprefix("json").removesuffix("```")
 
 
 @runtime_checkable
@@ -456,7 +462,7 @@ class OpenAICompatibleBrainstormLLM:
         """
         if finish_reason not in {"stop", "tool_calls"}:
             cls._invalid_response(cls._truncated_error())
-        parsed = model.model_validate_json(_json_object(content))
+        parsed = model.model_validate_json(_unfenced(content))
         if isinstance(parsed, AssistantAnalysis) and parsed.stage is not stage:
             cls._invalid_response(cls._stage_error())
         return parsed
@@ -488,7 +494,11 @@ class OpenAICompatibleBrainstormLLM:
             {"role": "system", "content": self.prompt_loader.system_prompt()},
             {"role": "user", "content": prompt},
         ]
-        schema = _provider_schema(model)
+        schema = _drop_server_fields(
+            cast("dict[str, Any]", pydantic_function_tool(model)["function"]["parameters"]),
+            model,
+        )
+        _strip_gate_metadata(schema)
         options: Any
         if self.settings.llm_output_mode is StructuredOutputMode.TOOL:
             options = {
@@ -615,7 +625,7 @@ class OpenAICompatibleBrainstormLLM:
         prompt = "\n\n".join([
             self.prompt_loader.stage_prompt(stage),
             self.prompt_loader.completeness_prompt(),
-            json.dumps(_provider_schema(model)),
+            json.dumps(_drop_server_fields(model.model_json_schema(), model)),
             json.dumps(context),
             user_message,
         ])

@@ -57,7 +57,6 @@ function Harness({
 const queued: QueuedMessage = {
   id: "q1",
   content: "Who pays?\nFamilies",
-  stage: "stage_1_problem_framing",
 };
 
 describe("ChatPanel", () => {
@@ -113,6 +112,9 @@ describe("ChatPanel", () => {
     const { rerender } = render(<Harness queue={[queued]} onSendQueue={onSendQueue} />);
     await userEvent.click(screen.getByRole("button", { name: "Send now" }));
     expect(onSendQueue).toHaveBeenCalledOnce();
+    // While another turn runs, a kept message is told apart from those about to leave.
+    rerender(<Harness running queue={[{ ...queued, held: true }]} />);
+    expect(screen.getByText("Kept")).toBeInTheDocument();
     rerender(<Harness queue={[queued]} blockedReason="Review first." onSendQueue={onSendQueue} />);
     expect(screen.getByRole("button", { name: "Send now" })).toBeDisabled();
   });
