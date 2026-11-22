@@ -30,6 +30,7 @@ import { StageDetails } from "./stage-details";
 import { StageStepper } from "./stage-stepper";
 import { initialWorkspaceState, workspaceReducer } from "./state";
 import { errorToFailure } from "./turn";
+import { canFlush, mergeQueue, queuedQuestionIds, useTurnQueue } from "./turn-queue";
 import { answerMessage, currentQuestions } from "./view-model";
 
 type Loaded =
@@ -93,6 +94,11 @@ function WorkspaceView({ initialSnapshot }: { initialSnapshot: SessionSnapshot }
   const [selectedStage, setSelectedStage] = useState<Stage | null>(null);
   const [actionError, setActionError] = useState<unknown>(null);
   const [acting, setActing] = useState(false);
+  const [running, setRunning] = useState(false);
+  const runningRef = useRef(false);
+  /** Questions answered by the running turn; the stored state drops them when it ends. */
+  const [answeringIds, setAnsweringIds] = useState<string[]>([]);
+  const { queue, peek, add, remove, clear } = useTurnQueue();
   const abortRef = useRef<AbortController | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const [stagesColumn, documentColumn] = useSideColumns(gridRef, STAGES_COLUMN, DOCUMENT_COLUMN);
@@ -102,18 +108,21 @@ function WorkspaceView({ initialSnapshot }: { initialSnapshot: SessionSnapshot }
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
-  async function refresh() {
+  async function refresh(): Promise<SessionOverview | null> {
     try {
-      dispatch({ type: "snapshot.loaded", snapshot: await api.getSession(sessionId) });
+      const snapshot = await api.getSession(sessionId);
+      dispatch({ type: "snapshot.loaded", snapshot });
+      return snapshot.session;
     } catch (error) {
       setActionError(error);
+      return null;
     }
   }
 
-  async function sendMessage(message: string) {
+  /** Runs one turn; returns the stored session only after a completed turn. */
+  async function runTurn(message: string): Promise<SessionOverview | null> {
     const controller = new AbortController();
     abortRef.current = controller;
-    setSelectedStage(null);
     setActionError(null);
     dispatch({
       type: "turn.submitted",
@@ -134,13 +143,57 @@ function WorkspaceView({ initialSnapshot }: { initialSnapshot: SessionSnapshot }
       }
       if (terminal !== "failed") {
         // Questions, completed stages and message ids are only final in the stored state.
-        await refresh();
+        const stored = await refresh();
+        return terminal === "completed" && !controller.signal.aborted ? stored : null;
       }
     } catch (error) {
       if (!controller.signal.aborted) {
         dispatch({ type: "turn.failed", error: errorToFailure(error) });
       }
     }
+    return null;
+  }
+
+  /** Runs a turn, then one more for whatever was queued meanwhile, while it is safe to. */
+  async function runTurns(message: string, questionIds: string[]) {
+    runningRef.current = true;
+    setRunning(true);
+    let next: string | null = message;
+    let answering = questionIds;
+    while (next !== null) {
+      setAnsweringIds(answering);
+      const stored = await runTurn(next);
+      next = null;
+      const waiting = peek();
+      // A failed turn, a review or a stage change keeps the queue for the user to decide.
+      if (stored && canFlush(waiting, stored)) {
+        next = mergeQueue(waiting);
+        answering = queuedQuestionIds(waiting);
+        clear();
+      }
+    }
+    setAnsweringIds([]);
+    runningRef.current = false;
+    setRunning(false);
+  }
+
+  function sendMessage(message: string, questionId?: string) {
+    if (runningRef.current) {
+      add({ content: message, stage: session.current_stage, questionId });
+      return;
+    }
+    setSelectedStage(null);
+    void runTurns(message, questionId ? [questionId] : []);
+  }
+
+  function sendQueue() {
+    const waiting = peek();
+    if (runningRef.current || waiting.length === 0) {
+      return;
+    }
+    clear();
+    setSelectedStage(null);
+    void runTurns(mergeQueue(waiting), queuedQuestionIds(waiting));
   }
 
   async function act(run: () => Promise<SessionOverview>, resetSelection = false) {
@@ -160,7 +213,7 @@ function WorkspaceView({ initialSnapshot }: { initialSnapshot: SessionSnapshot }
     }
   }
 
-  const busy = state.streaming !== null || acting;
+  const busy = running || acting;
   const pendingReview = session.pending_human_review ?? null;
   const archived = session.archived === true;
   const blockedReason = archived
@@ -168,10 +221,10 @@ function WorkspaceView({ initialSnapshot }: { initialSnapshot: SessionSnapshot }
     : pendingReview
       ? `${STAGE_LABELS[pendingReview.from_stage]} is waiting for your review. Approve it or request changes first.`
       : null;
-  const questions = currentQuestions(session);
+  const questions = currentQuestions(session, [...answeringIds, ...queuedQuestionIds(queue)]);
 
   function answer(question: OpenQuestionItem, option: string) {
-    void sendMessage(answerMessage(question, option));
+    sendMessage(answerMessage(question, option), question.id);
   }
 
   async function review(target: Stage, action: ReviewAction, note?: string) {
@@ -236,7 +289,9 @@ function WorkspaceView({ initialSnapshot }: { initialSnapshot: SessionSnapshot }
             sessionId={sessionId}
             available={session.current_stage !== "stage_0_pitch"}
             disabled={busy || archived}
-            onChanged={refresh}
+            onChanged={async () => {
+              await refresh();
+            }}
           />
           <ChatPanel
             messages={state.messages}
@@ -244,9 +299,16 @@ function WorkspaceView({ initialSnapshot }: { initialSnapshot: SessionSnapshot }
             error={state.turnError}
             blockedReason={blockedReason}
             pending={acting}
+            running={running}
+            queue={queue}
             draft={state.draft}
             onDraftChange={(draft) => dispatch({ type: "draft.changed", draft })}
-            onSend={(message) => void sendMessage(message)}
+            onSend={(message) => {
+              dispatch({ type: "draft.changed", draft: "" });
+              sendMessage(message);
+            }}
+            onSendQueue={sendQueue}
+            onRemoveQueued={remove}
           />
         </section>
         <CollapsibleColumn
@@ -280,7 +342,8 @@ function WorkspaceView({ initialSnapshot }: { initialSnapshot: SessionSnapshot }
             <TabsContent value="questions" className="min-h-0 overflow-y-auto">
               <OpenQuestions
                 questions={questions}
-                disabled={busy || blockedReason !== null}
+                disabled={acting || blockedReason !== null}
+                queueing={running}
                 onAnswer={answer}
               />
             </TabsContent>

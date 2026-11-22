@@ -22,6 +22,12 @@ providers without strict schemas. Retry malformed structured output once with it
 reject a second failure before persisting any turn. Disable transport retries to bound lock duration.
 The session lock TTL must exceed three call timeouts, or five with the optional findings challenge.
 
+Anthropic models in json_object mode wrap the object in a Markdown fence: the adapter keeps the
+outermost object before validation instead of spending a repair call on it. The analysis schema
+sent to the provider leaves out server-owned fields (reply text, readiness verdict, clarifications,
+usage), which the server overwrites; a provider that still sends them is accepted. Rejected outputs
+are logged with their error types only.
+
 Separate structured analysis from conversational reply streaming. A challenge may append findings
 but cannot replace business values. Deterministic gates remain authoritative. Context includes
 current values/coverage, a bounded transcript and previous-stage summaries. Provider usage,

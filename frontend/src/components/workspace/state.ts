@@ -57,7 +57,8 @@ function failTurn(state: WorkspaceState, error: TurnFailure): WorkspaceState {
     messages: state.messages.filter((message) => !message.local),
     streaming: null,
     turnError: error,
-    draft: local.at(-1)?.content ?? state.draft,
+    // Text typed while the turn ran stays, after the message to send again.
+    draft: [local.at(-1)?.content, state.draft].filter(Boolean).join("\n\n"),
   };
 }
 
@@ -121,7 +122,6 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
         messages: [...state.messages, { ...action.message, local: true }],
         streaming: { turnId: null, text: "", status: "Sending…" },
         turnError: null,
-        draft: "",
       };
     case "turn.event":
       return applyEvent(state, action.event);

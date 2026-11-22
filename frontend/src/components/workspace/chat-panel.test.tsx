@@ -5,6 +5,7 @@ import { describe, expect, it, onTestFinished, vi } from "vitest";
 
 import { ChatPanel } from "./chat-panel";
 import type { StreamingTurn, TurnFailure } from "./state";
+import type { QueuedMessage } from "./turn-queue";
 import type { ChatMessage } from "./view-model";
 
 function message(role: ChatMessage["role"], content: string): ChatMessage {
@@ -17,14 +18,22 @@ function Harness({
   error = null,
   blockedReason = null,
   pending = false,
-  onSend,
+  running = false,
+  queue = [],
+  onSend = vi.fn(),
+  onSendQueue = vi.fn(),
+  onRemoveQueued = vi.fn(),
 }: {
   messages?: ChatMessage[];
   streaming?: StreamingTurn | null;
   error?: TurnFailure | null;
   blockedReason?: string | null;
   pending?: boolean;
-  onSend: (message: string) => void;
+  running?: boolean;
+  queue?: QueuedMessage[];
+  onSend?: (message: string) => void;
+  onSendQueue?: () => void;
+  onRemoveQueued?: (id: string) => void;
 }) {
   const [draft, setDraft] = useState("");
   return (
@@ -34,12 +43,22 @@ function Harness({
       error={error}
       blockedReason={blockedReason}
       pending={pending}
+      running={running}
+      queue={queue}
       draft={draft}
       onDraftChange={setDraft}
       onSend={onSend}
+      onSendQueue={onSendQueue}
+      onRemoveQueued={onRemoveQueued}
     />
   );
 }
+
+const queued: QueuedMessage = {
+  id: "q1",
+  content: "Who pays?\nFamilies",
+  stage: "stage_1_problem_framing",
+};
 
 describe("ChatPanel", () => {
   it("sends the trimmed draft with Enter", async () => {
@@ -64,6 +83,38 @@ describe("ChatPanel", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Checking");
     expect(screen.getByText("Partial")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
+  });
+
+  it("accepts a message while a turn runs and shows the queue", async () => {
+    const onSend = vi.fn();
+    const onRemoveQueued = vi.fn();
+    render(
+      <Harness
+        running
+        streaming={{ turnId: "t", status: "Checking", text: "" }}
+        queue={[queued]}
+        onSend={onSend}
+        onRemoveQueued={onRemoveQueued}
+      />,
+    );
+    expect(screen.getByRole("region", { name: "Waiting answers" })).toHaveTextContent(
+      "Who pays? Families",
+    );
+    expect(screen.queryByRole("button", { name: "Send now" })).toBeNull();
+    await userEvent.type(screen.getByRole("textbox", { name: "Message" }), "More");
+    await userEvent.click(screen.getByRole("button", { name: "Queue" }));
+    expect(onSend).toHaveBeenCalledWith("More");
+    await userEvent.click(screen.getByRole("button", { name: "Remove from queue" }));
+    expect(onRemoveQueued).toHaveBeenCalledWith("q1");
+  });
+
+  it("lets the user send a kept queue, unless input is paused", async () => {
+    const onSendQueue = vi.fn();
+    const { rerender } = render(<Harness queue={[queued]} onSendQueue={onSendQueue} />);
+    await userEvent.click(screen.getByRole("button", { name: "Send now" }));
+    expect(onSendQueue).toHaveBeenCalledOnce();
+    rerender(<Harness queue={[queued]} blockedReason="Review first." onSendQueue={onSendQueue} />);
+    expect(screen.getByRole("button", { name: "Send now" })).toBeDisabled();
   });
 
   it("blocks input while a review is pending and shows turn errors", () => {

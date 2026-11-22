@@ -97,7 +97,8 @@ uv run brainstorm-agent hash-api-key "replace-me" --pepper "server-side-secret"
 
 `frontend/` is a Next.js (App Router) workspace: login (password, plus SSO when OIDC is
 configured), sessions list and the framing workspace (streamed chat that stops following the reply
-when the reader scrolls up, a composer with bulleted and numbered lists, versioned stage documents
+when the reader scrolls up, a composer with bulleted and numbered lists, a queue for messages and
+answers written while a turn runs, versioned stage documents
 with diff, 8-stage stepper with readiness and coverage, open questions, review bar, delivery
 slicing view, exports). On large screens the stages column (left) and the document, questions and
 delivery column (right) each collapse to a rail and resize by dragging their inner edge (or, with
@@ -563,8 +564,12 @@ requires its id in `resolved_question_ids`. Use `resolved_item_ids` to retract o
 `json_object` if the selected LiteLLM model does not support strict schemas: Anthropic models reject
 the stage analysis grammar as too large (400 "compiled grammar is too large"), so the docker-box
 stack defaults to `json_object`. Unsupported-provider errors are
-surfaced; the service does not silently downgrade. Invalid JSON/schema gets exactly one repair
-attempt with the validation error, then an actionable error with no persisted partial turn.
+surfaced; the service does not silently downgrade. A Markdown fence or prose around the JSON object
+is dropped before validation. Invalid JSON/schema gets exactly one repair
+attempt with the validation error, then an actionable error with no persisted partial turn. Each
+rejected output logs `llm_output_rejected` (error types only, never the content): a repair doubles
+the length of the turn. The analysis schema sent to the provider leaves out the fields the server
+fills itself (reply text, readiness verdict, clarifications, usage).
 
 The asynchronous turn has analysis (maximum two calls), an optional findings-only challenge
 (`LLM_CHALLENGE_PASS=off|findings`, maximum two calls), and a conversational reply. The adapter

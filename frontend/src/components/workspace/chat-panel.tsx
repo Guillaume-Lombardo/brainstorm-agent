@@ -1,6 +1,13 @@
 "use client";
 
-import { ListIcon, ListOrderedIcon, LoaderCircleIcon, SendIcon } from "lucide-react";
+import {
+  ListIcon,
+  ListOrderedIcon,
+  ListPlusIcon,
+  LoaderCircleIcon,
+  SendIcon,
+  XIcon,
+} from "lucide-react";
 import { memo, useEffect, useRef, type KeyboardEvent } from "react";
 
 import { ErrorState } from "@/components/error-state";
@@ -13,6 +20,7 @@ import { cn } from "@/lib/utils";
 import type { StreamingTurn, TurnFailure } from "./state";
 import { continueList, toggleList, type ListKind, type TextEdit } from "./list-input";
 import { failureToError } from "./turn";
+import type { QueuedMessage } from "./turn-queue";
 import type { ChatMessage } from "./view-model";
 
 export function ChatPanel({
@@ -21,9 +29,13 @@ export function ChatPanel({
   error,
   blockedReason,
   pending,
+  running,
+  queue,
   draft,
   onDraftChange,
   onSend,
+  onSendQueue,
+  onRemoveQueued,
 }: {
   messages: ChatMessage[];
   streaming: StreamingTurn | null;
@@ -32,9 +44,14 @@ export function ChatPanel({
   blockedReason: string | null;
   /** Another workspace action is being saved: its snapshot must land first. */
   pending: boolean;
+  /** A turn is running: a sent message joins the queue. */
+  running: boolean;
+  queue: QueuedMessage[];
   draft: string;
   onDraftChange: (draft: string) => void;
   onSend: (message: string) => void;
+  onSendQueue: () => void;
+  onRemoveQueued: (id: string) => void;
 }) {
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -57,8 +74,7 @@ export function ChatPanel({
     }
   }, [messages.length, streaming?.text]);
 
-  const busy = streaming !== null || pending;
-  const canSend = !busy && blockedReason === null && draft.trim().length > 0;
+  const canSend = !pending && blockedReason === null && draft.trim().length > 0;
 
   function submit() {
     if (!canSend) {
@@ -137,6 +153,48 @@ export function ChatPanel({
             <AlertDescription>{blockedReason}</AlertDescription>
           </Alert>
         ) : null}
+        {queue.length > 0 ? (
+          <section
+            aria-label="Waiting answers"
+            className="flex flex-col gap-1 rounded-xl border border-dashed p-2 text-xs"
+          >
+            <div className="flex items-center justify-between gap-2 text-muted-foreground">
+              <p>
+                {running
+                  ? "Queued: sent together when the current turn ends."
+                  : "Not sent yet: check these messages, then send or remove them."}
+              </p>
+              {running ? null : (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={pending || blockedReason !== null}
+                  onClick={onSendQueue}
+                >
+                  Send now
+                </Button>
+              )}
+            </div>
+            <ul className="flex max-h-32 flex-col gap-1 overflow-y-auto">
+              {queue.map((item) => (
+                <li key={item.id} className="flex items-start gap-1">
+                  <p className="line-clamp-3 flex-1 whitespace-pre-wrap">{item.content}</p>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label="Remove from queue"
+                    title="Remove from queue"
+                    onClick={() => onRemoveQueued(item.id)}
+                  >
+                    <XIcon />
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
         <form
           className="flex items-end gap-2"
           onSubmit={(event) => {
@@ -178,8 +236,19 @@ export function ChatPanel({
             onChange={(event) => onDraftChange(event.target.value)}
             onKeyDown={onKeyDown}
           />
-          <Button type="submit" disabled={!canSend} aria-label="Send">
-            {busy ? <LoaderCircleIcon className="animate-spin" /> : <SendIcon />}
+          <Button
+            type="submit"
+            disabled={!canSend}
+            aria-label={running ? "Queue" : "Send"}
+            title={running ? "Queue until the current turn ends" : undefined}
+          >
+            {pending ? (
+              <LoaderCircleIcon className="animate-spin" />
+            ) : running ? (
+              <ListPlusIcon />
+            ) : (
+              <SendIcon />
+            )}
           </Button>
         </form>
       </div>

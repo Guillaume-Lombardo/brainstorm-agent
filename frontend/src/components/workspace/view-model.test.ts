@@ -129,6 +129,12 @@ describe("currentQuestions", () => {
       "gate",
       "security",
     ]);
+    // Answered questions make room for the next ones before the backend processes them.
+    expect(currentQuestions(session, ["scope", "gate"]).map((question) => question.id)).toEqual([
+      "security",
+      "ux",
+      "technical",
+    ]);
   });
 });
 

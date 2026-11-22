@@ -152,13 +152,18 @@ const QUESTION_PRIORITIES: OpenQuestionItem["priority"][] = [
 
 /**
  * Open questions of the current stage as the backend presents them: every question persists,
- * but only the first three by topic priority are asked.
+ * but only the first three by topic priority are asked. Questions already answered but not yet
+ * processed leave their place to the next ones.
  */
-export function currentQuestions(session: SessionOverview): OpenQuestionItem[] {
+export function currentQuestions(
+  session: SessionOverview,
+  answeredIds: readonly string[] = [],
+): OpenQuestionItem[] {
   const state = stageState(session, session.current_stage);
   const rank = (question: OpenQuestionItem) => QUESTION_PRIORITIES.indexOf(question.priority);
   return (state?.open_questions ?? [])
     .filter((question) => question.status !== "resolved")
+    .filter((question) => !question.id || !answeredIds.includes(question.id))
     .sort((left, right) => rank(left) - rank(right))
     .slice(0, QUESTION_BUDGET);
 }

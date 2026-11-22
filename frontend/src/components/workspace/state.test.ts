@@ -12,7 +12,7 @@ const history = [
 ];
 
 function submitted(): WorkspaceState {
-  const state = { ...initialWorkspaceState({ session, messages: history }), draft: "Hello" };
+  const state = initialWorkspaceState({ session, messages: history });
   return workspaceReducer(state, {
     type: "turn.submitted",
     message: { id: "local-1", role: "user", content: "Hello" },
@@ -57,7 +57,6 @@ describe("workspaceReducer", () => {
 
   it("accumulates streamed deltas and status, then appends the final message", () => {
     let state = submitted();
-    expect(state.draft).toBe("");
     expect(state.messages.at(-1)).toMatchObject({ content: "Hello", local: true });
     state = apply(
       state,
@@ -129,6 +128,17 @@ describe("workspaceReducer", () => {
     expect(state.draft).toBe("Hello");
     expect(state.streaming).toBeNull();
     expect(state.messages.map((message) => message.id)).toEqual(["m1", "m2"]);
+  });
+
+  it("keeps the text typed during a turn, even when that turn fails", () => {
+    let state = workspaceReducer(submitted(), { type: "draft.changed", draft: "Also this" });
+    state = workspaceReducer(state, {
+      type: "turn.submitted",
+      message: { id: "local-2", role: "user", content: "Queued answers" },
+    });
+    expect(state.draft).toBe("Also this");
+    state = apply(state, { type: "error", code: "turn_failed", message: "Model failed" });
+    expect(state.draft).toBe("Queued answers\n\nAlso this");
   });
 
   it("restores the draft when the request itself is refused", () => {
