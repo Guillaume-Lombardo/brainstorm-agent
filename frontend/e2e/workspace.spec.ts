@@ -112,6 +112,10 @@ test("login, new session, streamed turn, updated document, review and approval",
   await expect(page.getByTestId("stage-document")).toContainText(
     "A weekly meal planner that builds the shopping list",
   );
+  // The panel is about the selected stage: the document does not name it again.
+  await expect(
+    page.getByTestId("stage-document").getByRole("heading", { name: /Stage 0/ }),
+  ).toHaveCount(0);
   const details = page.getByTestId("stage-details");
   await expect(details.locator('[data-field="pitch_summary"]')).toContainText("clear");
 

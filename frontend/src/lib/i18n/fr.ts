@@ -196,9 +196,6 @@ export const fr: Messages = {
       Decisions: "Décisions",
       Risks: "Risques",
       Clarifications: "Précisions",
-      "Problem framing": "Cadrage du problème",
-      "Backlog synthesis": "Synthèse du backlog",
-      "Delivery slicing": "Découpage en lots",
       "Delivery slices": "Lots de livraison",
       "Delivery waves": "Vagues de livraison",
       "Contract matrix": "Matrice des contrats",
@@ -231,7 +228,7 @@ export const fr: Messages = {
     sections: {
       "Open Questions": [
         [/ \(blocking\): /, " (bloquante)\u00a0: "],
-        [/\?: /, "?\u00a0: "],
+        [/^([^?`]*\?): /, "$1\u00a0: "],
         [/ \| Options: (?=\[)/, " | Options\u00a0: "],
         [/ \| Recommended: none$/, ""],
         [/ \| Recommended: /, " | Conseil\u00a0: "],

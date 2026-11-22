@@ -27,7 +27,7 @@ describe("splitSections", () => {
 
 const DOCUMENT = `# Structured Summary
 
-## Pitch
+## Stage 0 - Initial Pitch
 
 A planner.
 
@@ -45,7 +45,7 @@ A planner.
 
 # Stage Deliverable
 
-## Pitch
+## Stage 0 - Initial Pitch
 
 ### Facts
 
@@ -62,12 +62,16 @@ A planner.
 ### Readiness
 
 - 1/2 passed/total
+- [x] field:pitch_summary: Required field pitch_summary: clear
+- [ ] blocking_questions: Blocking questions remain open.
+- ambiguities: missing
 
 ### Clarifications
 
 ### Transition Decision
 
 - Stage clear enough: no
+- Reason: Required field ambiguities: partial (later); Blocking questions remain open.
 
 ### Delivery waves
 
@@ -78,11 +82,11 @@ describe("readableDocument", () => {
     const { body: shown, record } = readableDocument(DOCUMENT);
     expect(shown.split("\n").filter((line) => line.startsWith("#"))).toEqual([
       "# Structured Summary",
-      "## Pitch",
+      "## Stage 0 - Initial Pitch",
       "# Open Questions and Uncertainties",
       "## Open Questions",
       "# Stage Deliverable",
-      "## Pitch",
+      "## Stage 0 - Initial Pitch",
       "### Facts",
       "### Assumptions",
       "### Delivery waves",
@@ -91,6 +95,18 @@ describe("readableDocument", () => {
     expect(shown).toContain("- Wave 0: slice-0");
     expect(shown).not.toContain("passed/total");
     expect(record).toContain("### Readiness\n\n- 1/2 passed/total");
+    expect(translateDocument(record, MESSAGES.fr)).toBe(`### Contrôles
+
+- 1/2 contrôles validés
+- [x] Résumé du pitch (clair)
+- [ ] Des questions bloquantes restent ouvertes.
+- Ambiguïtés (manquant)
+
+### Décision de passage
+
+- Étape assez claire\u00a0: non
+- Raison\u00a0: Ambiguïtés (partiel) (later); Des questions bloquantes restent ouvertes.
+`);
     expect(record).toContain("- Stage clear enough: no");
   });
 
@@ -98,13 +114,13 @@ describe("readableDocument", () => {
     const code = "# A\n\n```sh\n# Questions to Continue\n## Facts\n- None.\n```";
     expect(readableDocument(code)).toEqual({ body: code, record: "" });
     expect(splitSections(code)).toHaveLength(1);
-    expect(translateDocument(code, MESSAGES.fr.document)).toBe(code);
+    expect(translateDocument(code, MESSAGES.fr)).toBe(code);
   });
 });
 
 describe("translateDocument", () => {
   it("translates the template, not what was said", () => {
-    const shown = translateDocument(DOCUMENT, MESSAGES.fr.document);
+    const shown = translateDocument(DOCUMENT, MESSAGES.fr);
     expect(shown).toContain("# Synthèse");
     expect(shown).toContain("- Aucune incertitude identifiée.");
     expect(shown).toContain("- None of this is a placeholder.");
@@ -115,9 +131,10 @@ describe("translateDocument", () => {
   });
 
   it("only rewrites template words in their own section", () => {
-    const said = "### Facts\n\n- toString\n- Wave 2: later | Options: [a, b]\n\nGiven up.";
-    expect(translateDocument(said, MESSAGES.fr.document, { hideOptions: true })).toBe(
-      said.replace("Facts", "Faits"),
+    const said =
+      "### Facts\n\n- toString\n- Wave 2: later | Options: [a, b]\n\nGiven up.  \nEnd.\n\n### Open Questions\n\n- Is `?: ` fine";
+    expect(translateDocument(said, MESSAGES.fr, { hideOptions: true })).toBe(
+      said.replace("Facts", "Faits").replace("Open Questions", "Questions ouvertes"),
     );
   });
 
@@ -137,7 +154,7 @@ Cross-cutting foundation
 Given a user
 When they book
 Then it is saved`;
-    expect(translateDocument(plan, MESSAGES.fr.document)).toBe(`| Lot | Objectif | Backlog |
+    expect(translateDocument(plan, MESSAGES.fr)).toBe(`| Lot | Objectif | Backlog |
 | --- | --- | --- |
 | slice-0 | Goal | A |
 
@@ -155,7 +172,7 @@ Alors it is saved`);
   });
 
   it("leaves the options of the current questions to the questions panel", () => {
-    expect(translateDocument(DOCUMENT, MESSAGES.en.document, { hideOptions: true })).toContain(
+    expect(translateDocument(DOCUMENT, MESSAGES.en, { hideOptions: true })).toContain(
       "- Who pays? (blocking): It changes the scope.\n",
     );
   });

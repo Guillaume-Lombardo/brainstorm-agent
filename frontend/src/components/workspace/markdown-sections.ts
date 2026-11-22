@@ -1,3 +1,7 @@
+import { STAGE_FIELDS } from "@/lib/backend/generated/stage-fields";
+import { STAGES, type CoverageStatus, type Stage } from "@/lib/backend/types";
+import { serverText, type Messages } from "@/lib/i18n";
+
 export interface MarkdownSection {
   /** `null` for the text under a `#` heading, before its first `##` heading. */
   heading: string | null;
@@ -89,46 +93,84 @@ function joinFilled(parts: { level: number; lines: string[] }[]): string {
     .join("\n");
 }
 
-/** Words of the backend document template, by English source text. */
-export interface DocumentWords {
-  /** Whole headings, list items and table headers. */
-  lines: Record<string, string>;
-  /** First word of the heading of a delivery slice. */
-  slice: string;
-  /** Words inside the lines of one section, by English heading. */
-  sections: Record<string, readonly (readonly [RegExp, string])[]>;
+/** Stage named by a heading of the backend template ("Stage 2 - User Story Mapping"). */
+export function headingStage(heading: string | null): Stage | undefined {
+  const index = heading && /^Stage (\d) - /.exec(heading)?.[1];
+  return index ? STAGES[Number(index)] : undefined;
+}
+
+const FIELD_LABELS = new Map(
+  Object.values(STAGE_FIELDS).flatMap((fields) => fields.map(({ name, label }) => [name, label])),
+) as ReadonlyMap<string, string>;
+
+function fieldLabel(name: string, messages: Messages): string {
+  return messages.fields[name] ?? FIELD_LABELS.get(name) ?? name;
+}
+
+/** A check of the backend rules, in the interface language. */
+function checkText(message: string, messages: Messages): string {
+  const field = /^Required field (\w+): (clear|partial|missing)(.*)$/.exec(message);
+  return field
+    ? `${fieldLabel(field[1], messages)} (${messages.stageDetails.coverage[field[2] as CoverageStatus]})${field[3]}`
+    : serverText(message, messages);
+}
+
+/** A list item of the assessment parts, in the interface language. */
+function assessmentText(section: string, text: string, messages: Messages): string {
+  if (section === "Stage Fields") {
+    return text.replace(/^\w+(?=: )/, (name) => fieldLabel(name, messages));
+  }
+  if (section === "Readiness") {
+    const check = /^(\[[ x]\]) [\w:.-]+: (.+)$/.exec(text);
+    const coverage = /^(\w+): (clear|partial|missing)$/.exec(text);
+    return check
+      ? `${check[1]} ${checkText(check[2], messages)}`
+      : coverage
+        ? `${fieldLabel(coverage[1], messages)} (${messages.stageDetails.coverage[coverage[2] as CoverageStatus]})`
+        : text;
+  }
+  if (section === "Transition Decision" && text.startsWith("Reason: ")) {
+    const reasons = text.slice("Reason: ".length).split("; ");
+    return `Reason: ${reasons.map((reason) => checkText(reason, messages)).join("; ")}`;
+  }
+  return text;
 }
 
 /** Translates what the template wrote; what the user or the model wrote stays as it is. */
 export function translateDocument(
   markdown: string,
-  words: DocumentWords,
+  messages: Messages,
   { hideOptions = false } = {},
 ): string {
+  const words = messages.document;
   let section = "";
   return markdownLines(markdown)
     .map(({ text: line, code }) => {
-      const match = code ? null : /^(#{1,6}\s+|- |\| |)(.+?)\s*$/.exec(line);
+      const match = code ? null : /^(#{1,6}\s+|- |\| |)(.+?)(\s*)$/.exec(line);
       if (!match) {
         return line;
       }
-      const [, marker, text] = match;
+      const [, marker, text, end] = match;
       if (marker.startsWith("#")) {
         section = text;
       }
       if (marker && Object.hasOwn(words.lines, text)) {
-        return marker + words.lines[text];
+        return marker + words.lines[text] + end;
       }
       if (marker.startsWith("#")) {
-        return marker + text.replace(/^Slice (?=\S+$)/, words.slice);
+        return marker + text.replace(/^Slice (?=\S+$)/, words.slice) + end;
       }
       const rules = Object.hasOwn(words.sections, section) ? words.sections[section] : [];
       // The options of the current questions are in the questions panel.
       const shown =
         hideOptions && section === "Open Questions"
           ? text.replace(/ \| Options: \[.*\] \| Recommended: .+$/, "")
-          : text;
-      return marker + rules.reduce((result, [source, word]) => result.replace(source, word), shown);
+          : assessmentText(section, text, messages);
+      const translated = rules.reduce(
+        (result, [source, word]) => result.replace(source, word),
+        shown,
+      );
+      return marker + translated + end;
     })
     .join("\n");
 }

@@ -11,16 +11,19 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/api/client";
 import {
-  STAGES,
   type DocumentDiff,
   type SectionComment,
   type Stage,
   type StepDocument,
 } from "@/lib/backend/types";
-import { MESSAGES } from "@/lib/i18n";
 
 import { DiffView } from "./diff-view";
-import { readableDocument, splitSections, translateDocument } from "./markdown-sections";
+import {
+  headingStage,
+  readableDocument,
+  splitSections,
+  translateDocument,
+} from "./markdown-sections";
 
 type Loaded = { key: string; versions: StepDocument[] } | { key: string; error: unknown };
 
@@ -29,6 +32,7 @@ export function DocumentPanel({
   sessionId,
   stage,
   revision,
+  asked,
   comments,
   readOnly,
   onComment,
@@ -36,12 +40,15 @@ export function DocumentPanel({
   sessionId: string;
   stage: Stage;
   revision: number;
+  /** The questions panel shows the questions of this stage. */
+  asked: boolean;
   comments: SectionComment[];
   /** Comments are disabled (turn or action in progress, archived session). */
   readOnly: boolean;
   onComment: (section: string, body: string) => Promise<boolean>;
 }) {
-  const t = useMessages().document;
+  const messages = useMessages();
+  const t = messages.document;
   const key = `${stage}:${revision}`;
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [selection, setSelection] = useState<{ key: string; version: number } | null>(null);
@@ -136,7 +143,7 @@ export function DocumentPanel({
               comments={comments.filter(
                 (comment) => comment.stage === stage && comment.section === section.heading,
               )}
-              current={selectedVersion === latest}
+              hideOptions={asked && selectedVersion === latest}
               readOnly={readOnly}
               onComment={onComment}
             />
@@ -146,7 +153,7 @@ export function DocumentPanel({
               <summary className="cursor-pointer text-[13px] text-muted-foreground">
                 {t.record}
               </summary>
-              <Markdown>{translateDocument(record, t)}</Markdown>
+              <Markdown>{translateDocument(record, messages)}</Markdown>
             </details>
           ) : null}
           {otherComments.length > 0 ? (
@@ -169,14 +176,14 @@ function DocumentSection({
   heading,
   markdown,
   comments,
-  current,
+  hideOptions,
   readOnly,
   onComment,
 }: {
   heading: string | null;
   markdown: string;
-  /** Section of the latest version. */
-  current: boolean;
+  /** The questions panel shows the options of these questions. */
+  hideOptions: boolean;
   comments: SectionComment[];
   readOnly: boolean;
   onComment: (section: string, body: string) => Promise<boolean>;
@@ -185,7 +192,7 @@ function DocumentSection({
   const t = messages.document;
   const [draft, setDraft] = useState<string | null>(null);
   // The panel is about one stage: its name is not repeated as a heading.
-  const named = STAGES.find((stage) => MESSAGES.en.stages[stage] === heading);
+  const named = headingStage(heading);
   const text = named ? markdown.slice(markdown.indexOf("\n") + 1) : markdown;
   const title = named ? messages.stages[named] : heading && (t.lines[heading] ?? heading);
   const label = t.commentOn(title ?? "");
@@ -204,7 +211,7 @@ function DocumentSection({
           <MessageSquarePlusIcon />
         </Button>
       ) : null}
-      <Markdown>{translateDocument(text, t, { hideOptions: current })}</Markdown>
+      <Markdown>{translateDocument(text, messages, { hideOptions })}</Markdown>
       {comments.length > 0 || draft !== null ? (
         <div className="my-2 flex flex-col gap-2">
           {comments.map((comment, index) => (

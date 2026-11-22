@@ -440,6 +440,7 @@ function WorkspaceView({ initialSnapshot }: { initialSnapshot: SessionSnapshot }
                 sessionId={sessionId}
                 stage={stage}
                 revision={state.documentRevision}
+                asked={stage === session.current_stage}
                 comments={session.comments ?? []}
                 readOnly={busy || archived}
                 onComment={(section, body) =>
