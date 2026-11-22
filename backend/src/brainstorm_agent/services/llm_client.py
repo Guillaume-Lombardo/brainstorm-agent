@@ -62,6 +62,7 @@ STATE_FIELDS_OUT_OF_CONTEXT = frozenset({
     "updated_at",
 })
 RISK_PART_COUNT = 5
+LANGUAGE_NAMES = {Language.EN: "English", Language.FR: "French"}
 RECOMMENDED_LABEL = {Language.EN: "recommended", Language.FR: "recommandé"}
 
 
@@ -138,6 +139,26 @@ def _drop_server_fields(schema: dict[str, Any], model: type[BaseModel]) -> dict[
     }
 
 
+def _language_rule(language: Language | None) -> list[str]:
+    """State the session language: context in another language must not change it.
+
+    Args:
+        language (Language | None): Session language.
+
+    Returns:
+        list[str]: Prompt instruction, empty when the language is unknown.
+    """
+    if language is None:
+        return []
+    return [
+        (
+            f"Session language: {LANGUAGE_NAMES[language]}. Write every text, including questions, reasons "
+            "and options, in this language, whatever the language of the context, unless the user "
+            "writes in another one."
+        ),
+    ]
+
+
 def _unfenced(content: str) -> str:
     """Drop the Markdown code fence some providers put around their JSON.
 
@@ -163,6 +184,7 @@ class StreamingReply(Protocol):
         stage: Stage,
         analysis: AssistantAnalysis,
         user_message: str,
+        language: Language | None = None,
     ) -> AsyncIterator[str]:
         """Return provider deltas as they arrive.
 
@@ -170,6 +192,7 @@ class StreamingReply(Protocol):
             stage (Stage): Processed stage.
             analysis (AssistantAnalysis): Validated state.
             user_message (str): Latest user input.
+            language (Language | None): Session language.
 
         Returns:
             AsyncIterator[str]: Incremental conversational text.
@@ -187,13 +210,21 @@ class BrainstormLLM(Protocol):
         user_message: str,
         session_state: BrainstormSessionState,
         current_stage_state: StageState | None,
+        language: Language | None = None,
     ) -> AssistantAnalysis:
         """Extract a typed patch."""
 
     async def challenge(self, *, stage: Stage, analysis: AssistantAnalysis) -> AssistantAnalysis:
         """Return findings without rewriting business values."""
 
-    async def reply(self, *, stage: Stage, analysis: AssistantAnalysis, user_message: str) -> str:
+    async def reply(
+        self,
+        *,
+        stage: Stage,
+        analysis: AssistantAnalysis,
+        user_message: str,
+        language: Language | None = None,
+    ) -> str:
         """Generate a conversational reply."""
 
 
@@ -211,6 +242,7 @@ class FakeBrainstormLLM:
         user_message: str,
         session_state: BrainstormSessionState,
         current_stage_state: StageState | None,
+        language: Language | None = None,
     ) -> AssistantAnalysis:
         """Produce a deterministic structured analysis.
 
@@ -219,6 +251,7 @@ class FakeBrainstormLLM:
             user_message: Latest user message.
             session_state: Current session state.
             current_stage_state: Current stage state snapshot.
+            language: Session language, detected from the message when absent.
 
         Returns:
             AssistantAnalysis: Deterministic analysis payload.
@@ -275,7 +308,10 @@ class FakeBrainstormLLM:
             if field_name not in extracted_fields
         ]
         open_questions = [
-            field_question(name, language=session_language(user_message, session_state.transcript))
+            field_question(
+                name,
+                language=language or session_language(user_message, session_state.transcript),
+            )
             for name in missing_fields
         ]
         uncertainties = []
@@ -410,19 +446,26 @@ class FakeBrainstormLLM:
         return fields
 
     @staticmethod
-    async def reply(*, stage: Stage, analysis: AssistantAnalysis, user_message: str) -> str:
+    async def reply(
+        *,
+        stage: Stage,
+        analysis: AssistantAnalysis,
+        user_message: str,
+        language: Language | None = None,
+    ) -> str:
         """Return the scripted reply and the selected questions as a Markdown list.
 
         Args:
             stage (Stage): Processed stage.
             analysis (AssistantAnalysis): Validated state with the selected questions.
             user_message (str): Latest user text, which sets the reply language.
+            language (Language | None): Session language, detected from the text when absent.
 
         Returns:
             str: Deterministic Markdown reply.
         """
         del stage
-        recommended = RECOMMENDED_LABEL[detect_language([user_message])]
+        recommended = RECOMMENDED_LABEL[language or detect_language([user_message])]
         questions = [
             f"- **{item.question}** "
             + " / ".join(
@@ -586,6 +629,7 @@ class OpenAICompatibleBrainstormLLM:
         user_message: str,
         session_state: BrainstormSessionState,
         current_stage_state: StageState | None,
+        language: Language | None = None,
     ) -> AssistantAnalysis:
         """Extract a bounded typed patch from conversation context.
 
@@ -594,6 +638,7 @@ class OpenAICompatibleBrainstormLLM:
             user_message (str): Latest user message.
             session_state (BrainstormSessionState): Session snapshot.
             current_stage_state (StageState | None): Accumulated active state.
+            language (Language | None): Session language.
 
         Returns:
             AssistantAnalysis: Validated patch and actual usage.
@@ -640,6 +685,7 @@ class OpenAICompatibleBrainstormLLM:
             self.prompt_loader.completeness_prompt(),
             json.dumps(_drop_server_fields(model.model_json_schema(), model)),
             json.dumps(context),
+            *_language_rule(language),
             user_message,
         ])
         usage = AssistantAnalysis(stage=stage, summary="", assistant_message="")
@@ -676,6 +722,7 @@ class OpenAICompatibleBrainstormLLM:
         stage: Stage,
         analysis: AssistantAnalysis,
         user_message: str,
+        language: Language | None = None,
     ) -> AsyncIterator[str]:
         """Stream reply deltas and account for provider usage.
 
@@ -683,6 +730,7 @@ class OpenAICompatibleBrainstormLLM:
             stage (Stage): Active stage.
             analysis (AssistantAnalysis): Validated accumulated analysis.
             user_message (str): Language and conversational context.
+            language (Language | None): Session language.
 
         Yields:
             str: Provider text delta.
@@ -699,7 +747,8 @@ class OpenAICompatibleBrainstormLLM:
                         "role": "system",
                         "content": self.prompt_loader.system_prompt()
                         + " Respond conversationally in the user's language. Ask only the supplied selected questions (at most three), preserve their priority, reasons and options; do not invent answers or claim an unapproved transition."
-                        + " This is a conversational reply, not a structured task: write prose only, never output JSON, code blocks or the internal analysis itself.",
+                        + " This is a conversational reply, not a structured task: write prose only, never output JSON, code blocks or the internal analysis itself."
+                        + "".join(f" {rule}" for rule in _language_rule(language)),
                     },
                     {
                         "role": "user",
@@ -715,20 +764,33 @@ class OpenAICompatibleBrainstormLLM:
                 if chunk.choices and chunk.choices[0].delta.content:
                     yield chunk.choices[0].delta.content
 
-    async def reply(self, *, stage: Stage, analysis: AssistantAnalysis, user_message: str) -> str:
+    async def reply(
+        self,
+        *,
+        stage: Stage,
+        analysis: AssistantAnalysis,
+        user_message: str,
+        language: Language | None = None,
+    ) -> str:
         """Collect the stream for transports without incremental events.
 
         Args:
             stage (Stage): Active stage.
             analysis (AssistantAnalysis): Validated analysis.
             user_message (str): Latest user text.
+            language (Language | None): Session language.
 
         Returns:
             str: Conversational response.
         """
         return "".join([
             part
-            async for part in self.stream_reply(stage=stage, analysis=analysis, user_message=user_message)
+            async for part in self.stream_reply(
+                stage=stage,
+                analysis=analysis,
+                user_message=user_message,
+                language=language,
+            )
         ])
 
 

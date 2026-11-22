@@ -58,8 +58,10 @@ def test_selected_candidates_reach_stage_two(tmp_path: Path) -> None:
         original = service.llm.analyze
         captured = AsyncMock(wraps=original)
         with patch.object(service.llm, "analyze", captured):
-            service.process_user_message(session_id=sid, content="capabilities: Shared framing")
+            output = service.process_user_message(session_id=sid, content="capabilities: des listes")
         assert "Shared framing\nMarkdown export" in captured.call_args.kwargs["user_message"]
+        # The English candidates sent with the message do not change the session language.
+        assert all(item.question.startswith(("Qu", "De quoi")) for item in output.open_questions)
 
 
 def test_deselection_regenerates_main_decisions(tmp_path: Path) -> None:

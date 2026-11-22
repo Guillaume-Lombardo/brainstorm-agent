@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from pytest_mock import MockerFixture  # noqa: TC002
 
 from brainstorm_agent.api.main import create_app
-from brainstorm_agent.core.enums import LLMMode, Stage
+from brainstorm_agent.core.enums import Language, LLMMode, Stage
 from brainstorm_agent.services.llm_client import FakeBrainstormLLM
 from brainstorm_agent.settings import Settings
 
@@ -91,13 +91,14 @@ def test_slow_turn_streams_keepalive_comments_until_completion(tmp_path: Path, m
     mocker.patch("brainstorm_agent.services.streaming.TURN_KEEPALIVE_SECONDS", 0.05)
     analyze = FakeBrainstormLLM.analyze
 
-    async def slow_analyze(
+    async def slow_analyze(  # noqa: PLR0913 - Same signature as the provider port
         self: FakeBrainstormLLM,
         *,
         stage: Stage,
         user_message: str,
         session_state: BrainstormSessionState,
         current_stage_state: StageState | None,
+        language: Language | None = None,
     ) -> AssistantAnalysis:
         await asyncio.sleep(0.3)
         return await analyze(
@@ -106,6 +107,7 @@ def test_slow_turn_streams_keepalive_comments_until_completion(tmp_path: Path, m
             user_message=user_message,
             session_state=session_state,
             current_stage_state=current_stage_state,
+            language=language,
         )
 
     mocker.patch.object(FakeBrainstormLLM, "analyze", slow_analyze)

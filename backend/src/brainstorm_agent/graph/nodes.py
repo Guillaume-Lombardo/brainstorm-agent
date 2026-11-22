@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from uuid import uuid4
 
 from brainstorm_agent.core.elicitation import filter_defaults, selected_questions
-from brainstorm_agent.core.enums import Stage
+from brainstorm_agent.core.enums import Language, Stage
 from brainstorm_agent.core.gate_questions import GATE_ID_PREFIX, gate_questions
 from brainstorm_agent.core.language import session_language
 from brainstorm_agent.core.models import (
@@ -26,6 +26,21 @@ if TYPE_CHECKING:
     from brainstorm_agent.graph.state import TurnGraphState
     from brainstorm_agent.services.llm_client import BrainstormLLM
     from brainstorm_agent.services.markdown import MarkdownRenderer
+
+
+def _turn_language(state: TurnGraphState) -> Language:
+    """Detect the turn language from what the user typed, never from the server context.
+
+    Args:
+        state (TurnGraphState): Current graph state.
+
+    Returns:
+        Language: Session language.
+    """
+    return session_language(
+        state.get("user_text", state["user_message"]),
+        state["session_state"].get("transcript", []),
+    )
 
 
 type TurnNode = Callable[[TurnGraphState], Awaitable[dict[str, object]]]
@@ -49,13 +64,18 @@ def make_extract_node(llm: BrainstormLLM) -> TurnNode:
             stage=stage,
             user_message=state["user_message"],
             session_state=session_state,
+            language=_turn_language(state),
             current_stage_state=StageState.model_validate(current_stage_state)
             if current_stage_state
             else None,
         )
         if current_stage_state:
             analysis.clarifications = [
-                Clarification(question_id=q.id, question=q.question, answer=state["user_message"])
+                Clarification(
+                    question_id=q.id,
+                    question=q.question,
+                    answer=state.get("user_text", state["user_message"]),
+                )
                 for q in current_stage_state.open_questions
                 if q.id in analysis.resolved_question_ids
             ]
@@ -114,7 +134,7 @@ def apply_stage_rules(state: TurnGraphState) -> dict[str, object]:
     analysis.open_questions.extend(
         gate_questions(
             validation,
-            language=session_language(state["user_message"], session_state.get("transcript", [])),
+            language=_turn_language(state),
             partial_fields=partial_fields,
             contradictions=analysis.contradictions,
             model_questions=analysis.open_questions,
@@ -153,6 +173,7 @@ def make_render_node(renderer: MarkdownRenderer, llm: BrainstormLLM) -> TurnNode
                 stage=stage,
                 analysis=reply_analysis,
                 user_message=state["user_message"],
+                language=_turn_language(state),
             ):
                 parts.append(part)
                 await callback(part)
@@ -162,6 +183,7 @@ def make_render_node(renderer: MarkdownRenderer, llm: BrainstormLLM) -> TurnNode
                 stage=stage,
                 analysis=reply_analysis,
                 user_message=state["user_message"],
+                language=_turn_language(state),
             )
             if callback is not None:
                 for part in analysis.assistant_message.splitlines(keepends=True):

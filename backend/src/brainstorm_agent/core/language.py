@@ -149,7 +149,7 @@ def detect_language(texts: Iterable[str]) -> Language:
 
 
 def session_language(user_message: str, transcript: Iterable[dict[str, str]]) -> Language:
-    """Detect the language from the latest message, then from earlier user turns.
+    """Detect the language from the latest message, then from earlier turns, the user's first.
 
     Args:
         user_message (str): Latest user message (empty for direct edits).
@@ -158,5 +158,11 @@ def session_language(user_message: str, transcript: Iterable[dict[str, str]]) ->
     Returns:
         Language: Session language for deterministic wording.
     """
-    earlier = [turn.get("content", "") for turn in transcript if turn.get("role") == "user"]
-    return detect_language([user_message, *reversed(earlier)])
+    turns = list(transcript)[::-1]
+    earlier = [
+        turn.get("content", "")
+        for role in ("user", "assistant")
+        for turn in turns
+        if turn.get("role") == role
+    ]
+    return detect_language([user_message, *earlier])
