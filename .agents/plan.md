@@ -289,8 +289,8 @@ Reuse lot 2 validators and elicitation metadata; exports delegate to lot 4 deliv
 - [x] Assistant messages rendered as Markdown in the chat (raw HTML never interpreted); user
       messages stay plain text.
 - [x] `LLM_MAX_TOKENS` defaults to 32768.
-- [x] docker-box defaults to `claude-opus-5-5` with a 300-second LLM timeout and a 1800-second
-      session lock.
+- [x] docker-box defaults to `claude-opus-5-5` (later `GLM-5.3-Flash`) with a 300-second LLM
+      timeout and a 1800-second session lock.
 - [x] Turn streams send a `: keepalive` SSE comment every 15 seconds while the turn is silent;
       the frontend proxy relays it and ends a stream only after 60 silent seconds, so slow
       provider calls and their retries are no longer cut by the proxies.
