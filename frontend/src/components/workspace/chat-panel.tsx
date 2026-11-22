@@ -160,7 +160,7 @@ export function ChatPanel({
           >
             <div className="flex items-center justify-between gap-2 text-muted-foreground">
               <p>
-                {running
+                {running && queue.some((item) => !item.held)
                   ? "Queued: sent together when the current turn ends."
                   : "Not sent yet: check these messages, then send or remove them."}
               </p>

@@ -18,7 +18,7 @@ import {
   deliverySlices,
   draftFromValue,
   fieldLines,
-  isStored,
+  lastUserTurnId,
   stageFields,
   stageStatus,
   valueFromDraft,
@@ -140,15 +140,17 @@ describe("currentQuestions", () => {
   });
 });
 
-describe("isStored", () => {
-  it("recognizes the message of an interrupted turn in the stored conversation", () => {
+describe("lastUserTurnId", () => {
+  it("tells a stored message from an interrupted one with the same text", () => {
     const turns = [
-      turnFixture({ role: "user", content: "first" }),
-      turnFixture({ role: "assistant", content: "reply" }),
+      turnFixture({ id: "u1", role: "user", content: "Yes" }),
+      turnFixture({ id: "a1", role: "assistant", content: "reply" }),
     ];
-    expect(isStored(turns, "first")).toBe(true);
-    expect(isStored(turns, "queued answers")).toBe(false);
-    expect(isStored([], "first")).toBe(false);
+    expect(lastUserTurnId(turns)).toBe("u1");
+    expect(
+      lastUserTurnId([...turns, turnFixture({ id: "u2", role: "user", content: "Yes" })]),
+    ).toBe("u2");
+    expect(lastUserTurnId([])).toBeUndefined();
   });
 });
 

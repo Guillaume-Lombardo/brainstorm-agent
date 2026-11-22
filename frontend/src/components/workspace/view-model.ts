@@ -189,9 +189,9 @@ export function chatMessages(turns: ConversationTurn[]): ChatMessage[] {
   }));
 }
 
-/** Whether the backend kept this message as the latest user turn. */
-export function isStored(turns: ConversationTurn[], content: string): boolean {
-  return turns.findLast((turn) => turn.role === "user")?.content === content;
+/** Latest user turn the backend kept: it changes once a sent message is stored. */
+export function lastUserTurnId(turns: ConversationTurn[]): string | undefined {
+  return turns.findLast((turn) => turn.role === "user")?.id;
 }
 
 /** Slices of stage 7 as last analysed (draft until the plan passes its checks). */

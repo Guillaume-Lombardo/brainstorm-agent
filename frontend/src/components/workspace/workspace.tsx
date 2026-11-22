@@ -31,7 +31,7 @@ import { StageStepper } from "./stage-stepper";
 import { initialWorkspaceState, workspaceReducer } from "./state";
 import { errorToFailure } from "./turn";
 import { acceptsNext, mergeQueue, queuedQuestionIds, useTurnQueue } from "./turn-queue";
-import { answerMessage, currentQuestions, isStored } from "./view-model";
+import { answerMessage, currentQuestions, lastUserTurnId } from "./view-model";
 
 type Loaded =
   { sessionId: string; snapshot: SessionSnapshot } | { sessionId: string; error: unknown };
@@ -99,6 +99,7 @@ function WorkspaceView({ initialSnapshot }: { initialSnapshot: SessionSnapshot }
   /** Questions answered by the running turn; the stored state drops them when it ends. */
   const [answeringIds, setAnsweringIds] = useState<string[]>([]);
   const { queue, add, remove, take, hold } = useTurnQueue();
+  const storedTurnRef = useRef(lastUserTurnId(initialSnapshot.messages));
   const abortRef = useRef<AbortController | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const [stagesColumn, documentColumn] = useSideColumns(gridRef, STAGES_COLUMN, DOCUMENT_COLUMN);
@@ -108,11 +109,12 @@ function WorkspaceView({ initialSnapshot }: { initialSnapshot: SessionSnapshot }
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
-  async function refresh(): Promise<SessionSnapshot | null> {
+  async function refresh(): Promise<SessionOverview | null> {
     try {
       const snapshot = await api.getSession(sessionId);
+      storedTurnRef.current = lastUserTurnId(snapshot.messages);
       dispatch({ type: "snapshot.loaded", snapshot });
-      return snapshot;
+      return snapshot.session;
     } catch (error) {
       setActionError(error);
       return null;
@@ -123,6 +125,7 @@ function WorkspaceView({ initialSnapshot }: { initialSnapshot: SessionSnapshot }
   async function runTurn(message: string): Promise<SessionOverview | null> {
     const controller = new AbortController();
     abortRef.current = controller;
+    const previousTurn = storedTurnRef.current;
     setActionError(null);
     dispatch({
       type: "turn.submitted",
@@ -145,9 +148,10 @@ function WorkspaceView({ initialSnapshot }: { initialSnapshot: SessionSnapshot }
         // Questions, completed stages and message ids are only final in the stored state.
         const stored = await refresh();
         if (terminal === "completed") {
-          return controller.signal.aborted ? null : (stored?.session ?? null);
+          return controller.signal.aborted ? null : stored;
         }
-        if (stored && !isStored(stored.messages, message)) {
+        if (storedTurnRef.current === previousTurn) {
+          // The backend kept nothing, or could not say so: do not lose the text.
           dispatch({ type: "draft.restored", content: message });
         }
       }
