@@ -305,7 +305,8 @@ def merge_analysis(*, previous: StageState | None, patch: AssistantAnalysis) -> 
         **{
             item.field: item.reason
             for item in patch.partial_fields
-            if item.field not in unconfirmed and item.reason not in PROPOSED_REASON.values()
+            if (item.field not in unconfirmed or item.field in patch.confirmed_fields)
+            and item.reason not in PROPOSED_REASON.values()
         },
     }
     patch.partial_fields = [PartialField(field=key, reason=value) for key, value in partial_fields.items()]

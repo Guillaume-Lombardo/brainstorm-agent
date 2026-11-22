@@ -645,7 +645,7 @@ blocking questions prevent advancement. A pitch needs at least five words; objec
 numeric targets. These deterministic checks are bounded structural checks, not semantic proof.
 
 When a stage starts, the assistant prepares it from the earlier stages before the user writes
-(see the opening endpoint below). Every prepared field is partial until the user confirms it, so an
+(see the opening endpoint below). Every prepared field, optional ones included, is partial until the user confirms it, so an
 opening never passes the gate: facts, decisions and resolutions returned by the provider are
 dropped, and one question asks to confirm the whole proposal. A proposal is settled by that
 answer, by a name the provider returns in `confirmed_fields`, or by another value.

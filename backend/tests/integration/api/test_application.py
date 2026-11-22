@@ -10,7 +10,8 @@ from fastapi.testclient import TestClient
 
 from brainstorm_agent.api.dependencies import get_session_service
 from brainstorm_agent.api.main import create_app
-from brainstorm_agent.core.enums import LLMMode, Stage
+from brainstorm_agent.core.enums import Language, LLMMode, Stage
+from brainstorm_agent.core.gate_questions import PROPOSED_REASON
 from brainstorm_agent.core.models import StageState
 from brainstorm_agent.persistence.repositories import SessionRepository
 from brainstorm_agent.services.session_service import SessionService
@@ -226,6 +227,16 @@ def test_identical_edit_preserves_partial_coverage(tmp_path: Path) -> None:
     assert result["pending_human_review"] is None
 
 
+def _set_partial(client: TestClient, sid: str, partial_fields: dict[str, str]) -> None:
+    assert isinstance(client.app, FastAPI)
+    with client.app.state.session_factory() as db:
+        repository = SessionRepository(db)
+        state = repository.to_state(repository.require(sid))
+        state.stage_states[Stage.STAGE_7_DELIVERY_SLICING].partial_fields = partial_fields
+        repository.save_state(sid, state)
+        db.commit()
+
+
 def test_delivery_exports_use_domain_plan_and_reject_stale_or_invalid(tmp_path: Path) -> None:
     client = client_for(tmp_path)
     assert isinstance(client.app, FastAPI)
@@ -277,6 +288,11 @@ def test_delivery_exports_use_domain_plan_and_reject_stale_or_invalid(tmp_path: 
     assert backlog["waves"] == [["slice-0"], ["reports"]]
     assert backlog["slices"][1]["dependencies"] == ["slice-0"]
     assert backlog["backlog"]["mvp_user_stories"][0]["id"] == "story"
+    _set_partial(client, sid, {"slices": PROPOSED_REASON[Language.EN]})
+    # A proposed plan is not exported before the user confirms it.
+    assert client.get(base + "/export/slice_specs").status_code == 409
+    assert client.get(base + "/export/backlog_json").status_code == 409
+    _set_partial(client, sid, {})
     assert (
         client.patch(base + "/stages/stage_7_delivery_slicing", json={"fields": {"slices": []}}).status_code
         == 200

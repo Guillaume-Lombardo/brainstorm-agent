@@ -36,6 +36,7 @@ from brainstorm_agent.core.application import (
     TurnStarted,
 )
 from brainstorm_agent.core.enums import HumanReviewDecision, MessageRole, Modality, Stage
+from brainstorm_agent.core.gate_questions import proposed_fields
 from brainstorm_agent.core.language import LANGUAGE_MEMORY_MESSAGES
 from brainstorm_agent.core.models import (
     AssistantAnalysis,
@@ -1006,11 +1007,11 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
             tuple[DeliveryFields, dict[str, Any]]: Domain export inputs.
 
         Raises:
-            ConflictError: Delivery state is missing or stale.
+            ConflictError: Delivery state is missing, stale or still a proposal.
         """
         state = self.sessions.to_state(self._require_owned(session_id))
         delivery = state.stage_states.get(Stage.STAGE_7_DELIVERY_SLICING.value)
-        if delivery is None or delivery.stale:
+        if delivery is None or delivery.stale or proposed_fields(delivery.partial_fields):
             message = "Delivery slicing must be completed and revalidated before export."
             raise ConflictError(message)
         fields = DeliveryFields.model_validate(delivery.extracted_fields.model_dump())

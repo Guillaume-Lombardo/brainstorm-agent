@@ -6,6 +6,7 @@ requirement as a question a user can answer, in the session language (decision D
 
 from __future__ import annotations
 
+import itertools
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 from uuid import uuid4
@@ -546,9 +547,14 @@ def confirms_proposals(text: str) -> bool:
         text (str): What the user typed or selected.
 
     Returns:
-        bool: True when the confirming option is part of the answer.
+        bool: True when the confirming option is the whole message or directly answers its question.
     """
-    return any(options[0] in text for options in PROPOSAL_QUESTION.options.values())
+    lines = [line.strip() for line in text.strip().splitlines()]
+    return any(
+        lines == [options[0]]
+        or (PROPOSAL_QUESTION.question[language], options[0]) in itertools.pairwise(lines)
+        for language, options in PROPOSAL_QUESTION.options.items()
+    )
 
 
 def _gate_id() -> str:

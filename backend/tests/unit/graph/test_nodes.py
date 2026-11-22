@@ -24,7 +24,9 @@ from brainstorm_agent.core.models import (
 from brainstorm_agent.core.stage_contracts import (
     BacklogFields,
     BacklogItem,
+    EventFields,
     ProblemFields,
+    RiskFields,
 )
 from brainstorm_agent.graph.nodes import (
     apply_stage_rules,
@@ -293,6 +295,12 @@ def test_opening_keeps_only_proposals_to_confirm():
     }
 
 
+CONFIRMATION = "\n".join((
+    PROPOSAL_QUESTION.question[Language.FR],
+    PROPOSAL_QUESTION.options[Language.FR][0],
+))
+
+
 def _proposed_state(**fields: object) -> StageState:
     return StageState(
         stage=Stage.STAGE_1_PROBLEM_FRAMING,
@@ -335,6 +343,13 @@ def _user_patch(**values: object) -> AssistantAnalysis:
         ),
         # The user picks the confirming answer: no provider judgement is needed.
         ({}, PROPOSAL_QUESTION.options[Language.FR][0], set()),
+        ({}, f"Le budget ?\nAucun\n\n{CONFIRMATION}", set()),
+        # Quoting that answer confirms nothing.
+        (
+            {},
+            f"Je ne veux pas dire « {PROPOSAL_QUESTION.options[Language.FR][0]} », j'hésite.",
+            {"problem_statement", "users_actors"},
+        ),
     ],
 )
 def test_proposals_wait_for_the_user(patch: dict[str, object], user_text: str, remaining: set[str]):
@@ -363,6 +378,65 @@ def test_adding_an_item_does_not_confirm_a_proposed_collection():
         ),
     )
     assert [item.field for item in merged.partial_fields] == ["risk_spikes"]
+
+
+RISK = {
+    "id": "risk-1",
+    "category": "technical",
+    "description": "Data loss",
+    "impact": "high",
+    "probability": "low",
+    "mitigation": "Backup",
+    "action": "Restore drill",
+}
+
+
+def test_confirming_a_proposed_collection_keeps_a_new_ambiguity():
+    previous = StageState(
+        stage=Stage.STAGE_5_RISK_STORMING,
+        extracted_fields=RiskFields.model_validate({"risks_by_category": [RISK]}),
+        partial_fields={"risks_by_category": PROPOSED},
+    )
+    merged = merge_analysis(
+        previous=previous,
+        patch=AssistantAnalysis(
+            stage=previous.stage,
+            summary="",
+            assistant_message="",
+            confirmed_fields=["risks_by_category"],
+            partial_fields=[PartialField(field="risks_by_category", reason="Which data?")],
+        ),
+    )
+    assert [(item.field, item.reason) for item in merged.partial_fields] == [
+        ("risks_by_category", "Which data?"),
+    ]
+
+
+def test_an_optional_proposal_never_leaves_its_stage_unconfirmed():
+    def rules(*proposed: str) -> AssistantAnalysis:
+        result = apply_stage_rules({
+            "session_id": "s",
+            "current_stage": Stage.STAGE_3_EVENT_STORMING.value,
+            "user_message": TODAY,
+            "session_state": {},
+            "analysis": AssistantAnalysis(
+                stage=Stage.STAGE_3_EVENT_STORMING,
+                summary="",
+                assistant_message="",
+                extracted_fields=EventFields(
+                    event_storming_relevant=True,
+                    domain_events=["Order placed"],
+                    aggregates=["Order"],
+                ),
+                partial_fields=[PartialField(field=name, reason=PROPOSED) for name in proposed],
+            ).model_dump(mode="json"),
+        })
+        return AssistantAnalysis.model_validate(result["analysis"])
+
+    waiting = rules("aggregates")
+    assert not waiting.stage_is_clear_enough
+    assert [q.question for q in waiting.open_questions] == [PROPOSAL_QUESTION.question[Language.FR]]
+    assert rules().stage_is_clear_enough
 
 
 def test_proposals_are_confirmed_with_one_question():
