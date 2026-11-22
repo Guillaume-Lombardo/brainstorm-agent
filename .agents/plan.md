@@ -336,6 +336,15 @@ ADR impact: ADR 0007 and ADR 0011 updated.
 - [x] Stop asking the provider for fields the server overwrites; log rejected outputs.
 - [x] Queue messages and answers written while a turn runs and send them as one turn.
 
+### Lot 12: Bounded model context
+
+Validated scope: never send the conversation since the pitch; older messages are replaced by the
+structured state of the stage document. The chat keeps every message.
+ADR impact: ADR 0007 updated.
+
+- [x] Send the last two exchanges instead of four; keep the stored window for language detection.
+- [x] Leave raw clarifications, rendered text and gate verdicts out of the provider context.
+
 ### Production cross-path acceptance fixes
 
 Validated scope: reproduce the deployed expense-sharing journey; correct the Questions panel's

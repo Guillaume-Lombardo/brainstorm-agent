@@ -48,6 +48,19 @@ SERVER_OWNED_FIELDS = frozenset({
     "stage_is_clear_enough",
     "transition_decision_reason",
 })
+# Parts of the accumulated stage state that repeat the conversation or what the context already
+# carries. The structured fields and items are the synthetic document: they stay.
+STATE_FIELDS_OUT_OF_CONTEXT = frozenset({
+    "assistant_message",
+    "clarifications",
+    "coverage",
+    "latest_markdown",
+    "readiness",
+    "stage_is_clear_enough",
+    "stale",
+    "transition_decision_reason",
+    "updated_at",
+})
 RISK_PART_COUNT = 5
 RECOMMENDED_LABEL = {Language.EN: "recommended", Language.FR: "recommandé"}
 
@@ -593,7 +606,7 @@ class OpenAICompatibleBrainstormLLM:
             extracted_fields=(STAGE_MODELS[stage], ...),
         )
         current = (
-            current_stage_state.model_dump(mode="json", exclude={"latest_markdown"})
+            current_stage_state.model_dump(mode="json", exclude=set(STATE_FIELDS_OUT_OF_CONTEXT))
             if current_stage_state
             else {}
         )
@@ -691,7 +704,7 @@ class OpenAICompatibleBrainstormLLM:
                     {
                         "role": "user",
                         "content": f"User message:\n{user_message}\n\n"
-                        f"Internal analysis (context only, never quote it):\n{analysis.model_dump_json()}",
+                        f"Internal analysis (context only, never quote it):\n{analysis.model_dump_json(exclude={'clarifications'})}",
                     },
                 ],
             )

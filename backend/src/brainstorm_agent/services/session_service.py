@@ -35,6 +35,7 @@ from brainstorm_agent.core.application import (
     TurnStarted,
 )
 from brainstorm_agent.core.enums import HumanReviewDecision, MessageRole, Modality, Stage
+from brainstorm_agent.core.language import LANGUAGE_MEMORY_MESSAGES
 from brainstorm_agent.core.models import (
     AssistantAnalysis,
     AssistantTurnOutput,
@@ -307,11 +308,10 @@ class SessionService:  # noqa: PLR0904 - Shared owner authorization boundary
                 {"role": "user", "content": content},
                 {"role": "assistant", "content": output.assistant_message},
             ])
-            state.transcript = (
-                state.transcript[-self.settings.llm_context_turns :]
-                if self.settings.llm_context_turns
-                else []
-            )
+            # Language detection looks further back than the model context, which is cut on use.
+            state.transcript = state.transcript[
+                -max(self.settings.llm_context_turns, LANGUAGE_MEMORY_MESSAGES) :
+            ]
             self.messages.add(
                 ConversationTurn(
                     session_id=session_id,
