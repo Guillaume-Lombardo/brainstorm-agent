@@ -249,8 +249,7 @@ describe("ChatPanel", () => {
     const onSend = vi.fn();
     render(<Harness onSend={onSend} />);
     const input = screen.getByRole("textbox", { name: "Message" });
-    await userEvent.click(screen.getByRole("button", { name: "Numbered list" }));
-    await userEvent.type(input, "milk{Enter}eggs{Enter}{Enter}");
+    await userEvent.type(input, "1. milk{Enter}eggs{Enter}{Enter}");
     expect(input).toHaveValue("1. milk\n2. eggs\n");
     expect(onSend).not.toHaveBeenCalled();
 
@@ -258,13 +257,34 @@ describe("ChatPanel", () => {
     expect(onSend).toHaveBeenCalledWith("1. milk\n2. eggs\nThanks");
   });
 
-  it("turns the current line into a bulleted list", async () => {
+  it("detects a list as it is typed, with nested items", async () => {
     render(<Harness onSend={vi.fn()} />);
     const input = screen.getByRole("textbox", { name: "Message" });
+    await userEvent.type(input, "Buy{Shift>}{Enter}{/Shift}* milk{Enter}whole");
+    await userEvent.tab();
+    expect(input).toHaveFocus();
+    await userEvent.type(input, "{Enter}{Enter}eggs");
+    expect(input).toHaveValue("Buy\n• milk\n  ◦ whole\n• eggs");
+    expect(screen.queryByRole("button", { name: /list/i })).toBeNull();
+  });
+
+  it("starts a numbered list at the typed number", async () => {
+    render(<Harness onSend={vi.fn()} />);
+    const input = screen.getByRole("textbox", { name: "Message" });
+    await userEvent.type(input, "4. milk{Enter}eggs");
+    expect(input).toHaveValue("4. milk\n5. eggs");
+  });
+
+  it("leaves pasted text alone and lets Tab move the focus outside a list", async () => {
+    render(<Harness onSend={vi.fn()} />);
+    const input = screen.getByRole("textbox", { name: "Message" });
+    await userEvent.click(input);
+    await userEvent.paste("* ");
+    expect(input).toHaveValue("* ");
+    await userEvent.clear(input);
     await userEvent.type(input, "milk");
-    await userEvent.click(screen.getByRole("button", { name: "Bulleted list" }));
-    await userEvent.type(input, "{Enter}eggs");
-    expect(input).toHaveValue("• milk\n• eggs");
+    await userEvent.tab();
+    expect(input).not.toHaveFocus();
   });
 
   it("stops following a reply once the reader scrolls up", () => {

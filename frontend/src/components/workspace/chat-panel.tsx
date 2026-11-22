@@ -1,15 +1,7 @@
 "use client";
 
-import {
-  ListIcon,
-  ListOrderedIcon,
-  ListPlusIcon,
-  LoaderCircleIcon,
-  PlayIcon,
-  SendIcon,
-  XIcon,
-} from "lucide-react";
-import { Fragment, memo, useEffect, useRef, type KeyboardEvent } from "react";
+import { ListPlusIcon, LoaderCircleIcon, PlayIcon, SendIcon, XIcon } from "lucide-react";
+import { Fragment, memo, useEffect, useRef, type ChangeEvent, type KeyboardEvent } from "react";
 
 import { ErrorState } from "@/components/error-state";
 import { Markdown } from "@/components/markdown";
@@ -20,7 +12,7 @@ import type { Stage } from "@/lib/backend/types";
 import { cn } from "@/lib/utils";
 
 import type { StreamingTurn, TurnFailure } from "./state";
-import { continueList, toggleList, type ListKind, type TextEdit } from "./list-input";
+import { continueList, detectList, indentItem, type TextEdit } from "./list-input";
 import { StageDivider } from "./stage-divider";
 import { failureToError } from "./turn";
 import type { QueuedMessage } from "./turn-queue";
@@ -101,28 +93,48 @@ export function ChatPanel({
       return;
     }
     input.focus();
-    input.setRangeText(edit.text, edit.start, edit.end, edit.select ? "select" : "end");
+    input.setRangeText(edit.text, edit.start, edit.end, "end");
+    if (edit.caretFromEnd) {
+      const caret = edit.start + edit.text.length - edit.caretFromEnd;
+      input.setSelectionRange(caret, caret);
+    }
     onDraftChange(input.value);
   }
 
+  function onChange(event: ChangeEvent<HTMLTextAreaElement>) {
+    const { value, selectionStart } = event.target;
+    onDraftChange(value);
+    // Typing only: a pasted or deleted text is left as it is.
+    const typed = (event.nativeEvent as InputEvent).inputType === "insertText";
+    const edit = typed ? detectList(value, selectionStart) : null;
+    if (edit) {
+      apply(edit);
+    }
+  }
+
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) {
+    if (event.nativeEvent.isComposing) {
+      return;
+    }
+    const { value, selectionStart, selectionEnd } = event.currentTarget;
+    if (event.key === "Tab" && selectionStart === selectionEnd) {
+      // Outside a list, Tab keeps moving the focus.
+      const edit = indentItem(value, selectionStart, event.shiftKey ? -1 : 1);
+      if (edit) {
+        event.preventDefault();
+        apply(edit);
+      }
+      return;
+    }
+    if (event.key !== "Enter" || event.shiftKey) {
       return;
     }
     event.preventDefault();
-    const { value, selectionStart, selectionEnd } = event.currentTarget;
     const edit = continueList(value, selectionStart, selectionEnd);
     if (edit) {
       apply(edit);
     } else {
       submit();
-    }
-  }
-
-  function list(kind: ListKind) {
-    const input = inputRef.current;
-    if (input) {
-      apply(toggleList(input.value, input.selectionStart, input.selectionEnd, kind));
     }
   }
 
@@ -234,30 +246,6 @@ export function ChatPanel({
             submit();
           }}
         >
-          <div className="flex flex-col gap-1">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Bulleted list"
-              title="Bulleted list"
-              disabled={blockedReason !== null}
-              onClick={() => list("bullet")}
-            >
-              <ListIcon />
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Numbered list"
-              title="Numbered list"
-              disabled={blockedReason !== null}
-              onClick={() => list("numbered")}
-            >
-              <ListOrderedIcon />
-            </Button>
-          </div>
           <Textarea
             ref={inputRef}
             aria-label="Message"
@@ -265,7 +253,7 @@ export function ChatPanel({
             value={draft}
             rows={2}
             disabled={blockedReason !== null}
-            onChange={(event) => onDraftChange(event.target.value)}
+            onChange={onChange}
             onKeyDown={onKeyDown}
           />
           <Button
